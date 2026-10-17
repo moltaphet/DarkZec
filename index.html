@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'" />
+    <title>DarkZec — NODE 07 Private Markets</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div class="terminal">
+      <header class="masthead">
+        <a class="brand" href="#" aria-label="DarkZec home"><span class="brand-mark">[ Z ]</span> DARKZEC<span class="brand-slash">/</span></a>
+        <div class="masthead-sub">PRIVATE MARKETS<br /><span>SEALED AUCTION TERMINAL</span></div>
+        <div class="node-label"><span class="status-dot"></span> NODE 07 <span class="muted">/ LOCAL SESSION</span></div>
+      </header>
+
+      <nav class="navigation" aria-label="Terminal views">
+        <button id="sandbox-tab" class="nav-item active" aria-pressed="true">Auction sandbox <span>01</span></button>
+        <button id="wallet-tab" class="nav-item" aria-pressed="false">Wallet request <span>02</span></button>
+        <span class="network-status">● NO RPC CONNECTION</span>
+      </nav>
+
+      <main>
+        <section class="intro">
+          <div><div class="eyebrow">ZECATHON / PRIVATE MARKETS</div><h1>Price discovery.<br /><span>Without exposure.</span></h1></div>
+          <p class="intro-copy">A sealed book. A verifiable outcome.<br />Prepare a private bid, commit locally,<br />and audit your place in the auction.</p>
+        </section>
+
+        <div id="session-status" class="notice" role="status" aria-live="polite"><span class="notice-tag">SANDBOX</span><span>Session-only simulation. No funds move. Reloading erases all bids.</span></div>
+        <div id="error" class="error" role="alert" hidden></div>
+
+        <div id="sandbox-view">
+          <section class="auction-strip" aria-label="Auction configuration">
+            <div><span class="micro">AUCTION ID</span><strong>NODE07-001</strong></div>
+            <div><span class="micro">INVENTORY</span><strong>10 <small>DEMO LOTS</small></strong></div>
+            <div><span class="micro">RESERVE / LOT</span><strong>0.50 <small>ZEC</small></strong></div>
+            <div><span class="micro">CLEARING RULE</span><strong>UNIFORM PRICE</strong></div>
+            <div class="phase-cell"><span class="micro">VAULT STATE</span><strong id="phase">ACCEPTING BIDS</strong></div>
+          </section>
+
+          <div class="workspace">
+            <section class="panel composer">
+              <div class="panel-heading"><h2><span class="section-code">01 /</span> Compose bid</h2><span class="micro">PRIVATE WORKSPACE</span></div>
+              <form id="bid-form" autocomplete="off">
+                <label for="bid-price">Limit price <span>ZEC / LOT</span></label>
+                <div class="input-unit"><input id="bid-price" name="price" value="0.72" inputmode="decimal" required maxlength="17" spellcheck="false" /><span>ZEC</span></div>
+                <label for="bid-quantity">Quantity <span>WHOLE LOTS</span></label>
+                <div class="input-unit"><input id="bid-quantity" name="quantity" value="4" inputmode="numeric" required maxlength="6" spellcheck="false" /><span>LOTS</span></div>
+                <div class="form-note">A fresh 256-bit salt protects each bid. Price and quantity stay out of the public book.</div>
+                <button id="prepare" class="button primary" type="submit">Prepare sealed bid <span>↗</span></button>
+              </form>
+              <div id="prepared-panel" class="prepared" hidden>
+                <div class="micro green">BID PREPARED / LOCAL ONLY</div>
+                <dl class="receipt"><div><dt>Escrow</dt><dd id="prepared-amount"></dd></div><div><dt>Memo audit</dt><dd id="prepared-bytes"></dd></div></dl>
+                <span class="micro">SHA-256 COMMITMENT</span><code id="prepared-hash" class="hash"></code>
+                <details id="sensitive-details"><summary>Review sensitive demo request</summary><p class="small warning">Base64url is readable encoding. This URI contains your bid and salt. It is not an encrypted memo until a wallet creates a shielded transaction. Demo address: never send funds.</p><textarea id="demo-uri" aria-label="Sensitive demo payment URI" readonly spellcheck="false"></textarea><button id="copy-demo" class="button quiet" type="button">Copy demo URI</button></details>
+                <button id="commit" class="button primary" type="button">Commit to local vault <span>→</span></button>
+              </div>
+              <div class="composer-footer"><span class="tiny-lock">▣</span><span>No wallet connection.<br />No private keys requested.</span></div>
+            </section>
+
+            <section class="panel book">
+              <div class="panel-heading"><h2><span class="section-code">02 /</span> Sealed book</h2><span class="book-count"><span id="bid-count">00</span> COMMITMENTS</span></div>
+              <div class="book-visual" aria-hidden="true"><div class="seal-bracket">[</div><div class="note-stack"><div class="note-sheet back"><span>•••• •••• •••• ••••</span></div><div class="note-sheet middle"><span>•••• •••• •••• ••••</span></div><div class="note-sheet front"><span class="micro">DARKZEC / SEALED NOTE</span><div>•••• •••• ••••</div><span class="micro">CONTENTS WITHHELD</span><span class="note-stamp">Z</span></div></div><div class="seal-bracket">]</div></div>
+              <div class="book-thesis"><span>COMMITMENTS ARE PUBLIC.</span><br />The bids behind them are sealed.</div>
+              <div class="book-columns"><span>ENTRY</span><span>COMMITMENT / SHA-256</span><span>STATE</span></div>
+              <div id="commitment-list" class="commitment-list"><div class="empty-book">The book is empty. Prepare your bid or load the demo set.</div></div>
+              <div class="book-actions"><button id="seed" class="button quiet" type="button">+ Load 3 demo bids</button><span class="small muted">Local fixtures · no RPC</span></div>
+            </section>
+          </div>
+
+          <section class="panel lifecycle">
+            <div class="lifecycle-copy"><div class="eyebrow">CONTROL DESK</div><h2>Close. Unseal. Verify.</h2><p>Closing freezes the commitment set. Unsealing reveals demo bids on this screen and computes allocations.</p></div>
+            <div class="lifecycle-actions"><button id="close" class="button quiet" type="button">Close auction <span>→</span></button><button id="clear" class="button primary" type="button" disabled>Unseal &amp; clear <span>↗</span></button><button id="reset" class="reset" type="button">Reset local session</button></div>
+          </section>
+
+          <section id="audit-panel" class="panel audit-panel" hidden>
+            <div class="panel-heading"><h2><span class="section-code">03 /</span> Inclusion audit</h2><span class="micro green">FROZEN COMMITMENT SET</span></div>
+            <div class="audit-content"><div><span class="micro">MERKLE ROOT / SHA-256</span><code id="merkle-root" class="hash"></code><p class="small muted">The root and proof contain no bid price, salt, memo or address. This local root is not externally anchored.</p></div><form id="audit-form"><label for="audit-index">Commitment entry</label><div class="audit-controls"><input id="audit-index" inputmode="numeric" value="1" aria-label="Commitment entry" /><button id="verify-proof" type="submit" class="button quiet">Verify inclusion</button></div><output id="audit-result" aria-live="polite"></output></form></div>
+          </section>
+
+          <section id="results-panel" class="panel results" hidden>
+            <div class="panel-heading"><h2><span class="section-code">04 /</span> Clearing result</h2><span class="micro warning">REVEALED DEMO DATA</span></div>
+            <div class="result-stats"><div><span class="micro">UNIFORM PRICE</span><strong id="clearing-price"></strong></div><div><span class="micro">ALLOCATED</span><strong id="filled-lots"></strong></div></div>
+            <p class="small muted result-note">Highest prices fill first; commitment order breaks ties. Exhausted supply pays the marginal accepted price; unsold supply pays reserve. Refunds below are accounting entries only.</p>
+            <div class="table-scroll"><table><thead><tr><th>Commitment</th><th>Limit / ZEC</th><th>Filled / requested</th><th>Paid / ZEC</th><th>Refund / ZEC</th></tr></thead><tbody id="result-rows"></tbody></table></div>
+          </section>
+        </div>
+
+        <section id="wallet-view" class="panel wallet-panel" hidden>
+          <div class="panel-heading"><h2>Prepare a wallet request</h2><span class="micro">ZIP-321 / ZODL HANDOFF</span></div>
+          <p class="wallet-description">Build a request for an independently verified vault. Your wallet reviews the destination, amount and memo, then creates the shielded payment. DarkZec never asks for a seed or a spending key.</p>
+          <form id="wallet-form" autocomplete="off">
+            <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet">Mainnet</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div></div>
+            <label for="wallet-vault">Verified vault address <span>ORCHARD-ONLY UA</span></label><textarea id="wallet-vault" required spellcheck="false" placeholder="Paste the vault's u1… or utest1… address"></textarea>
+            <label for="wallet-refund">Your refund / settlement address <span>ORCHARD-ONLY UA</span></label><textarea id="wallet-refund" required spellcheck="false" placeholder="Paste your shielded receiving address"></textarea>
+            <div class="wallet-grid"><div><label for="wallet-price">Limit price / ZEC</label><input id="wallet-price" inputmode="decimal" required maxlength="17" /></div><div><label for="wallet-quantity">Quantity / lots</label><input id="wallet-quantity" inputmode="numeric" required maxlength="6" /></div></div>
+            <p class="small warning">The generated URI includes your full bid, refund address and salt as readable data. Only share it with your trusted wallet. Verify the network and full address in the wallet before paying. No payment status is tracked here.</p>
+            <button id="wallet-prepare" class="button primary" type="submit">Prepare private payment request <span>↗</span></button>
+          </form>
+          <div id="wallet-output" class="wallet-output" hidden><dl class="receipt"><div><dt>Escrow</dt><dd id="wallet-amount"></dd></div><div><dt>Memo audit</dt><dd id="wallet-bytes"></dd></div></dl><label for="wallet-uri">Sensitive ZIP-321 payment URI</label><textarea id="wallet-uri" readonly spellcheck="false"></textarea><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div></div>
+        </section>
+
+        <section class="privacy-strip" aria-label="Privacy properties"><div><span class="green">▣</span><strong>Browser-local</strong><span>Keys stay on your device</span></div><div><span class="green">◇</span><strong>Orchard only</strong><span>No receiver fallback</span></div><div><span class="green">⌘</span><strong>512-byte audit</strong><span>UTF-8 checked before encoding</span></div></section>
+      </main>
+      <footer><span>DARKZEC <span class="muted">/</span> NODE 07</span><span>PRIVATE BY CONSTRUCTION. VERIFIABLE BY DESIGN.</span><span class="green">● SESSION IN MEMORY</span></footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
