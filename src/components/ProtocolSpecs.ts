@@ -34,7 +34,7 @@ const ENTRIES: readonly ProtocolEntry[] = [
       'In a single-lot Vickrey sealed-bid auction, the highest eligible bidder wins and pays the second-highest bid, subject to the announced reserve and tie rules. For example, with bids of 0.90, 0.75 and 0.60 ZEC and a reserve below 0.75 ZEC, the winning bidder pays 0.75 ZEC. The clearing rule must be announced before bids are accepted.',
       'In a production vault, an authorized Incoming Viewing Key (IVK) holder can decrypt incoming shielded notes without gaining spending authority from that key. After the auction closes, the engine can read bids, compute the clearing price and publish the price plus commitment-based audit data while withholding participant addresses from the public. The viewing-key holder can still see the incoming note contents.',
     ],
-    note: 'CURRENT SANDBOX / This build uses a uniform-price multi-lot engine, not Vickrey: exhausted supply pays the marginal accepted price; unsold supply pays reserve. AES-GCM simulates unsealing locally, and demo bids are revealed on this screen. No real IVK scanning or settlement runs here.',
+    note: 'CURRENT SANDBOX / This build uses a uniform-price multi-lot engine, not Vickrey: exhausted supply pays the marginal accepted price; unsold supply pays reserve. The separate Vault scanner authenticates mock AES-GCM notes using a saved, passphrase-encrypted key. No real Orchard IVK scanning or settlement runs here.',
   },
   {
     id: 'audit', title: 'Verifiable audit', question: 'How do I prove my bid was included?', tag: 'SHA-256 / MERKLE',

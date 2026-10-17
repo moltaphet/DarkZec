@@ -19,6 +19,7 @@
       <nav class="navigation" aria-label="Terminal views">
         <button id="sandbox-tab" class="nav-item active" aria-pressed="true">Auction sandbox <span>01</span></button>
         <button id="wallet-tab" class="nav-item" aria-pressed="false">Wallet request <span>02</span></button>
+        <button id="vault-tab" class="nav-item" aria-pressed="false">Vault scanner <span>03</span></button>
         <span class="network-status">● NO RPC CONNECTION</span>
       </nav>
 
@@ -114,6 +115,8 @@
           </form>
           <div id="wallet-output" class="wallet-output" hidden><dl class="receipt"><div><dt>Escrow</dt><dd id="wallet-amount"></dd></div><div><dt>Memo audit</dt><dd id="wallet-bytes"></dd></div></dl><label for="wallet-uri">Sensitive ZIP-321 payment URI</label><textarea id="wallet-uri" readonly spellcheck="false"></textarea><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div></div>
         </section>
+
+        <section id="viewing-key-view" hidden aria-label="Viewing-key scanner"></section>
 
         <section class="privacy-strip" aria-label="Privacy properties"><div><span class="green">▣</span><strong>Browser-local</strong><span>Keys stay on your device</span></div><div><span class="green">◇</span><strong>Orchard only</strong><span>No receiver fallback</span></div><div><span class="green">⌘</span><strong>512-byte audit</strong><span>UTF-8 checked before encoding</span></div></section>
       </main>

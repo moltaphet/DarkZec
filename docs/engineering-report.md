@@ -2,6 +2,8 @@
 
 Date: 2026-10-17. Module: **Zero-Leakage Sealed Bidding & ZIP-321 URI Generator**, using the example in the supplied module placeholder.
 
+Later addition: the [Viewing Key Vault](viewing-key-vault-report.md) adds an explicit, isolated exception to this original module's no-persistence policy: a passphrase-encrypted viewing-key record in tab session storage. Auction bids and telemetry remain unpersisted. This report describes the original module; the newer report documents the mock scanner and current persistence boundary.
+
 ## Delivered behavior
 
 The NODE 07 terminal supports private bid preparation, exact escrow computation, ZIP-321 generation, session-only sealed commitment submission, auction close, uniform-price clearing, partial fills, refund accounting, Merkle inclusion verification and reset. A separate wallet request view supports explicit Zodl/Orchard-wallet handoff. No real transaction, wallet connection, key import, RPC or external service is required for the judge walkthrough.

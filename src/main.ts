@@ -1,6 +1,7 @@
 import './style.css';
 import './components/terminal-effects.css';
 import './components/ProtocolSpecs.css';
+import './components/ViewingKeyVault.css';
 import { element, Lifetime } from './lib/dom';
 import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
@@ -8,6 +9,7 @@ import { MemoScramble } from './components/MemoScramble';
 import { BlindOrderflow } from './components/BlindOrderflow';
 import { TelemetryRail } from './components/TelemetryRail';
 import { mountProtocolSpecs } from './components/ProtocolSpecs';
+import { ViewingKeyVault } from './components/ViewingKeyVault';
 import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, SIMULATION_CONFIG } from './fixtures';
 import type { Network } from './protocol/address';
 import { decodeUnifiedAddress } from './protocol/address';
@@ -27,6 +29,8 @@ const text = (id: string, value: string): void => { el(id).textContent = value; 
 const visible = (id: string, show: boolean): void => { el(id).hidden = !show; };
 
 const effects = new Lifetime();
+const viewingKeyVault = new ViewingKeyVault(el('viewing-key-view'));
+effects.own(() => viewingKeyVault.destroy());
 const protocolSpecs = mountProtocolSpecs(el('protocol-specs'));
 effects.own(() => protocolSpecs.destroy());
 const telemetry = new TelemetryRail(el('telemetry-rail'), button('telemetry-toggle'), el('telemetry-log'), el('telemetry-leaks'), el('telemetry-bytes'), el('telemetry-shield'));
@@ -48,12 +52,13 @@ let walletPrepared: PreparedBid | undefined;
 let working = false;
 let seeded = false;
 let walletView = false;
+let scannerView = false;
 let lastResult: ClearingResult | undefined;
 
 function vault(): Sandbox { if (!sandbox) throw new Error('The local vault is still starting.'); return sandbox; }
 function status(message: string): void {
   const target = el('session-status');
-  const tag = document.createElement('span'); tag.className = 'notice-tag'; tag.textContent = walletView ? 'LOCAL BUILDER' : 'SANDBOX';
+  const tag = document.createElement('span'); tag.className = 'notice-tag'; tag.textContent = scannerView ? 'LOCAL SCANNER' : walletView ? 'LOCAL BUILDER' : 'SANDBOX';
   const content = document.createElement('span'); content.textContent = message;
   target.replaceChildren(tag, content);
 }
@@ -80,8 +85,8 @@ function updateWalletLink(): void {
 }
 function controls(): void {
   const phase = sandbox?.publicSnapshot().phase;
-  for (const control of document.querySelectorAll<HTMLButtonElement>('button')) control.disabled = working || !sandbox;
-  for (const control of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select')) control.disabled = working || !sandbox;
+  for (const control of document.querySelectorAll<HTMLButtonElement>('button')) if (!control.closest('[data-independent-controls]')) control.disabled = working || !sandbox;
+  for (const control of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select')) if (!control.closest('[data-independent-controls]')) control.disabled = working || !sandbox;
   for (const id of ['prepare', 'seed', 'commit']) button(id).disabled = working || phase !== 'open';
   button('seed').disabled ||= seeded;
   button('commit').disabled ||= !prepared;
@@ -121,18 +126,19 @@ async function action(operation: () => Promise<void>): Promise<void> {
     if (sandbox) renderBook(); controls();
   }
 }
-function setView(wallet: boolean): void {
+function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
   if (working) return;
-  walletView = wallet;
-  visible('sandbox-view', !wallet); visible('wallet-view', wallet);
-  for (const [id, active] of [['sandbox-tab', !wallet], ['wallet-tab', wallet]] as const) {
+  walletView = view === 'wallet'; scannerView = view === 'scanner';
+  if (!scannerView) viewingKeyVault.lock();
+  visible('sandbox-view', view === 'sandbox'); visible('wallet-view', walletView); visible('viewing-key-view', scannerView);
+  for (const [id, active] of [['sandbox-tab', view === 'sandbox'], ['wallet-tab', walletView], ['vault-tab', scannerView]] as const) {
     el(id).classList.toggle('active', active); el(id).setAttribute('aria-pressed', String(active));
   }
   visible('error', false);
   clearPrepared(); eraseWallet();
   memoPreview.clear();
-  if (!wallet && vault().publicSnapshot().phase === 'open') memoPreview.update();
-  status(wallet ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
+  if (view === 'sandbox' && vault().publicSnapshot().phase === 'open') memoPreview.update();
+  status(scannerView ? 'Private mock-note scanner. Viewing keys are stored only as passphrase-encrypted session ciphertext. No RPC.' : walletView ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
   controls();
 }
 
@@ -222,8 +228,9 @@ button('reset').addEventListener('click', () => {
     status('Local session reset. A new session key is active and the book is empty.');
   });
 });
-button('sandbox-tab').addEventListener('click', () => setView(false));
-button('wallet-tab').addEventListener('click', () => setView(true));
+button('sandbox-tab').addEventListener('click', () => setView('sandbox'));
+button('wallet-tab').addEventListener('click', () => setView('wallet'));
+button('vault-tab').addEventListener('click', () => setView('scanner'));
 
 element('wallet-form', HTMLFormElement).addEventListener('input', () => { eraseWallet(); controls(); });
 element('wallet-form', HTMLFormElement).addEventListener('submit', event => {

@@ -50,3 +50,13 @@ The terminal includes a radar header and brand micro-glitch, live private memo s
 Expand **[ PROTOCOL SPECS & FAQ ]** above the auction or wallet workspace to read the dark-pool thesis, memo/wallet privacy mechanics, Vickrey protocol option and salt/Merkle inclusion workflow. The manual labels the current uniform-price sandbox separately from production viewing-key and OTC designs. It is bundled locally and supports native keyboard disclosures.
 
 See [the UI polish report](docs/ui-polish-report.md) for component paths, interaction details and browser verification. This checkout uses Vite and TypeScript, with no framework migration required for the UI enhancements.
+
+## Viewing Key Vault & Decryption Engine
+
+Choose **Vault scanner → Use demo credentials → Save & unlock → Load demo notes**. Loading automatically authenticates and scans five local fixtures: three valid bids (direct JSON and Base64url), one quarantined invalid schema and one ZIP-302 no-memo marker. **Simulate incoming note** adds an authenticated note and rescans. **Inspect memo** reveals private details only on request. These notes are a separate simulation from the auction book; they never enter public commitments or telemetry.
+
+Viewing keys are stored only as AES-256-GCM ciphertext in this tab's session storage, wrapped using a local 12–128-character passphrase and PBKDF2-SHA256 (600,000 iterations). The public demo passphrase is `node07-demo-passphrase`; use it only for mock data. Inputs clear after save/unlock. Reload keeps the encrypted record but requires the passphrase again; switching views or choosing **Lock vault** clears live keys and decrypted results. **Forget saved key** removes the record. Saving/unlocking fails closed if storage or authentication fails.
+
+Unified `uview1…` / `uviewtest1…` envelopes can be saved after checksum/padding checks, but semantic Orchard key validation and real note decryption require an audited adapter. The implemented scanner is explicitly **mock AES-GCM**, with 528-byte authenticated envelopes that decrypt to exact 512-byte memo fields. Padding is removed after authentication; direct JSON is the normal wallet memo, and explicit Base64url mock transport is decoded strictly. No RPC, spending key or seed phrase is used. Same-origin malicious scripts or a compromised device can access an unlocked vault; JavaScript strings cannot be reliably zeroized.
+
+See [the viewing-key vault report](docs/viewing-key-vault-report.md) for file inventory, parser/security invariants and test coverage.
