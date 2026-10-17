@@ -110,4 +110,5 @@ test('CSP blocks outbound fetch before a network request leaves the page', async
     try { await fetch('https://example.invalid/privacy-probe'); return false; } catch { return true; }
   });
   expect(blocked).toBe(true); expect(outbound).toEqual([]);
+  await expect(page.locator('#telemetry-leaks')).toHaveText('1');
 });

@@ -11,7 +11,7 @@
   <body>
     <div class="terminal">
       <header class="masthead">
-        <a class="brand" href="#" aria-label="DarkZec home"><span class="brand-mark">[ Z ]</span> DARKZEC<span class="brand-slash">/</span></a>
+        <a class="brand" href="#" aria-label="DarkZec home"><span class="brand-mark">[ Z ]</span> <span class="brand-word" data-text="DARKZEC">DARKZEC</span><span class="brand-slash">/</span></a>
         <div class="masthead-sub">PRIVATE MARKETS<br /><span>SEALED AUCTION TERMINAL</span></div>
         <div class="node-label"><span class="status-dot"></span> NODE 07 <span class="muted">/ LOCAL SESSION</span></div>
       </header>
@@ -30,6 +30,7 @@
 
         <div id="session-status" class="notice" role="status" aria-live="polite"><span class="notice-tag">SANDBOX</span><span>Session-only simulation. No funds move. Reloading erases all bids.</span></div>
         <div id="error" class="error" role="alert" hidden></div>
+        <section id="protocol-specs" aria-label="Protocol specs and FAQ"></section>
 
         <div id="sandbox-view">
           <section class="auction-strip" aria-label="Auction configuration">
@@ -49,6 +50,13 @@
                 <label for="bid-quantity">Quantity <span>WHOLE LOTS</span></label>
                 <div class="input-unit"><input id="bid-quantity" name="quantity" value="4" inputmode="numeric" required maxlength="6" spellcheck="false" /><span>LOTS</span></div>
                 <div class="form-note">A fresh 256-bit salt protects each bid. Price and quantity stay out of the public book.</div>
+                <div id="memo-scramble" class="memo-console" data-state="empty">
+                  <div class="memo-console-heading"><span class="micro">MEMO ASSEMBLY / ZIP-302</span><span class="memo-indicator" aria-hidden="true"></span></div>
+                  <div id="memo-hex-stream" class="memo-hex-stream" aria-hidden="true">4F 3A B2 07 D9 A1 6C 80</div>
+                  <div id="memo-draft-state" class="micro">LOCAL DRAFT / INITIALIZING</div>
+                  <pre id="memo-payload" class="memo-payload" aria-label="Private Base64url memo preview">NO ACTIVE MEMO DRAFT</pre>
+                  <p class="memo-warning">PRIVATE PREVIEW · Readable encoding, not encryption. Wallets encrypt the on-chain memo.</p>
+                </div>
                 <button id="prepare" class="button primary" type="submit">Prepare sealed bid <span>↗</span></button>
               </form>
               <div id="prepared-panel" class="prepared" hidden>
@@ -58,12 +66,16 @@
                 <details id="sensitive-details"><summary>Review sensitive demo request</summary><p class="small warning">Base64url is readable encoding. This URI contains your bid and salt. It is not an encrypted memo until a wallet creates a shielded transaction. Demo address: never send funds.</p><textarea id="demo-uri" aria-label="Sensitive demo payment URI" readonly spellcheck="false"></textarea><button id="copy-demo" class="button quiet" type="button">Copy demo URI</button></details>
                 <button id="commit" class="button primary" type="button">Commit to local vault <span>→</span></button>
               </div>
-              <div class="composer-footer"><span class="tiny-lock">▣</span><span>No wallet connection.<br />No private keys requested.</span></div>
+              <div class="composer-footer"><svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 10V7a6 6 0 0 1 12 0v3M4 10h16v12H4zM12 14v4" /></svg><span>No wallet connection.<br />No private keys requested.</span></div>
             </section>
 
             <section class="panel book">
               <div class="panel-heading"><h2><span class="section-code">02 /</span> Sealed book</h2><span class="book-count"><span id="bid-count">00</span> COMMITMENTS</span></div>
-              <div class="book-visual" aria-hidden="true"><div class="seal-bracket">[</div><div class="note-stack"><div class="note-sheet back"><span>•••• •••• •••• ••••</span></div><div class="note-sheet middle"><span>•••• •••• •••• ••••</span></div><div class="note-sheet front"><span class="micro">DARKZEC / SEALED NOTE</span><div>•••• •••• ••••</div><span class="micro">CONTENTS WITHHELD</span><span class="note-stamp">Z</span></div></div><div class="seal-bracket">]</div></div>
+              <div class="blind-orderflow">
+                <div class="mesh-label"><span class="micro">BLIND ORDERFLOW / COMMITMENT MESH</span><span class="mesh-live">● LOCAL</span></div>
+                <div class="mesh-viewport"><canvas id="blind-mesh" tabindex="0" role="img" aria-describedby="mesh-caption">Encrypted orderflow visualization. Public commitments are also listed below.</canvas><div class="clearing-anchor" aria-hidden="true"><span>CLEARING</span><strong id="mesh-state">BLINDED</strong><span>PRICE ANCHOR</span></div></div>
+                <div id="mesh-caption" class="mesh-caption" role="status">IDLE MESH / NO BIDS · LOCAL VISUAL SIMULATION</div>
+              </div>
               <div class="book-thesis"><span>COMMITMENTS ARE PUBLIC.</span><br />The bids behind them are sealed.</div>
               <div class="book-columns"><span>ENTRY</span><span>COMMITMENT / SHA-256</span><span>STATE</span></div>
               <div id="commitment-list" class="commitment-list"><div class="empty-book">The book is empty. Prepare your bid or load the demo set.</div></div>
@@ -107,6 +119,17 @@
       </main>
       <footer><span>DARKZEC <span class="muted">/</span> NODE 07</span><span>PRIVATE BY CONSTRUCTION. VERIFIABLE BY DESIGN.</span><span class="green">● SESSION IN MEMORY</span></footer>
     </div>
+    <aside id="telemetry-rail" class="telemetry-rail panel" aria-label="Local security telemetry">
+      <button id="telemetry-toggle" class="telemetry-toggle" type="button" aria-expanded="true" aria-controls="telemetry-body" aria-label="Collapse telemetry"><span class="telemetry-title"><svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 12h4l3-8 6 16 3-8h4" /></svg>SECURITY TELEMETRY</span><span class="telemetry-toggle-symbol" aria-hidden="true">−</span></button>
+      <div id="telemetry-body" class="telemetry-body">
+        <div class="telemetry-node"><span class="status-dot"></span>NODE 07 <span>POLICY MONITOR</span></div>
+        <dl class="telemetry-counters"><div><dt>LEAKS BLOCKED</dt><dd id="telemetry-leaks">0</dd></div><div><dt>ORCHARD SHIELD</dt><dd id="telemetry-shield">OFFLINE</dd></div><div><dt>MEMO BYTES</dt><dd id="telemetry-bytes">0/512</dd></div></dl>
+        <div class="telemetry-policy">Orchard-only address policy.<br />No live chain connection.</div>
+        <div class="telemetry-log-heading"><span>EVENT STREAM</span><span>LOCAL / MOCK FEED</span></div>
+        <div id="telemetry-log" class="telemetry-log" role="log" aria-label="Local simulation security events" aria-live="off" tabindex="0"></div>
+        <div class="telemetry-footer"><span class="status-dot"></span>NO PAYLOADS LOGGED <span>▰▰▰▱</span></div>
+      </div>
+    </aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

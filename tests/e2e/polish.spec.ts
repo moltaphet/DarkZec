@@ -1,0 +1,118 @@
+import { test, expect } from '@playwright/test';
+import { meshNodes } from '../../src/lib/blind-mesh';
+
+test('live private preview tracks rapid edits and is the exact prepared payment memo', async ({ page }) => {
+  const failures: string[] = [];
+  page.on('pageerror', error => failures.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  await page.goto('/');
+  const preview = page.locator('#memo-scramble');
+  await preview.scrollIntoViewIfNeeded();
+  await page.locator('#bid-price').fill('0.81');
+  await page.locator('#bid-quantity').fill('7');
+  await page.locator('#bid-price').fill('0.83');
+  await page.locator('#bid-quantity').fill('9');
+  await expect(preview).toHaveAttribute('data-state', 'ready');
+  const payload = await page.locator('#memo-payload').textContent();
+  expect(payload).toMatch(/^[A-Za-z0-9_-]+$/);
+  const decoded = Buffer.from(payload ?? '', 'base64url').toString('utf8');
+  const memo: unknown = JSON.parse(decoded);
+  expect(memo).toMatchObject({ p: '0.83', q: 9 });
+  await expect(page.locator('#telemetry-bytes')).toHaveText(`${Buffer.byteLength(decoded)}/512`);
+  await page.locator('#prepare').click();
+  await expect(page.locator('#prepared-panel')).toBeVisible();
+  await expect(page.locator('#prepare .action-ripple')).toHaveCount(1);
+  await page.locator('#sensitive-details summary').click();
+  await expect(page.locator('#demo-uri')).toHaveValue(/^zcash:/);
+  const uri = await page.locator('#demo-uri').inputValue();
+  expect(new URLSearchParams(uri.split('?')[1]).get('memo')).toBe(payload);
+  await expect(page.locator('#telemetry-leaks')).toHaveText('0');
+  const log = await page.locator('#telemetry-log').textContent();
+  expect(log).not.toContain(payload);
+  expect(log).not.toContain('0.83');
+  await expect(page.locator('#prepare .action-ripple')).toHaveCount(0);
+  await page.locator('#commit').click();
+  await expect(page.locator('#memo-payload')).toHaveText('NO ACTIVE MEMO DRAFT');
+  await expect(page.locator('#telemetry-bytes')).toHaveText('0/512');
+  expect(failures).toEqual([]);
+});
+
+test('invalid automatic drafts fail quietly and recover after editing', async ({ page }) => {
+  const failures: string[] = [];
+  page.on('pageerror', error => failures.push(error.message));
+  await page.goto('/');
+  await page.locator('#bid-quantity').fill('0');
+  await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'invalid');
+  await expect(page.locator('#telemetry-bytes')).toHaveText('0/512');
+  await page.locator('#prepare').click();
+  await expect(page.locator('#error')).toContainText('whole number');
+  await page.locator('#bid-quantity').fill('3');
+  await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
+  await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
+  await page.locator('#prepare').click();
+  await expect(page.locator('#prepared-amount')).toHaveText('2.16 ZEC');
+  expect(failures).toEqual([]);
+});
+
+test('canvas node hover and keyboard inspection reveal commitment identifiers only', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  await page.goto('/');
+  await page.locator('#seed').click();
+  const canvas = page.locator('#blind-mesh');
+  await expect(canvas).toHaveAttribute('data-node-count', '3');
+  const hash = await page.locator('.commitment-row code').first().textContent();
+  if (!hash) throw new Error('Missing commitment');
+  const point = meshNodes([hash, '1'.repeat(64), '2'.repeat(64)])[0];
+  const bounds = await canvas.boundingBox();
+  if (!bounds || !point) throw new Error('Missing canvas layout');
+  await canvas.hover({ position: { x: point.x * bounds.width, y: point.y * bounds.height } });
+  await expect(canvas).toHaveAttribute('data-active-node', '0');
+  await expect(page.locator('#mesh-caption')).toContainText(hash.slice(0, 16).toUpperCase());
+  await expect(page.locator('#mesh-caption')).toContainText('AMOUNT WITHHELD');
+  await canvas.focus();
+  await canvas.press('ArrowRight');
+  await expect(canvas).toHaveAttribute('data-active-node', '1');
+  await canvas.press('Escape');
+  await expect(canvas).toHaveAttribute('data-active-node', '-1');
+  await expect(page.locator('.blind-orderflow')).not.toContainText('0.74');
+  await page.screenshot({ path: 'test-results/polished-desktop.png', fullPage: true });
+});
+
+test('telemetry is a collapsible mobile dock with private event text and reset cleanup', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('#telemetry-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#telemetry-body')).toBeHidden();
+  await page.getByRole('button', { name: 'Expand telemetry' }).click();
+  await expect(page.locator('#telemetry-body')).toBeVisible();
+  await expect(page.locator('#telemetry-shield')).toHaveText('ACTIVE');
+  await expect(page.locator('#telemetry-log')).toContainText('Local policy guard initialized');
+  await page.getByRole('button', { name: 'Collapse telemetry' }).click();
+  await expect(page.locator('#telemetry-body')).toBeHidden();
+  await page.locator('#bid-quantity').fill('2');
+  await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
+  await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
+  await page.screenshot({ path: 'test-results/polished-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('#reset').click();
+  await expect(page.locator('#telemetry-log .telemetry-line')).toHaveCount(1);
+  await expect(page.locator('#telemetry-bytes')).toHaveText('0/512');
+});
+
+test('reduced motion settles the preview and keeps the mesh and header static', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
+  await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
+  expect(await page.locator('.header-scanner').evaluate(node => getComputedStyle(node).animationName)).toBe('none');
+  await page.locator('#blind-mesh').scrollIntoViewIfNeeded();
+  const stable = await page.locator('#blind-mesh').evaluate(async node => {
+    if (!(node instanceof HTMLCanvasElement)) return false;
+    const first = node.toDataURL();
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    return first === node.toDataURL();
+  });
+  expect(stable).toBe(true);
+  await page.locator('#prepare').click();
+  await expect(page.locator('.action-ripple')).toHaveCount(0);
+});

@@ -42,3 +42,11 @@ npm run verify
 If Chromium is already installed elsewhere, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to that executable when running Playwright. The browser suite writes desktop/mobile previews into ignored `test-results/`.
 
 See [the engineering report](docs/engineering-report.md) for the full file inventory, privacy model, protocol details, verification results, fixture provenance and production boundaries. The original [DARKZEC-STANDARD](DARKZEC-STANDARD.md) is unchanged.
+
+## NODE 07 interface
+
+The terminal includes a radar header and brand micro-glitch, live private memo scramble, a commitment-only interactive canvas, matte neon glass panels with action ripples, and a floating/collapsible security telemetry rail. Telemetry uses local fixed event names; mock IVK activity is explicitly labeled. No bid values or payloads are logged. Animations respect reduced motion and stop when hidden/offscreen.
+
+Expand **[ PROTOCOL SPECS & FAQ ]** above the auction or wallet workspace to read the dark-pool thesis, memo/wallet privacy mechanics, Vickrey protocol option and salt/Merkle inclusion workflow. The manual labels the current uniform-price sandbox separately from production viewing-key and OTC designs. It is bundled locally and supports native keyboard disclosures.
+
+See [the UI polish report](docs/ui-polish-report.md) for component paths, interaction details and browser verification. This checkout uses Vite and TypeScript, with no framework migration required for the UI enhancements.

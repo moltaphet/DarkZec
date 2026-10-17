@@ -1,4 +1,13 @@
 import './style.css';
+import './components/terminal-effects.css';
+import './components/ProtocolSpecs.css';
+import { element, Lifetime } from './lib/dom';
+import { mountNetworkHeader } from './components/NetworkHeader';
+import { mountActionRipples } from './components/ActionRipples';
+import { MemoScramble } from './components/MemoScramble';
+import { BlindOrderflow } from './components/BlindOrderflow';
+import { TelemetryRail } from './components/TelemetryRail';
+import { mountProtocolSpecs } from './components/ProtocolSpecs';
 import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, SIMULATION_CONFIG } from './fixtures';
 import type { Network } from './protocol/address';
 import { decodeUnifiedAddress } from './protocol/address';
@@ -10,17 +19,28 @@ import { verifyProof } from './protocol/merkle';
 import { Sandbox } from './simulation';
 import type { ClearingResult } from './simulation';
 
-function element<T extends HTMLElement>(id: string, constructor: { new (): T }): T {
-  const found = document.getElementById(id);
-  if (!(found instanceof constructor)) throw new Error(`Missing interface element: ${id}`);
-  return found;
-}
 const el = (id: string): HTMLElement => element(id, HTMLElement);
 const input = (id: string): HTMLInputElement => element(id, HTMLInputElement);
 const area = (id: string): HTMLTextAreaElement => element(id, HTMLTextAreaElement);
 const button = (id: string): HTMLButtonElement => element(id, HTMLButtonElement);
 const text = (id: string, value: string): void => { el(id).textContent = value; };
 const visible = (id: string, show: boolean): void => { el(id).hidden = !show; };
+
+const effects = new Lifetime();
+const protocolSpecs = mountProtocolSpecs(el('protocol-specs'));
+effects.own(() => protocolSpecs.destroy());
+const telemetry = new TelemetryRail(el('telemetry-rail'), button('telemetry-toggle'), el('telemetry-log'), el('telemetry-leaks'), el('telemetry-bytes'), el('telemetry-shield'));
+const orderflow = new BlindOrderflow(element('blind-mesh', HTMLCanvasElement), el('mesh-caption'), el('mesh-state'));
+const memoPreview = new MemoScramble(el('memo-scramble'), el('memo-payload'), el('memo-hex-stream'), el('memo-draft-state'),
+  () => prepareBid({ auctionId: SIMULATION_CONFIG.auctionId, price: input('bid-price').value,
+    quantity: parseQuantity(input('bid-quantity').value), vault: FIXTURE_ADDRESS, refund: FIXTURE_ADDRESS, network: 'testnet' }),
+  audit => telemetry.memo(audit));
+const header = document.querySelector<HTMLElement>('.masthead');
+const brand = document.querySelector<HTMLElement>('.brand');
+if (header && brand) { const effect = mountNetworkHeader(header, brand); effects.own(() => effect.destroy()); }
+const ripples = mountActionRipples(document.body);
+effects.own(() => ripples.destroy()); effects.own(() => orderflow.destroy());
+effects.own(() => memoPreview.destroy()); effects.own(() => telemetry.destroy());
 
 let sandbox: Sandbox | undefined;
 let prepared: PreparedBid | undefined;
@@ -49,6 +69,7 @@ function eraseWallet(): void {
   input('wallet-reviewed').checked = false;
   for (const id of ['wallet-amount', 'wallet-bytes']) text(id, '');
   visible('wallet-output', false); updateWalletLink();
+  if (walletView) telemetry.memo({ bytes: 0, state: 'empty' });
 }
 function updateWalletLink(): void {
   const link = element('open-wallet', HTMLAnchorElement);
@@ -70,6 +91,7 @@ function controls(): void {
 }
 function renderBook(): void {
   const snapshot = vault().publicSnapshot();
+  orderflow.update(snapshot.commitments, snapshot.phase);
   text('bid-count', String(snapshot.commitments.length).padStart(2, '0'));
   text('phase', snapshot.phase === 'open' ? 'ACCEPTING BIDS' : snapshot.phase === 'closed' ? 'CLOSED / SEALED' : 'CLEARED');
   const list = el('commitment-list');
@@ -91,6 +113,7 @@ async function action(operation: () => Promise<void>): Promise<void> {
   working = true; visible('error', false); controls();
   try { await operation(); }
   catch (error: unknown) {
+    telemetry.log('invalid');
     text('error', error instanceof Error ? error.message : 'The operation failed. Check the inputs and try again.');
     visible('error', true);
   } finally {
@@ -107,6 +130,8 @@ function setView(wallet: boolean): void {
   }
   visible('error', false);
   clearPrepared(); eraseWallet();
+  memoPreview.clear();
+  if (!wallet && vault().publicSnapshot().phase === 'open') memoPreview.update();
   status(wallet ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
   controls();
 }
@@ -115,14 +140,14 @@ element('bid-form', HTMLFormElement).addEventListener('submit', event => {
   event.preventDefault();
   void action(async () => {
     clearPrepared();
-    prepared = await prepareBid({ auctionId: SIMULATION_CONFIG.auctionId, price: input('bid-price').value,
-      quantity: parseQuantity(input('bid-quantity').value), vault: FIXTURE_ADDRESS, refund: FIXTURE_ADDRESS, network: 'testnet' });
+    prepared = await memoPreview.prepare();
     text('prepared-hash', prepared.commitment); text('prepared-amount', `${prepared.amount} ZEC`);
     text('prepared-bytes', `${prepared.byteLength} / 512 BYTES`); visible('prepared-panel', true);
+    telemetry.log('prepared');
     status('Bid prepared privately. Review the memo audit, then commit to the local vault.');
   });
 });
-for (const id of ['bid-price', 'bid-quantity']) input(id).addEventListener('input', () => { clearPrepared(); controls(); });
+for (const id of ['bid-price', 'bid-quantity']) input(id).addEventListener('input', () => { clearPrepared(); memoPreview.update(); controls(); });
 element('sensitive-details', HTMLDetailsElement).addEventListener('toggle', () => {
   area('demo-uri').value = element('sensitive-details', HTMLDetailsElement).open ? prepared?.uri ?? '' : '';
 });
@@ -137,7 +162,7 @@ button('copy-demo').addEventListener('click', () => { void action(() => copy(pre
 button('commit').addEventListener('click', () => {
   void action(async () => {
     if (!prepared) throw new Error('Prepare a bid first.');
-    await vault().submit(prepared); clearPrepared();
+    await vault().submit(prepared); clearPrepared(); memoPreview.clear(); telemetry.log('committed');
     status('Bid committed locally. Only its hash appears in the sealed book.');
   });
 });
@@ -148,12 +173,13 @@ button('seed').addEventListener('click', () => {
       await vault().submit(await prepareBid({ ...bid, auctionId: SIMULATION_CONFIG.auctionId, vault: FIXTURE_ADDRESS, refund: FIXTURE_ADDRESS, network: 'testnet' }));
     }
     seeded = true;
+    telemetry.log('seeded');
     status('Three local demo bids committed. Their prices stay sealed until you close and unseal the auction.');
   });
 });
 button('close').addEventListener('click', () => {
   void action(async () => {
-    vault().close(); clearPrepared(); visible('audit-panel', true);
+    vault().close(); clearPrepared(); memoPreview.clear(); telemetry.log('closed'); visible('audit-panel', true);
     const count = vault().publicSnapshot().commitments.length;
     if (count > 0) text('merkle-root', (await vault().audit(0)).root);
     else text('merkle-root', 'No commitments. Inclusion proofs require at least one bid.');
@@ -163,6 +189,7 @@ button('close').addEventListener('click', () => {
 button('clear').addEventListener('click', () => {
   void action(async () => {
     lastResult = await vault().clear();
+    telemetry.log('cleared');
     text('clearing-price', `${lastResult.clearingPrice} ZEC`); text('filled-lots', `${lastResult.filled} / ${SIMULATION_CONFIG.supply} LOTS`);
     const rows = el('result-rows'); rows.replaceChildren();
     for (const allocation of lastResult.allocations) {
@@ -182,12 +209,14 @@ element('audit-form', HTMLFormElement).addEventListener('submit', event => {
     const audit = await vault().audit(index);
     if (!await verifyProof(audit.commitment, audit.proof, audit.root)) throw new Error('Inclusion proof failed.');
     text('audit-result', `VERIFIED / Entry ${index + 1} belongs to the frozen Merkle root.`);
+    telemetry.log('proof');
   });
 });
 button('reset').addEventListener('click', () => {
   void action(async () => {
     sandbox = await Sandbox.create(SIMULATION_CONFIG); clearPrepared(); eraseWallet();
     seeded = false; lastResult = undefined;
+    memoPreview.clear(); telemetry.reset();
     visible('audit-panel', false); visible('results-panel', false); text('merkle-root', ''); text('audit-result', '');
     text('result-rows', ''); text('clearing-price', ''); text('filled-lots', '');
     status('Local session reset. A new session key is active and the book is empty.');
@@ -210,6 +239,7 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
     }
     walletPrepared = await prepareBid({ auctionId: input('wallet-auction').value, price: input('wallet-price').value,
       quantity: parseQuantity(input('wallet-quantity').value), vault: vaultAddress, refund, network });
+    telemetry.memo({ bytes: walletPrepared.byteLength, state: 'ready' }); telemetry.log('wallet');
     area('wallet-uri').value = walletPrepared.uri;
     text('wallet-amount', `${walletPrepared.amount} ZEC`); text('wallet-bytes', `${walletPrepared.byteLength} / 512 BYTES`);
     visible('wallet-output', true);
@@ -218,13 +248,13 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
 });
 input('wallet-reviewed').addEventListener('change', updateWalletLink);
 button('copy-wallet').addEventListener('click', () => { void action(() => copy(walletPrepared?.uri ?? '')); });
-button('erase-wallet').addEventListener('click', () => { eraseWallet(); controls(); status('Sensitive payment request erased from the interface.'); });
+button('erase-wallet').addEventListener('click', () => { eraseWallet(); telemetry.log('erased'); controls(); status('Sensitive payment request erased from the interface.'); });
 element('open-wallet', HTMLAnchorElement).addEventListener('click', event => {
   if (!walletPrepared || !input('wallet-reviewed').checked || working) event.preventDefault();
 });
 
 // Best-effort clear on page exit; JS strings and browser/OS clipboard cannot be securely erased.
-window.addEventListener('pagehide', () => { clearPrepared(); eraseWallet(); sandbox = undefined; lastResult = undefined; });
+window.addEventListener('pagehide', () => { clearPrepared(); eraseWallet(); effects.destroy(); sandbox = undefined; lastResult = undefined; });
 window.addEventListener('pageshow', event => {
   // A restored bfcache document must not retain stale controls after pagehide erased its vault.
   if (event.persisted) window.location.reload();
@@ -232,4 +262,5 @@ window.addEventListener('pageshow', event => {
 void action(async () => {
   if (!window.isSecureContext || !crypto.subtle) throw new Error('Open DarkZec on localhost or HTTPS to enable browser cryptography.');
   sandbox = await Sandbox.create(SIMULATION_CONFIG);
+  telemetry.shield(true); memoPreview.update();
 });
