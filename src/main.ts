@@ -7,6 +7,8 @@ import './theme.css';
 import { element, Lifetime } from './lib/dom';
 import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
+import { mountHeroLogo } from './components/HeroLogo';
+import { mountBrandDecode } from './components/BrandDecode';
 import { MemoScramble } from './components/MemoScramble';
 import { BlindOrderflow } from './components/BlindOrderflow';
 import { TelemetryRail } from './components/TelemetryRail';
@@ -51,6 +53,10 @@ const memoPreview = new MemoScramble(el('memo-scramble'), el('memo-payload'), el
 const header = document.querySelector<HTMLElement>('.masthead');
 const brand = document.querySelector<HTMLElement>('.brand');
 if (header && brand) { const effect = mountNetworkHeader(header, brand); effects.own(() => effect.destroy()); }
+const heroLogo = mountHeroLogo(element('hero-logo', HTMLCanvasElement));
+effects.own(() => heroLogo.destroy());
+const brandWord = document.querySelector<HTMLElement>('.brand-word');
+if (brand && brandWord) { const decode = mountBrandDecode(brandWord, brand); effects.own(() => decode.destroy()); }
 const ripples = mountActionRipples(document.body);
 effects.own(() => ripples.destroy()); effects.own(() => orderflow.destroy());
 effects.own(() => memoPreview.destroy()); effects.own(() => telemetry.destroy());
