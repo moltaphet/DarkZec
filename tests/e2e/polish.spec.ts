@@ -106,7 +106,7 @@ test('reduced motion settles the preview and keeps the mesh and header static', 
   await page.goto('/');
   await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
   await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
-  expect(await page.locator('.header-scanner').evaluate(node => getComputedStyle(node).animationName)).toBe('none');
+  await expect(page.locator('.header-scanner')).toHaveCount(0);
   await page.locator('#blind-mesh').scrollIntoViewIfNeeded();
   const stable = await page.locator('#blind-mesh').evaluate(async node => {
     if (!(node instanceof HTMLCanvasElement)) return false;
