@@ -51,6 +51,7 @@ function readCompact(bytes: Uint8Array, cursor: { offset: number }): number {
 }
 
 export function decodeUnifiedAddress(address: string, network: Network): readonly Receiver[] {
+  if (network !== 'mainnet' && network !== 'testnet') throw new Error('Select a valid network.');
   if (address.length > MAX_ADDRESS_LENGTH || address !== address.toLowerCase()) throw new Error('Use a lowercase Unified Address (maximum 2048 characters).');
   const prefix = network === 'mainnet' ? 'u' : 'utest';
   let decoded: ReturnType<typeof bech32m.decode>;
@@ -100,13 +101,28 @@ function validOrchardPoint(receiver: Uint8Array): boolean {
   return result === 1n;
 }
 
-/** Deliberately stricter than ZIP-316: no fallback receivers or unknown extensions. */
+/** Accept standard wallet UAs, but require a valid Orchard receiver. */
 export function validateOrchardAddress(address: string, network: Network): string {
   const receivers = decodeUnifiedAddress(address, network);
-  const orchard = receivers[0];
-  if (receivers.length !== 1 || orchard?.type !== 3) throw new Error('Use an Orchard-only Unified Address to prevent receiver fallback.');
+  const orchard = receivers.find(receiver => receiver.type === 3);
+  if (!orchard) throw new Error('An Orchard receiver is required in the Unified Address.');
   if (!validOrchardPoint(orchard.bytes)) throw new Error('Invalid Orchard payment point.');
   return address;
+}
+
+/** Project the supplied UA onto Orchard so payment instructions cannot fall back. */
+export function orchardPaymentAddress(address: string, network: Network): string {
+  validateOrchardAddress(address, network);
+  const receiver = decodeUnifiedAddress(address, network).find(item => item.type === 3);
+  if (!receiver) throw new Error('An Orchard receiver is required.');
+  return encodeOrchardAddress(receiver.bytes, network);
+}
+
+/** Different UA strings may encode the same Orchard destination. */
+export function assertDistinctRefund(refund: string, vault: string, network: Network): void {
+  if (refund === vault || orchardPaymentAddress(refund, network) === orchardPaymentAddress(vault, network)) {
+    throw new Error('Security error: refund address must differ from the auction vault.');
+  }
 }
 
 /** Encodes public receiver bytes; does not generate keys or prove address ownership. */

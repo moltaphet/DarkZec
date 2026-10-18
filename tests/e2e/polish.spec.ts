@@ -85,7 +85,7 @@ test('telemetry is a collapsible mobile dock with private event text and reset c
   await expect(page.locator('#telemetry-body')).toBeHidden();
   await page.getByRole('button', { name: 'Expand telemetry' }).click();
   await expect(page.locator('#telemetry-body')).toBeVisible();
-  await expect(page.locator('#telemetry-shield')).toHaveText('ACTIVE');
+  await expect(page.locator('#telemetry-shield')).toHaveText('IDLE');
   await expect(page.locator('#telemetry-log')).toContainText('Local policy guard initialized');
   await page.getByRole('button', { name: 'Collapse telemetry' }).click();
   await expect(page.locator('#telemetry-body')).toBeHidden();
@@ -95,8 +95,10 @@ test('telemetry is a collapsible mobile dock with private event text and reset c
   await page.screenshot({ path: 'test-results/polished-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('#reset').click();
-  await expect(page.locator('#telemetry-log .telemetry-line')).toHaveCount(1);
-  await expect(page.locator('#telemetry-bytes')).toHaveText('0/512');
+  await expect(page.locator('#bid-price')).toHaveValue('0.72'); await expect(page.locator('#bid-quantity')).toHaveValue('4');
+  await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
+  await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('#telemetry-bytes')).not.toHaveText('0/512');
 });
 
 test('reduced motion settles the preview and keeps the mesh and header static', async ({ page }) => {

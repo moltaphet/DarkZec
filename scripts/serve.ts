@@ -1,8 +1,16 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 const root = resolve('dist');
+try {
+  if (!(await stat(root)).isDirectory() || !(await stat(resolve(root, 'index.html'))).isFile()) throw new Error('Missing build entry');
+  await access(resolve(root, 'index.html'), constants.R_OK);
+} catch {
+  process.stderr.write('DarkZec: the production build is missing or unreadable.\nRun "npm run build" before "npm run preview", or use "npm run dev".\n');
+  process.exit(1);
+}
 const port = Number(process.env.PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be an integer from 1024 to 65535.');
 const types: Readonly<Record<string, string>> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json' };

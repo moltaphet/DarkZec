@@ -1,5 +1,7 @@
 # NODE 07 UI/UX polish
 
+Historical UI stage report. [Phase 2 QA](phase2-qa-report.md) supersedes its canvas ArrowLeft behavior, reset flow, startup shield/address-policy meaning and verification counts. The current engineering report documents the combined Git-enabled checkout.
+
 Implemented all five requested visual interactions in the checked-out DarkZec app. The repository is **Vite + strict TypeScript**, rather than the Next.js/Tailwind stack described in the request. The implementation preserves the working application and protocol and introduces modular DOM components under `src/components/` and shared helpers under `src/lib/`. No dependencies were added.
 
 ## Created components and helpers
