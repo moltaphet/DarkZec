@@ -27,34 +27,6 @@ body::before {
   border-bottom-color: #00f05840;
 }
 
-.header-scanner {
-  position: absolute;
-  inset: 0 auto 0 -35%;
-  width: 35%;
-  background: linear-gradient(90deg, transparent, #00f05808 60%, #00f0581c 97%, #93f6b745 99%, transparent);
-  border-right: 1px solid #00f05833;
-  pointer-events: none;
-  z-index: -1;
-  animation: header-scan 8s linear infinite;
-  will-change: transform;
-}
-
-.header-scanner::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 58%;
-  height: 1px;
-  background: #00f058;
-  box-shadow: 0 0 14px #00f05899;
-}
-
-@keyframes header-scan {
-  to { transform: translateX(395%); }
-}
-
-.motion-paused .header-scanner { animation-play-state: paused; }
 .terminal-paused .panel::before,
 .terminal-paused .memo-console[data-state='scrambling'] .memo-hex-stream { animation-play-state: paused; }
 
@@ -323,11 +295,10 @@ a.button.primary:not([aria-disabled='true']):hover { background: #2c2a2e; }
   .memo-payload { height: 65px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .header-scanner, .panel::before, .memo-console[data-state='scrambling'] .memo-hex-stream,
+  .panel::before, .memo-console[data-state='scrambling'] .memo-hex-stream,
   .is-glitching .brand-word, .is-glitching .brand-word::before, .is-glitching .brand-word::after {
     animation: none;
   }
   .brand-word::before, .brand-word::after { display: none; }
-  .header-scanner { transform: translateX(170%); opacity: .4; }
   .action-ripple { display: none; }
 }
