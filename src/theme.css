@@ -1,0 +1,189 @@
+/* Visual language: near-black surfaces, flat bordered panels, magenta accent,
+   cyan secondary, bold sans headings and monospace micro-labels. Loaded last. */
+:root {
+  --bg: #080808;
+  --surface: #0d0d0e;
+  --raised: #121214;
+  --line: #29292d;
+  --muted: #929297;
+  --text: #f5f5f6;
+  --accent: #00ff66;
+  --blue: #7dffae;
+  --medium: #f4bd4b;
+  --high: #4dff8e;
+  --green: var(--accent);
+  --panel: var(--surface);
+  --amber: var(--medium);
+  --mono: Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+  color: var(--text);
+  background: var(--bg);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+html { background: var(--bg); scroll-behavior: smooth; }
+body { background: var(--bg); }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Monospace is reserved for data and micro-labels. */
+code, pre, textarea, .hash, table, .commitment-row, [role="log"], .memo-console, .protocol-formula,
+.micro, .eyebrow, .notice-tag, .section-code, .brand-mark, .masthead-sub, .node-label, .network-status,
+.nav-item span, .book-columns, th, .button, label > span, .status-dot + span {
+  font-family: var(--mono);
+}
+
+/* Header: boxed brand mark, hairline rules. */
+.masthead { height: 96px; gap: 24px; background: var(--bg); }
+.brand { display: flex; align-items: center; gap: 14px; font-size: 17px; letter-spacing: 0; font-weight: 700; }
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  height: 40px;
+  min-width: 40px;
+  margin: 0;
+  padding: 0 9px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.brand-word { letter-spacing: -.01em; }
+.brand-slash { display: none; }
+.masthead-sub { border-left: 1px solid var(--line); padding-left: 22px; letter-spacing: .1em; text-transform: uppercase; }
+.node-label {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  color: #c4c4c8;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.status-dot { width: 6px; height: 6px; background: var(--accent); box-shadow: 0 0 0 3px rgb(0 255 102 / 16%); }
+
+/* Navigation: tab strip with an accent underline. */
+.navigation { height: 56px; gap: 4px; }
+.nav-item {
+  padding: 0 16px;
+  border-bottom: 2px solid transparent;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  transition: color .15s, background .15s;
+}
+.nav-item:hover { color: var(--text); background: var(--surface); }
+.nav-item.active { color: var(--text); border-bottom-color: var(--accent); background: var(--surface); }
+.network-status { letter-spacing: .12em; text-transform: uppercase; }
+
+/* Hero: bold tight headline with the accent rule and square motif. */
+.intro { position: relative; padding: 56px 0 104px; align-items: flex-start; }
+.eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 16px; }
+h1 { font-size: clamp(36px, 5.2vw, 68px); font-weight: 700; line-height: 1.02; letter-spacing: -.04em; }
+h1 span { color: var(--accent); }
+.intro-copy { max-width: 360px; margin-top: auto; color: #c9c9ce; font-size: 14px; line-height: 1.6; border-left: 0; padding-left: 0; }
+.intro::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 28px;
+  left: 0;
+  height: 48px;
+  background:
+    linear-gradient(var(--text), var(--text)) calc(100% - 174px) 50% / 16px 16px no-repeat,
+    linear-gradient(90deg, var(--accent) calc(100% - 214px), transparent calc(100% - 214px) calc(100% - 90px), var(--accent) calc(100% - 90px)) 0 50% / 100% 3px no-repeat;
+}
+.intro::before {
+  content: "";
+  position: absolute;
+  right: 90px;
+  bottom: 28px;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--accent);
+  background: var(--bg);
+  transform: translateX(-18px);
+}
+
+/* Notices and errors: flat, hairline, no tint. */
+.notice { background: var(--surface); border: 1px solid var(--line); color: #bdbdc2; }
+.notice-tag { color: var(--accent); border: 1px solid var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.error { background: #130c0e; border: 1px solid #61303a; color: #a4e5bc; }
+
+/* Panels: flat surfaces with a section-row style heading. */
+.panel, .auction-strip, .lifecycle, .privacy-strip { background: var(--surface); border: 1px solid var(--line); border-radius: 0; }
+.panel-heading { padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.panel-heading h2 { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.section-code { color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+.micro { color: #77777d; letter-spacing: .12em; text-transform: uppercase; }
+.micro.green { color: var(--accent); font-weight: 700; }
+.auction-strip { gap: 0; }
+.auction-strip > div { padding: 22px 24px; background: var(--surface); transition: background .18s; }
+.auction-strip > div:hover { background: var(--raised); }
+.auction-strip strong { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.phase-cell { box-shadow: inset 0 -2px var(--accent); }
+.phase-cell strong { color: var(--accent); }
+
+/* Fields and buttons. */
+label { color: #c4c4c8; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+label > span { color: #77777d; font-weight: 400; letter-spacing: .1em; }
+input, textarea, select { background: #09090a; border: 1px solid #303034; color: #dddde0; }
+input:hover, textarea:hover, select:hover, input:focus, textarea:focus, select:focus { border-color: #57575e; }
+.button { border: 1px solid var(--line); background: transparent; color: #dedee0; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.button:hover:enabled { border-color: var(--accent); color: var(--accent); }
+.button.quiet { background: #09090b; color: #dedee0; }
+.button.quiet:hover:enabled { background: #09110c; }
+.button.primary { background: var(--accent); border-color: var(--accent); color: #031208; }
+.button.primary:hover:enabled { background: transparent; color: var(--accent); }
+.reset { font-family: var(--mono); }
+
+/* Tables, hashes and the commitment book. */
+th { color: #77777d; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+td, th { border-color: var(--line); }
+tbody tr:hover { background: var(--raised); }
+.book-columns { background: #0b0b0c; color: #77777d; letter-spacing: .12em; }
+.commitment-row { border-color: var(--line); }
+.hash { color: var(--blue); }
+
+/* Footer. */
+footer { color: #77777d; letter-spacing: .08em; text-transform: uppercase; }
+
+@media (max-width: 760px) {
+  .masthead { height: auto; min-height: 76px; flex-wrap: wrap; padding: 14px 0; }
+  .nav-item { padding: 0 10px; }
+  .intro { padding-bottom: 88px; }
+  .intro::before { right: 40px; }
+  .intro::after {
+    background:
+      linear-gradient(var(--text), var(--text)) calc(100% - 124px) 50% / 16px 16px no-repeat,
+      linear-gradient(90deg, var(--accent) calc(100% - 164px), transparent calc(100% - 164px) calc(100% - 40px), var(--accent) calc(100% - 40px)) 0 50% / 100% 3px no-repeat;
+  }
+}
+
+/* Flat surfaces: neutralise the earlier glow, gradient and blur treatments. */
+body { background-image: none; }
+.panel, .panel-heading, .protocol-manual, .vault-pipeline, .lifecycle, .auction-strip, .privacy-strip, .telemetry-rail, .blind-orderflow {
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.panel, .protocol-manual, .lifecycle, .auction-strip, .telemetry-rail { background-color: var(--surface); border-color: var(--line); }
+.panel-heading { border-bottom-color: var(--line); background-color: transparent; }
+.panel:hover { border-color: #3a3a40; }
+h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
+.brand:hover, .brand:focus-visible { color: var(--text); text-shadow: none; }
+.protocol-manual-summary:hover, .protocol-entry-summary:hover { background: var(--raised); }
+
+/* Navigation never wraps: tabs stay on one row and scroll on narrow screens. */
+.navigation { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.navigation::-webkit-scrollbar { display: none; }
+.nav-item { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 760px) {
+  .nav-item { padding: 0 11px; font-size: 11px; letter-spacing: .03em; }
+  .network-status { display: none; }
+}
