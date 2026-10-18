@@ -56,6 +56,8 @@ test('observed CSP violations count once across both views and clear preserves t
   await expect(page.locator('#stream-leaks')).toHaveText('1'); await expect(page.locator('#telemetry-leaks')).toHaveText('1');
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded();
   await expect(log).toContainText('External request blocked by CSP'); expect(await log.innerText()).not.toContain('example.invalid');
+  // Clearing history does not cancel the initial asynchronous memo preparation.
+  await expect(log).toContainText('Payment URI generated locally');
   await page.locator('#stream-clear').click(); await expect(log.locator('.terminal-event')).toHaveCount(0);
   await expect(page.locator('#stream-leaks')).toHaveText('1'); await expect(page.locator('#telemetry-leaks')).toHaveText('1');
 });

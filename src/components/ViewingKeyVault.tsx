@@ -61,7 +61,7 @@ export class ViewingKeyVault implements Disposable {
     const saved = session.status();
     this.#message(saved === 'saved' ? 'Encrypted session found. Enter your local passphrase and unlock; no key is restored automatically.' :
       saved === 'corrupt' ? 'The saved record is invalid. Forget it or save a new key.' :
-      saved === 'unavailable' ? 'Tab storage is unavailable. No viewing key has been saved.' : 'Vault locked. Use demo credentials or enter a viewing key and a local unlock passphrase.');
+      saved === 'unavailable' ? 'Tab storage is unavailable. No mock key has been saved.' : 'Vault locked. Use demo credentials or enter a mock key and a local unlock passphrase. Real viewing keys are disabled.');
   }
 
   #build(): void {
@@ -74,13 +74,13 @@ export class ViewingKeyVault implements Disposable {
     const grid = node('div', 'vault-grid'); const credentials = node('section', 'vault-credentials');
     credentials.append(node('h3', '', 'Vault access'), this.#saved); this.#saved.id = 'vault-saved-state';
     this.#form.id = 'vault-key-form'; this.#form.autocomplete = 'off';
-    const keyLabel = node('label', '', 'Vault viewing key'); keyLabel.htmlFor = 'vault-viewing-key';
-    this.#keyInput.id = 'vault-viewing-key'; this.#keyInput.type = 'password'; this.#keyInput.maxLength = 2048; this.#keyInput.required = true;
-    this.#keyInput.autocomplete = 'off'; this.#keyInput.spellcheck = false; this.#keyInput.placeholder = 'uview1… or mock:node07:…';
+    const keyLabel = node('label', '', 'Mock vault key'); keyLabel.htmlFor = 'vault-viewing-key';
+    this.#keyInput.id = 'vault-viewing-key'; this.#keyInput.type = 'password'; this.#keyInput.maxLength = DEMO_VIEWING_KEY.length; this.#keyInput.required = true;
+    this.#keyInput.autocomplete = 'off'; this.#keyInput.spellcheck = false; this.#keyInput.placeholder = 'mock:node07: + 64 lowercase hex characters';
     const passLabel = node('label', '', 'Local unlock passphrase'); passLabel.htmlFor = 'vault-passphrase';
     this.#passphrase.id = 'vault-passphrase'; this.#passphrase.type = 'password'; this.#passphrase.minLength = 12; this.#passphrase.maxLength = 128;
     this.#passphrase.required = true; this.#passphrase.autocomplete = 'off'; this.#passphrase.placeholder = '12–128 characters · never stored';
-    const help = node('p', 'vault-help', 'The saved viewing key is encrypted in this tab with your passphrase. Reload requires unlocking again. Never enter a seed phrase or spending key.');
+    const help = node('p', 'vault-help', 'Mock keys only (mock:node07: + 64 lowercase hex characters). Real viewing keys are rejected. The mock key is encrypted in this tab with your passphrase; reload requires unlocking again. Never enter a seed phrase or spending key.');
     help.id = 'vault-key-help'; this.#keyInput.setAttribute('aria-describedby', help.id); this.#passphrase.setAttribute('aria-describedby', help.id);
     this.#save.type = 'submit';
     const saveActions = node('div', 'vault-actions'); saveActions.append(this.#save, this.#unlock);
@@ -97,40 +97,43 @@ export class ViewingKeyVault implements Disposable {
     ]) {
       const step = node('li'); step.append(node('strong', '', title ?? ''), node('p', '', copy ?? '')); stages.append(step);
     }
-    pipeline.append(stages, node('p', 'vault-boundary', 'SIMULATION BOUNDARY / Unified Viewing Keys can be stored, but real Orchard key validation and note decryption need an audited adapter. This engine decrypts mock AES-GCM notes only.'));
+    pipeline.append(stages, node('p', 'vault-boundary', 'SIMULATION BOUNDARY / Real Unified Viewing Keys cannot be saved or unlocked. An audited WASM adapter is required before real key handling is enabled. This engine decrypts mock AES-GCM notes only.'));
     grid.append(credentials, pipeline);
     this.#status.id = 'vault-status'; this.#status.setAttribute('role', 'status'); this.#status.setAttribute('aria-live', 'polite');
     this.#error.id = 'vault-error'; this.#error.setAttribute('role', 'alert'); this.#error.hidden = true;
     const stats = node('dl', 'vault-metrics'); stats.append(this.#received, this.#accepted, this.#rejected);
     const toolbar = node('div', 'vault-scanner-actions'); toolbar.append(this.#load, this.#scan, this.#incoming);
     const tableWrap = node('div', 'table-scroll vault-table');
+    const scrollHint = node('p', 'table-scroll-hint', '↔ Scroll horizontally to inspect all note fields'); scrollHint.id = 'vault-scroll-hint';
+    tableWrap.id = 'vault-table-scroll'; tableWrap.tabIndex = 0; tableWrap.setAttribute('role', 'region');
+    tableWrap.setAttribute('aria-label', 'Private mock note scan results'); tableWrap.setAttribute('aria-describedby', scrollHint.id);
     const table = node('table'); table.setAttribute('aria-label', 'Privately decrypted simulated bids');
     const caption = node('caption', '', 'Private scan results · never added to the public book or telemetry');
     const thead = node('thead'); const tr = node('tr');
     for (const label of ['Note / state', 'Auction', 'Price / ZEC', 'Quantity', 'Memo audit', 'Private details']) { const th = node('th', '', label); th.scope = 'col'; tr.append(th); }
     thead.append(tr); this.#rows.id = 'vault-result-rows'; table.append(caption, thead, this.#rows); tableWrap.append(table);
     const footer = node('div', 'vault-footer', 'Session ciphertext stays in this tab. Unlocked data is visible to scripts running in this origin. Lock clears private rows and live key references; Forget removes the saved record.');
-    panel.append(heading, intro, grid, this.#status, this.#error, stats, toolbar, tableWrap, footer); this.#host.replaceChildren(panel);
+    panel.append(heading, intro, grid, this.#status, this.#error, stats, toolbar, scrollHint, tableWrap, footer); this.#host.replaceChildren(panel);
   }
 
   #events(): void {
     const signal = this.#lifetime.signal;
     this.#form.addEventListener('submit', event => { event.preventDefault(); void this.#run('save', async signal => {
-      const value = this.#keyInput.value.trim(); const passphrase = this.#passphrase.value;
+      const value = this.#keyInput.value; const passphrase = this.#passphrase.value;
       this.#clearInputs();
       const kind = await this.#session.save(value, passphrase); this.#check(signal);
-      const key = kind === 'mock' ? await mockNoteKey(value) : undefined; this.#check(signal);
+      const key = await mockNoteKey(value); this.#check(signal);
       this.#key = key; this.#kind = kind; this.#results = [];
-      notifyAudit(this.#audit, { type: 'vault-saved' }); notifyAudit(this.#audit, { type: 'vault-unlocked', mock: kind === 'mock' });
-      this.#message(kind === 'mock' ? 'Mock vault unlocked. Load demo notes to scan locally; no real Orchard decryption occurs.' : 'Unified key saved and unlocked locally. Real Orchard scanning is unavailable; use a mock key for the demo.');
+      notifyAudit(this.#audit, { type: 'vault-saved' }); notifyAudit(this.#audit, { type: 'vault-unlocked', mock: true });
+      this.#message('Mock vault unlocked. Load demo notes to scan locally; no real Orchard decryption occurs.');
     }); }, { signal });
     this.#unlock.addEventListener('click', () => { void this.#run('unlock', async signal => {
       const passphrase = this.#passphrase.value; this.#clearInputs();
       const value = await this.#session.unlock(passphrase); this.#check(signal);
-      const kind = viewingKeyKind(value); const key = kind === 'mock' ? await mockNoteKey(value) : undefined; this.#check(signal);
+      const kind = viewingKeyKind(value); const key = await mockNoteKey(value); this.#check(signal);
       this.#kind = kind; this.#key = key;
-      notifyAudit(this.#audit, { type: 'vault-unlocked', mock: kind === 'mock' });
-      this.#message(kind === 'mock' ? 'Saved mock vault unlocked. Load or rescan the local notes.' : 'Unified key unlocked. The mock scanner cannot decrypt Orchard notes.');
+      notifyAudit(this.#audit, { type: 'vault-unlocked', mock: true });
+      this.#message('Saved mock vault unlocked. Load or rescan the local notes.');
     }); }, { signal });
     this.#demo.addEventListener('click', () => {
       this.#keyInput.value = DEMO_VIEWING_KEY; this.#passphrase.value = DEMO_UNLOCK_PASSPHRASE;
@@ -187,7 +190,7 @@ export class ViewingKeyVault implements Disposable {
   #controls(): void {
     const status = this.#session.status();
     this.#saved.textContent = status === 'saved' ? 'ENCRYPTED SESSION / SAVED' : status === 'empty' ? 'NO SAVED KEY' : status === 'corrupt' ? 'SAVED RECORD / INVALID' : 'TAB STORAGE / UNAVAILABLE';
-    this.#mode.textContent = this.#kind === 'mock' ? 'MOCK / UNLOCKED' : this.#kind === 'unified' ? 'UNIFIED / STORAGE ONLY' : 'LOCKED';
+    this.#mode.textContent = this.#kind === 'mock' ? 'MOCK / UNLOCKED' : 'LOCKED';
     this.#keyInput.disabled = this.#busy || this.#kind !== undefined;
     this.#passphrase.disabled = this.#busy || this.#kind !== undefined;
     this.#save.disabled = this.#busy || this.#kind !== undefined || status === 'unavailable';

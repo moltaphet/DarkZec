@@ -1,5 +1,3 @@
-import { bech32m } from '@scure/base';
-import { f4jumble } from '../protocol/address';
 import { hex, utf8 } from '../protocol/crypto';
 import { decodeHex, VaultError } from './vault-memo';
 
@@ -8,22 +6,14 @@ export const DEMO_VIEWING_KEY = `mock:node07:${'07'.repeat(32)}`;
 export const DEMO_UNLOCK_PASSPHRASE = 'node07-demo-passphrase';
 const ITERATIONS = 600_000;
 const SESSION_AAD = utf8('DARKZEC/viewing-key-session/v1');
-export type ViewingKeyKind = 'mock' | 'unified';
+export type ViewingKeyKind = 'mock';
 export interface SessionStore { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
 interface SavedKey { readonly v: 1; readonly kdf: 'PBKDF2-SHA256'; readonly iterations: number; readonly salt: string; readonly iv: string; readonly ciphertext: string }
 
-/** Unified key envelope/checksum checks only; real key semantics belong to an Orchard adapter. */
+/** Fail closed before derivation or persistence; real keys require an audited WASM adapter. */
 export function viewingKeyKind(value: string): ViewingKeyKind {
-  if (/^mock:node07:[a-f0-9]{64}$/.test(value)) return 'mock';
-  if (value.length > 2048 || value !== value.toLowerCase() || !/^uview(?:test)?1/.test(value)) throw new Error('Enter a Unified Viewing Key or use the demo mock key. Never enter a seed or spending key.');
-  try {
-    const decoded = bech32m.decode(value as `${string}1${string}`, 2048);
-    if (decoded.prefix !== 'uview' && decoded.prefix !== 'uviewtest') throw new Error('prefix');
-    const raw = f4jumble(new Uint8Array(bech32m.fromWords(decoded.words)), true);
-    const padding = new Uint8Array(16); padding.set(utf8(decoded.prefix));
-    if (!raw.slice(-16).every((byte, i) => byte === padding[i])) throw new Error('padding');
-  } catch { throw new Error('Unified Viewing Key checksum or envelope is invalid. Real key compatibility still requires an Orchard adapter.'); }
-  return 'unified';
+  if (value.length === DEMO_VIEWING_KEY.length && /^mock:node07:[a-f0-9]{64}$/.test(value)) return 'mock';
+  throw new Error('Mock keys only: use mock:node07: followed by 64 lowercase hex characters. Real viewing keys are disabled until an audited WASM adapter is ready. Never enter a seed or spending key.');
 }
 
 function validatePassphrase(value: string): void {
@@ -46,7 +36,8 @@ function parseRecord(text: string): SavedKey {
   const record: Record<string, unknown> = Object.fromEntries(Object.entries(value));
   if (Object.keys(record).sort().join(',') !== 'ciphertext,iterations,iv,kdf,salt,v' || record.v !== 1 || record.kdf !== 'PBKDF2-SHA256' || record.iterations !== ITERATIONS ||
     typeof record.salt !== 'string' || typeof record.iv !== 'string' || typeof record.ciphertext !== 'string') throw new VaultError('session');
-  if (!/^[a-f0-9]{32}$/.test(record.salt) || !/^[a-f0-9]{24}$/.test(record.iv) || !/^(?:[a-f0-9]{2}){17,2064}$/.test(record.ciphertext)) throw new VaultError('session');
+  if (!/^[a-f0-9]{32}$/.test(record.salt) || !/^[a-f0-9]{24}$/.test(record.iv) ||
+    record.ciphertext.length !== (DEMO_VIEWING_KEY.length + 16) * 2 || !/^[a-f0-9]+$/.test(record.ciphertext)) throw new VaultError('session');
   return { v: 1, kdf: 'PBKDF2-SHA256', iterations: ITERATIONS, salt: record.salt, iv: record.iv, ciphertext: record.ciphertext };
 }
 
@@ -95,7 +86,7 @@ export class ViewingKeySession {
   }
 }
 
-/** The sole authorized persistence boundary; only encrypted session records are written. */
+/** The sole persistence boundary; only validated mock keys enter encrypted tab records. */
 export function browserViewingKeySession(): ViewingKeySession {
   try { return new ViewingKeySession(window.sessionStorage); } catch { return new ViewingKeySession(null); }
 }

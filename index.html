@@ -47,9 +47,9 @@
               <div class="panel-heading"><h2><span class="section-code">01 /</span> Compose bid</h2><span class="micro">PRIVATE WORKSPACE</span></div>
               <form id="bid-form" autocomplete="off">
                 <label for="bid-price">Limit price <span>ZEC / LOT</span></label>
-                <div class="input-unit"><input id="bid-price" name="price" value="0.72" inputmode="decimal" required maxlength="17" spellcheck="false" /><span>ZEC</span></div>
+                <div class="input-unit"><input id="bid-price" name="price" value="0.72" placeholder="e.g. 0.72 ZEC per lot" inputmode="decimal" required maxlength="17" spellcheck="false" /><span>ZEC</span></div>
                 <label for="bid-quantity">Quantity <span>WHOLE LOTS</span></label>
-                <div class="input-unit"><input id="bid-quantity" name="quantity" value="4" inputmode="numeric" required maxlength="6" spellcheck="false" /><span>LOTS</span></div>
+                <div class="input-unit"><input id="bid-quantity" name="quantity" value="4" placeholder="e.g. 4 whole lots" inputmode="numeric" required maxlength="6" spellcheck="false" /><span>LOTS</span></div>
                 <div class="form-note">A fresh 256-bit salt protects each bid. Price and quantity stay out of the public book.</div>
                 <div id="memo-scramble" class="memo-console" data-state="empty">
                   <div class="memo-console-heading"><span class="micro">MEMO ASSEMBLY / ZIP-302</span><span class="memo-indicator" aria-hidden="true"></span></div>
@@ -98,7 +98,8 @@
             <div class="panel-heading"><h2><span class="section-code">04 /</span> Clearing result</h2><span class="micro warning">REVEALED DEMO DATA</span></div>
             <div class="result-stats"><div><span class="micro">UNIFORM PRICE</span><strong id="clearing-price"></strong></div><div><span class="micro">ALLOCATED</span><strong id="filled-lots"></strong></div></div>
             <p class="small muted result-note">Highest prices fill first; accepted submission order breaks ties. Demand at or below supply, or one eligible bid, pays reserve. A sole winner prices against losing competition, excluding its own excess quantity. Multiple winners use the unfilled margin. Refunds are accounting entries only.</p>
-            <div class="table-scroll"><table><thead><tr><th>Commitment</th><th>Limit / ZEC</th><th>Filled / requested</th><th>Paid / ZEC</th><th>Refund / ZEC</th></tr></thead><tbody id="result-rows"></tbody></table></div>
+            <p id="results-scroll-hint" class="table-scroll-hint"><span aria-hidden="true">↔</span> Scroll horizontally to view all allocations</p>
+            <div id="results-table-scroll" class="table-scroll" role="region" aria-label="Auction clearing allocations" aria-describedby="results-scroll-hint" tabindex="0"><table aria-label="Auction clearing results"><thead><tr><th>Commitment</th><th>Limit / ZEC</th><th>Filled / requested</th><th>Paid / ZEC</th><th>Refund / ZEC</th></tr></thead><tbody id="result-rows"></tbody></table></div>
           </section>
         </div>
 
@@ -109,7 +110,7 @@
             <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet">Mainnet</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div></div>
             <label for="wallet-vault">Verified vault address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-vault" required spellcheck="false" placeholder="Paste the vault's u1… or utest1… address"></textarea>
             <label for="wallet-refund">Your refund / settlement address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-refund" required spellcheck="false" placeholder="Paste your shielded receiving address"></textarea>
-            <div class="wallet-grid"><div><label for="wallet-price">Limit price / ZEC</label><input id="wallet-price" inputmode="decimal" required maxlength="17" /></div><div><label for="wallet-quantity">Quantity / lots</label><input id="wallet-quantity" inputmode="numeric" required maxlength="6" /></div></div>
+            <div class="wallet-grid"><div><label for="wallet-price">Limit price / ZEC</label><input id="wallet-price" placeholder="e.g. 0.72 ZEC per lot" inputmode="decimal" required maxlength="17" /></div><div><label for="wallet-quantity">Quantity / lots</label><input id="wallet-quantity" placeholder="e.g. 4 whole lots" inputmode="numeric" required maxlength="6" /></div></div>
             <p class="small warning">The generated URI includes your full bid, refund address and salt as readable data. Only share it with your trusted wallet. Verify the network and full address in the wallet before paying. No payment status is tracked here.</p>
             <button id="wallet-prepare" class="button primary" type="submit">Prepare private payment request <span>↗</span></button>
           </form>

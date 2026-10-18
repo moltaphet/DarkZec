@@ -18,7 +18,7 @@ DarkZec is a browser-local market terminal exploring sealed-bid auctions and pri
 | ZIP-302 JSON sizing and ZIP-321 URI generation | Implemented; exact UTF-8 audit, unpadded Base64url and explicit wallet review. |
 | Judge Sandbox | Implemented; encrypted local bids, sealed commitment book, uniform-price clearing and refund accounting. |
 | SHA-256 Merkle inclusion proofs | Implemented; domain separation, leaf-count binding and local verification. |
-| Viewing Key Vault | Implemented; encrypted tab-session storage and authenticated mock-note scanning. |
+| Viewing Key Vault | Mock keys only; encrypted tab-session storage and authenticated mock-note scanning. Real viewing keys are rejected. |
 | Live security stream | Implemented; fixed metadata events, shared counters and bounded in-memory history. |
 | Zodl Wallet handoff | Standard `zcash:` request builder; installed-wallet compatibility requires device testing. |
 | QR presentation | Planned local rendering of the same URI; no QR generator is included in this build. |
@@ -124,7 +124,7 @@ The default market has 10 lots and a `0.50 ZEC` reserve. With the three demo bid
 
 In the production design, a restricted viewing-key service would scan incoming Orchard notes, recover encrypted memo instructions and validate auction membership, commitment and escrow before clearing. Viewing authority permits observation without granting spending authority, as distinguished in [ZIP-316](https://zips.z.cash/zip-0316). Spending and settlement require separate authorization.
 
-The current **Viewing Key Vault** implements authenticated mock AES-GCM scanning. Unified `uview1…` / `uviewtest1…` envelopes can be saved after encoding checks, but real Orchard key semantics and note decryption require an audited adapter. This vault is separate from the sandbox session-key decryptor.
+The current **Viewing Key Vault** implements authenticated mock AES-GCM scanning. Only `mock:node07:` followed by exactly 64 lowercase hexadecimal characters is accepted. Real Unified Viewing Keys, including `uview1…` / `uviewtest1…`, cannot be saved or unlocked; real key handling requires an audited WASM adapter. This vault is separate from the sandbox session-key decryptor.
 
 A viewing key is not a cryptographic time lock: its holder may inspect incoming notes before the auction closes. The production protocol must define who holds that authority, when results may be disclosed and how abuse is constrained. A public clearing price can be released without publishing participant identities, but selective disclosure is a production responsibility. The judge sandbox deliberately reveals bid prices and allocations on its results screen.
 
@@ -208,7 +208,7 @@ The fixtures are public test-vector receiving data, not deposit instructions. No
 4. Choose **Lock vault**. Decrypted rows and live key references clear. Reload retains the encrypted record but requires the passphrase again; a wrong passphrase refuses unlock.
 5. Choose **Forget saved key** to remove the encrypted session record and local scanner state.
 
-Saved keys are wrapped with AES-256-GCM using PBKDF2-SHA256 at 600,000 iterations and a local 12–128-character passphrase. Only ciphertext and KDF metadata enter this tab's session storage. The passphrase is not stored. Unified keys use storage-only mode; choose mock credentials to exercise decryption. Never enter a seed phrase or spending key.
+Saved mock keys are wrapped with AES-256-GCM using PBKDF2-SHA256 at 600,000 iterations and a local 12–128-character passphrase. Only ciphertext and KDF metadata enter this tab's session storage. The passphrase is not stored. Real viewing keys and non-mock legacy sessions are refused. Use mock credentials to exercise decryption; never enter real viewing keys, seed phrases or spending keys.
 
 ### 3. Security stream and interface
 
@@ -235,13 +235,13 @@ npm run test:e2e
 
 Coverage includes address vectors and rejection cases, independent SHA-256/HMAC checks, exact monetary arithmetic, 512-byte ASCII/multibyte boundaries, canonical memo/URI round-trips, escrow conservation, partial fills, proof tampering, authenticated scanner failures, encrypted-session behavior, event redaction/retention, CSP enforcement and responsive auction/wallet/vault interactions. Screenshots are written to ignored `test-results/`.
 
-The [current engineering report](docs/engineering-report.md#build-serve-and-verification) records **58 unit/privacy/CLI tests, 27 E2E tests and 39 bundled modules**. Unit tests and strict builds passed on Node 22.18.0, 24.0.0 and 26.10.0; E2E ran on Node 26.10.0 with Chromium. These are recorded local results, not a hosted CI badge or an independent audit. Run the commands above against the checkout being reviewed.
+The [current engineering report](docs/engineering-report.md#build-serve-and-verification) records **62 unit/privacy/CLI tests, 30 E2E tests and 39 bundled modules**, including all of the previous 58/27 suite. Unit tests and strict builds passed on Node 22.18.0, 24.0.0 and 26.10.0; E2E ran on Node 26.10.0 with Chromium. New checks cover mock-only credentials, legacy non-mock sessions, an 11px CSS/canvas text floor, five responsive viewport widths and mobile result scrolling. These are recorded local results, not a hosted CI badge or an independent audit. Run the commands above against the checkout being reviewed.
 
 ## Security & privacy boundaries
 
 - **No external runtime requests:** local scripts/styles, inline icons and system fonts; no RPC, analytics, trackers, remote assets or background polling. CSP includes `connect-src 'none'` and `font-src 'none'`; the server binds to loopback and does not log requests.
 - **Private data stays out of logs:** the audit API accepts fixed event types and validated numeric metadata. Keys, salts, addresses, amounts, payloads, raw errors and blocked URLs are excluded. History is memory-only; it is not third-party telemetry.
-- **Controlled persistence:** auction bids and audit logs are not persisted. The viewing-key adapter alone stores a passphrase-encrypted record in tab session storage. Lock/view changes clear live vault data; Forget removes the record.
+- **Controlled persistence:** auction bids and audit logs are not persisted. The viewing-key adapter alone stores a passphrase-encrypted mock-key record in tab session storage. Validation rejects real keys before accessing storage and rechecks decrypted records on unlock. Lock/view changes clear live vault data; Forget removes the record.
 - **Local trust:** the browser, same-origin scripts, extensions and device remain in the trust boundary. The mock vault is not a substitute for Orchard encryption. JavaScript strings, garbage-collected keys and OS clipboard contents cannot be reliably zeroized.
 - **Production work:** audited Orchard scanning and transaction construction, custody/spending authorization, deadline enforcement, durable receipts, root publication, refund authentication and selective disclosure remain required. The current prototype is not a deployed decentralized exchange or an institutional custody product.
 
@@ -272,3 +272,9 @@ docs/             Engineering reports, implementation plans and local badge asse
 | [Comprehensive hardening audit](docs/repo-hardening-report.md) | Finding-by-finding verification, sole-winner competing margins, runtime type guards and repeat clean installation. |
 
 Reports describe their respective implementation stages; their historical test counts, commitment formats, UA policies and clearing rules should be read with the later vault, stream and Phase 1 security changes. The README describes the current combined checkout.
+
+## License and continuous integration
+
+DarkZec is licensed under the [MIT License](LICENSE). Public receiving vectors retain their upstream attribution.
+
+The [CI workflow](.github/workflows/ci.yml) runs on pushes and pull requests, using Node.js 22 and 24 to execute `npm install`, `npm run build` and `npm test`. Actions are pinned to immutable commit SHAs, repository permissions are read-only, and checkout credentials are not persisted. Browser verification remains available through `npm run test:e2e`; it is not part of this basic CI job. Adding the workflow does not imply a hosted run has passed.

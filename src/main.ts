@@ -151,7 +151,7 @@ function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
   memoPreview.clear();
   memoPreview.setEnabled(view === 'sandbox' && vault().publicSnapshot().phase === 'open');
   if (view === 'sandbox' && vault().publicSnapshot().phase === 'open') memoPreview.update();
-  status(scannerView ? 'Private mock-note scanner. Viewing keys are stored only as passphrase-encrypted session ciphertext. No RPC.' : walletView ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
+  status(scannerView ? 'Private mock-note scanner. Only mock keys can be saved as passphrase-encrypted tab ciphertext. Real viewing keys are disabled. No RPC.' : walletView ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
   controls();
 }
 

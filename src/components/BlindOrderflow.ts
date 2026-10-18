@@ -106,7 +106,7 @@ export class BlindOrderflow {
       ctx.beginPath(); ctx.arc(point.x, point.y, selected ? 12 : 7 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = selected ? '#ffce73' : '#00ff66'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = selected ? 18 : 10;
       ctx.fillRect(point.x - 2.5, point.y - 2.5, 5, 5); ctx.shadowBlur = 0;
-      ctx.fillStyle = selected ? '#ffce73' : '#709a80'; ctx.font = '8px ui-monospace, monospace'; ctx.textAlign = point.x > cx ? 'right' : 'left';
+      ctx.fillStyle = selected ? '#ffce73' : '#709a80'; ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = point.x > cx ? 'right' : 'left';
       const node = this.#nodes[i];
       ctx.fillText(node?.fixture ? `IDLE_${String(i + 1).padStart(2, '0')}` : (node?.id.slice(0, 6).toUpperCase() ?? ''), point.x + (point.x > cx ? -12 : 12), point.y - 10);
     });

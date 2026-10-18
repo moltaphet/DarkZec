@@ -18,6 +18,7 @@ export class TelemetryRail {
     const collapsed = (value: boolean): void => {
       root.classList.toggle('is-collapsed', value); toggle.setAttribute('aria-expanded', String(!value));
       toggle.setAttribute('aria-label', value ? 'Expand telemetry' : 'Collapse telemetry');
+      toggle.querySelector('.telemetry-toggle-symbol')?.replaceChildren(value ? '+' : '−');
     };
     toggle.addEventListener('click', () => collapsed(!root.classList.contains('is-collapsed')), { signal: this.#lifetime.signal });
     const compact = matchMedia('(max-width: 1279px)'); const adapt = (): void => collapsed(compact.matches);

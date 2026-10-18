@@ -29,7 +29,7 @@ export type ScannedNote =
   | { readonly status: 'rejected'; readonly id: string; readonly code: VaultErrorCode; readonly message: string };
 
 export async function mockNoteKey(viewingKey: string): Promise<CryptoKey> {
-  if (viewingKeyKind(viewingKey) !== 'mock') throw new VaultError('unsupported');
+  viewingKeyKind(viewingKey);
   const bytes = decodeHex(viewingKey.slice('mock:node07:'.length), 32);
   try {
     const material = await crypto.subtle.importKey('raw', bytes, 'HKDF', false, ['deriveKey']);

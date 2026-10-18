@@ -1,6 +1,6 @@
 # DarkZec engineering report — active repository
 
-Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream and Phase 1/Phase 2 refinements.
+Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream, Phase 1/Phase 2 refinements and targeted security/UI hardening.
 
 ## Repository and implementation status
 
@@ -8,7 +8,7 @@ The workspace is an active **Git repository on `main`**, with origin configured 
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification: **58 unit/privacy/CLI tests across 9 files, 27 E2E tests, and 39 transformed production modules**. The earlier 15-unit/9-E2E/29-module target describes a smaller stage; it is not the current result. No tests or functionality were removed to match historical counts.
+Current observed verification: **62 unit/privacy/CLI tests across 9 files, 30 E2E tests, and 39 transformed production modules**. This retains the previous 58/27 suite and adds four unit checks and three browser scenarios. The earlier 15-unit/9-E2E/29-module target describes a smaller stage; it is not the current result. The real-viewing-key storage acceptance test now requires rejection under the mock-only policy.
 
 ## Runtime and dependency compatibility
 
@@ -22,9 +22,9 @@ Node 22.18.0 is the floor for running the erasable TypeScript server without add
 
 | Runtime tested | Full unit/privacy/CLI suite | Strict type check and production bundle |
 | --- | --- | --- |
-| Node 22.18.0 | 58 passed | Passed; 39 modules. |
-| Node 24.0.0 | 58 passed | Passed; 39 modules. |
-| Node 26.10.0 | 58 passed | Passed; 39 modules. |
+| Node 22.18.0 | 62 passed | Passed; 39 modules. |
+| Node 24.0.0 | 62 passed | Passed; 39 modules. |
+| Node 26.10.0 | 62 passed | Passed; 39 modules. |
 
 The Node 22/24 matrix used official release archives, verified against their published SHA-256 checksums, outside the repository. E2E verification used Node 26.10.0 and cached Chromium. This does not claim that every future Node/browser release has been tested.
 
@@ -51,6 +51,7 @@ The project `.npmrc` selects official npm. The regenerated lockfile contains **8
 | `src/lib/security-events.ts`, `security-monitor.ts` | Typed fixed metadata, truthful encryption status and passive CSP observation. |
 | `src/lib/dom.ts`, `motion.ts`, `blind-mesh.ts` | Cleanup ownership, visibility/reduced-motion scheduling and public-commitment-only geometry. |
 | `tests/*.test.ts`, `tests/fixtures.ts`, `tests/e2e/*.spec.ts` | Unit/privacy/CLI invariants, synthetic/public encodings and complete browser flows. |
+| `LICENSE`, `.github/workflows/ci.yml` | MIT licensing and SHA-pinned, read-only push/PR build/unit CI on Node 22/24. |
 | `README.md`, `DARKZEC-STANDARD.md`, `docs/` | Current entry point, protocol rules, stage reports, local badge asset and implementation records. |
 
 Dependencies, `dist/`, browser traces/reports and `test-results/` are ignored artifacts. Source and protocol changes remain reviewable in Git.
@@ -75,9 +76,9 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 
 **Clearing.** Bids sort by price and accepted submission order. Eligible demand at or below supply, or one eligible envelope, pays reserve. When one envelope wins all supply, its own excess demand is excluded and the highest losing eligible envelope sets the price, floored at reserve. With multiple winners, the highest unfilled eligible lot sets the price; a partial marginal bid can set it. The single-lot/unit-demand case produces second-price clearing, without a multi-lot VCG claim. Every allocation preserves exact escrow conservation. The built-in 10-lot walkthrough still clears at `0.68 ZEC` with the default submitted bid and three fixtures.
 
-**Local sealing and viewing vault.** Sandbox bids are retained as AES-256-GCM ciphertext with random IVs and commitment AAD under a nonextractable session key. The separate mock scanner authenticates 528-byte envelopes before recovering exact 512-byte fields. It strips padding after authentication, decodes the declared transport, validates schema/commitment/escrow/refund and isolates rejected notes. Real Unified Viewing Keys can be stored after envelope checks but cannot perform real Orchard decryption here.
+**Local sealing and viewing vault.** Sandbox bids are retained as AES-256-GCM ciphertext with random IVs and commitment AAD under a nonextractable session key. The separate mock scanner authenticates 528-byte envelopes before recovering exact 512-byte fields. It strips padding after authentication, decodes the declared transport, validates schema/commitment/escrow/refund and isolates rejected notes. Only `mock:node07:` followed by exactly 64 lowercase hex characters is accepted. Real Unified Viewing Keys cannot be saved or unlocked until an audited WASM adapter is ready; the previous storage-only path and its acceptance test have been removed.
 
-**Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
+**Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes mock-key tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Invalid/non-mock input is rejected before storage access. Stored ciphertext must have the exact mock-key-plus-tag length, and decrypted credentials are validated again, so legacy non-mock records cannot unlock. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
 
 **Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing.
 
@@ -96,6 +97,8 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 Application code makes no external runtime requests. Scripts/styles are local, fonts are system monospace, icons are inline, and there is no RPC, analytics, remote QR service or background polling. HTTP and fallback meta CSP enforce `connect-src 'none'`, `font-src 'none'`, self-only scripts/styles and no workers/forms. The loopback server also applies no-referrer, no-store, nosniff, frame and permissions restrictions. Explicit wallet handoff leaves this boundary; the selected wallet controls its networking.
 
 The audit API stores fixed messages and bounded numeric metadata, never keys, addresses, salts, amounts, payloads, raw exceptions or blocked URLs. The full history retains 128 events, with 18 rendered in the rail. Pause freezes the full view only. Frame work is capped, pauses while hidden/offscreen, and respects reduced motion; subscriptions, timers and observers are disposed on page exit. The log is keyboard-readable without character-by-character screen-reader announcements. Canvas geometry never uses bid amounts.
+
+All CSS terminal text and canvas labels have an 11px minimum, including responsive overrides and telemetry streams. A DOM-updated telemetry symbol replaces the earlier zero-font-size hiding technique. Mobile navigation and telemetry labels wrap at readable sizes. Both bid forms provide price/quantity examples; auction and vault result tables use bounded horizontal scroll regions, keyboard focus outlines and visible mobile scroll hints. Browser checks cover 320, 390, 768, 1280 and 1440px widths, including the expanded manual and telemetry.
 
 ## Build, serve and verification
 
@@ -117,13 +120,16 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 58 tests passed across 9 files. |
+| `npm test` | 62 tests passed across 9 files. |
 | `npm run build` | Strict TypeScript passed; 39 transformed modules. |
-| `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | Fresh build followed by 27 passing E2E tests. |
-| Node 22.18.0 / 24.0.0 matrix | Each: 58 tests, strict check and 39-module bundle passed. |
-| Production bundle | JavaScript 88.10 kB / 30.96 kB gzip; CSS 37.22 kB / 8.66 kB gzip. |
+| `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | Fresh build followed by 30 passing E2E tests. |
+| Node 22.18.0 / 24.0.0 matrix | Each: 62 tests, strict check and 39-module bundle passed. |
+| Production bundle | JavaScript 87.88 kB / 30.85 kB gzip; CSS 37.63 kB / 8.62 kB gzip. |
+| CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24 and install/build/unit steps. Hosted execution requires pushing the workflow. |
 
 The temporary browser config only selects cached Chromium for this workspace. The maintained configuration is portable. Browser coverage includes existing protocol/wallet/vault/security flows, the five reproduced Phase 2 regressions, failed Merkle compilation and an oversized winning bid priced against competing demand; unit coverage includes missing-build CLI failures. Source privacy, registry origin and strict typing checks remain enabled. Desktop/mobile screenshots are generated under `test-results/` and visually reviewed. No public CI or independent audit result is claimed.
+
+The targeted pass additionally rejects checksum-valid real viewing keys before storage and authentic legacy encrypted non-mock records during unlock. Source and runtime privacy guards now restrict the storage exception to encrypted mock credentials. A timing race in the CSP/log-clear test was fixed by waiting for the initial memo operation to finish before asserting that history clears; legitimate later events are not suppressed. See the [targeted hardening report](targeted-hardening-report.md) for the full changed-file inventory and verification commands.
 
 ## References, provenance and remaining integration work
 

@@ -20,7 +20,7 @@ export type VaultOperation = 'save' | 'unlock' | 'load' | 'scan' | 'incoming';
 export type VaultAuditEvent = ScanAuditEvent
   | { readonly type: 'vault-attempt'; readonly operation: VaultOperation }
   | { readonly type: 'vault-saved' }
-  | { readonly type: 'vault-unlocked'; readonly mock: boolean }
+  | { readonly type: 'vault-unlocked'; readonly mock: true }
   | { readonly type: 'vault-failed'; readonly operation: VaultOperation }
   | { readonly type: 'vault-locked' }
   | { readonly type: 'vault-forgotten' };
@@ -149,7 +149,7 @@ export class SecurityAudit {
     switch (event.type) {
       case 'vault-attempt': if (Object.hasOwn(OPERATIONS, event.operation)) { this.encryption('idle'); this.#record('VAULT', `Attempt started: ${OPERATIONS[event.operation]}`); } break;
       case 'vault-saved': this.#record('VAULT', 'Viewing-key session encrypted and saved; key withheld', 'success'); break;
-      case 'vault-unlocked': this.#record('VAULT', event.mock ? 'Mock vault unlocked locally' : 'Unified key unlocked for storage only; Orchard adapter unavailable', 'success', event.mock); break;
+      case 'vault-unlocked': this.#record('VAULT', 'Mock vault unlocked locally', 'success', true); break;
       case 'vault-failed': if (Object.hasOwn(OPERATIONS, event.operation)) { this.encryption('invalid'); this.#record('VAULT', `Attempt refused: ${OPERATIONS[event.operation]}; private details omitted`, 'warning'); } break;
       case 'vault-locked': this.encryption('idle'); this.memo({ bytes: 0, state: 'empty' }, 'vault'); this.#record('VAULT', 'Vault locked; live keys and private rows cleared'); break;
       case 'vault-forgotten': this.#record('VAULT', 'Encrypted viewing-key session removed'); break;

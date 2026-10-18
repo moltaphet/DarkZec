@@ -12,6 +12,11 @@ import type { SessionStore } from '../src/lib/viewing-key-session';
 const bid = { auctionId: SIMULATION_CONFIG.auctionId, price: '0.74', quantity: 4, salt: 'a'.repeat(64), refund: FIXTURE_REFUND_ADDRESS };
 const memo = serializeBidMemo(bid, 'testnet');
 
+function unifiedViewingKey(prefix: 'uview' | 'uviewtest'): string {
+  const padding = new Uint8Array(16); padding.set(utf8(prefix));
+  return bech32m.encode(prefix, bech32m.toWords(f4jumble(new Uint8Array([3, 96, ...new Uint8Array(96), ...padding]))), 2048);
+}
+
 describe('authenticated memo field parsing', () => {
   it('accepts direct JSON and canonical Base64url after stripping only trailing zero bytes', () => {
     for (const transport of ['json', 'base64url'] as const) {
@@ -121,20 +126,44 @@ describe('passphrase-encrypted viewing-key session', () => {
   it('refuses insufficient passphrases, unsupported key inputs and unavailable/denied storage', async () => {
     const session = new ViewingKeySession(new MemoryStore());
     await expect(session.save(DEMO_VIEWING_KEY, 'short')).rejects.toThrow('12–128');
-    await expect(session.save('seed phrase', 'long-enough-passphrase')).rejects.toThrow('Viewing Key');
+    await expect(session.save('seed phrase', 'long-enough-passphrase')).rejects.toThrow('Mock keys only');
     expect(new ViewingKeySession(null).status()).toBe('unavailable');
     expect(new ViewingKeySession({ getItem: () => { throw new Error('denied'); }, setItem: () => undefined, removeItem: () => undefined }).status()).toBe('unavailable');
     await expect(new ViewingKeySession(null).save(DEMO_VIEWING_KEY, 'long-enough-passphrase')).rejects.toThrow('unavailable');
     const denied = new ViewingKeySession({ getItem: () => null, setItem: () => { throw new Error('denied'); }, removeItem: () => { throw new Error('denied'); } });
     await expect(denied.save(DEMO_VIEWING_KEY, 'long-enough-passphrase')).rejects.toThrow('could not be saved');
   });
-  it('checks Unified Viewing Key envelope format without pretending to decrypt Orchard notes', async () => {
-    const padding = new Uint8Array(16); padding.set(utf8('uview'));
-    const unified = bech32m.encode('uview', bech32m.toWords(f4jumble(new Uint8Array([3, 96, ...new Uint8Array(96), ...padding]))), 2048);
-    expect(viewingKeyKind(unified)).toBe('unified'); await expect(mockNoteKey(unified)).rejects.toMatchObject({ code: 'unsupported' });
-    expect(() => viewingKeyKind('uview1not-a-key')).toThrow();
-    const session = new ViewingKeySession(new MemoryStore()); await session.save(unified, 'correct-local-passphrase');
-    expect(await session.unlock('correct-local-passphrase')).toBe(unified);
+  it('rejects even checksum-valid Unified Viewing Keys before storage or mock derivation', async () => {
+    const store = new MemoryStore(); const session = new ViewingKeySession(store);
+    for (const prefix of ['uview', 'uviewtest'] as const) {
+      const unified = unifiedViewingKey(prefix);
+      expect(() => viewingKeyKind(unified)).toThrow('Mock keys only');
+      await expect(session.save(unified, 'correct-local-passphrase')).rejects.toThrow('Mock keys only');
+      await expect(mockNoteKey(unified)).rejects.toThrow('Mock keys only');
+      expect(store.values.size).toBe(0);
+    }
+  });
+  it('accepts only exact mock credentials and rejects malformed or appended key material', async () => {
+    expect(viewingKeyKind(DEMO_VIEWING_KEY)).toBe('mock');
+    for (const key of ['uview1not-a-key', 'mock:node07:*', DEMO_VIEWING_KEY + '\n', DEMO_VIEWING_KEY + '00',
+      DEMO_VIEWING_KEY.slice(0, -1), 'mock:node07:' + 'GG'.repeat(32), DEMO_VIEWING_KEY.replace('node07', 'node08')]) {
+      const store = new MemoryStore();
+      expect(() => viewingKeyKind(key)).toThrow('Mock keys only');
+      await expect(new ViewingKeySession(store).save(key, 'correct-local-passphrase')).rejects.toThrow('Mock keys only');
+      expect(store.values.size).toBe(0);
+    }
+  });
+  it('refuses non-mock plaintext inside an otherwise authentic legacy encrypted session', async () => {
+    const store = new MemoryStore(); const salt = crypto.getRandomValues(new Uint8Array(16));
+    const material = await crypto.subtle.importKey('raw', utf8('correct-local-passphrase'), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 }, material,
+      { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    for (const plaintext of [unifiedViewingKey('uview'), unifiedViewingKey('uviewtest'), 'uview1' + 'x'.repeat(DEMO_VIEWING_KEY.length - 6)]) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: utf8('DARKZEC/viewing-key-session/v1') }, key, utf8(plaintext));
+      store.setItem(VIEWING_SESSION_KEY, JSON.stringify({ v: 1, kdf: 'PBKDF2-SHA256', iterations: 600_000, salt: hex(salt), iv: hex(iv), ciphertext: hex(new Uint8Array(ciphertext)) }));
+      await expect(new ViewingKeySession(store).unlock('correct-local-passphrase')).rejects.toMatchObject({ code: 'session' });
+    }
   });
   it('cancels a pending save before it can repopulate a forgotten session', async () => {
     const store = new MemoryStore(); const session = new ViewingKeySession(store);
