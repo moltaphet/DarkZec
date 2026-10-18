@@ -4,13 +4,14 @@ import { parseBidMemo } from '../protocol/memo';
 import type { BidMemo } from '../protocol/memo';
 
 export type MemoTransport = 'json' | 'base64url';
-export type VaultErrorCode = 'format' | 'encoding' | 'schema' | 'auction' | 'authentication' | 'commitment' | 'escrow' | 'destination' | 'duplicate' | 'unsupported' | 'session' | 'cancelled';
+export type VaultErrorCode = 'format' | 'encoding' | 'schema' | 'auction' | 'authentication' | 'commitment' | 'escrow' | 'destination' | 'duplicate' | 'refund' | 'unsupported' | 'session' | 'cancelled';
 const ERRORS: Readonly<Record<VaultErrorCode, string>> = {
   format: 'Invalid note or 512-byte memo field.', encoding: 'Invalid memo encoding or noncanonical Base64url.',
   schema: 'Bid schema or Orchard refund validation failed.', auction: 'Note belongs to another auction.',
   authentication: 'Note authentication failed. Check the mock viewing key.', commitment: 'Bid commitment does not match the note.',
   escrow: 'Bid escrow does not match the note.', destination: 'Note network or vault destination does not match.',
   duplicate: 'Duplicate note identifier or commitment.', unsupported: 'Real Orchard scanning requires an audited adapter. Use the mock key for this local scanner.',
+  refund: 'Security error: refund address must differ from the auction vault.',
   session: 'Saved session is invalid or the unlock passphrase is incorrect.', cancelled: 'Vault operation cancelled.',
 };
 export class VaultError extends Error {

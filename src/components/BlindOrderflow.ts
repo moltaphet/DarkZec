@@ -43,7 +43,12 @@ export class BlindOrderflow {
       event.preventDefault();
       if (event.key === 'Escape') this.#select(-1);
       else if (event.key === 'Home') this.#select(0);
-      else this.#select((this.#selected + (event.key === 'ArrowLeft' ? -1 : 1) + this.#nodes.length) % this.#nodes.length);
+      else {
+        const count = this.#nodes.length;
+        const next = this.#selected < 0 ? (event.key === 'ArrowLeft' ? count - 1 : 0) :
+          (this.#selected + (event.key === 'ArrowLeft' ? -1 : 1) + count) % count;
+        this.#select(count ? next : -1);
+      }
     }, { signal: this.#lifetime.signal });
     canvas.addEventListener('blur', () => this.#select(-1), { signal: this.#lifetime.signal });
     this.#lifetime.own(() => resize.disconnect()); this.#lifetime.own(() => this.#loop.destroy());

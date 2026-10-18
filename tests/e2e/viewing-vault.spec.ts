@@ -69,6 +69,7 @@ test('wrong mock keys quarantine all notes and switching away during save leaves
   await page.locator('#vault-passphrase').fill('private-wrong-key-passphrase'); await page.locator('#vault-save').click();
   await expect(page.locator('#vault-mode')).toHaveText('MOCK / UNLOCKED'); await page.locator('#vault-load-notes').click();
   await expect(page.locator('#vault-accepted dd')).toHaveText('0'); await expect(page.locator('#vault-rejected dd')).toHaveText('5');
+  await expect(page.locator('#stream-shield')).toHaveText('OFFLINE');
   await expect(page.locator('#vault-result-rows')).toContainText('authentication failed');
   await page.locator('#vault-forget').click(); await page.locator('#vault-demo').click();
   await page.locator('#vault-save').click(); await page.getByRole('button', { name: 'Auction sandbox' }).click();

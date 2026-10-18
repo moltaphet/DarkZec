@@ -1,12 +1,14 @@
-import { validateOrchardAddress } from '../protocol/address';
+import { assertDistinctRefund, validateOrchardAddress } from '../protocol/address';
 import type { Network } from '../protocol/address';
 import { formatZec, parseZec } from '../protocol/amount';
 import { commitment, freshSalt, hex, utf8 } from '../protocol/crypto';
 import { encodeMemo, serializeBidMemo } from '../protocol/memo';
-import { DEMO_BIDS, FIXTURE_ADDRESS, SIMULATION_CONFIG } from '../fixtures';
+import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../fixtures';
 import { DEMO_VIEWING_KEY, viewingKeyKind } from './viewing-key-session';
 import { decodeHex, parseVaultMemo, VaultError } from './vault-memo';
 import type { MemoTransport, ParsedVaultMemo, VaultErrorCode } from './vault-memo';
+import { notifyAudit } from './security-events';
+import type { AuditObserver, ScanAuditEvent } from './security-events';
 
 export interface MockNote {
   readonly id: string;
@@ -52,11 +54,13 @@ export function paddedMockField(text: string): Uint8Array<ArrayBuffer> {
 }
 
 export async function scanMockNotes(notes: readonly MockNote[], key: CryptoKey, scope: ScanScope,
-  signal?: AbortSignal, progress?: (processed: number, total: number) => void): Promise<readonly ScannedNote[]> {
+  signal?: AbortSignal, progress?: (processed: number, total: number) => void, audit?: AuditObserver<ScanAuditEvent>): Promise<readonly ScannedNote[]> {
   if (notes.length > 128) throw new Error('Local scanner limit: 128 notes.');
+  if (signal?.aborted) throw new VaultError('cancelled');
   scope = Object.freeze({ ...scope });
   const ids = new Set<string>(); const hashes = new Set<string>(); const results: ScannedNote[] = [];
   const snapshot = notes.map(note => ({ ...note }));
+  notifyAudit(audit, { type: 'scan-started', total: snapshot.length });
   for (const note of snapshot) {
     if (signal?.aborted) throw new VaultError('cancelled');
     let bytes: Uint8Array<ArrayBuffer> | undefined;
@@ -67,34 +71,42 @@ export async function scanMockNotes(notes: readonly MockNote[], key: CryptoKey, 
       validateOrchardAddress(note.vault, scope.network);
       if (note.auctionId !== scope.auctionId) throw new VaultError('auction');
       const iv = decodeHex(note.ivHex, 12); const ciphertext = decodeHex(note.encryptedMemoHex, 528);
+      notifyAudit(audit, { type: 'decryption-attempt' });
       try { bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: noteAAD(note) }, key, ciphertext)); }
       catch { throw new VaultError('authentication'); }
       if (signal?.aborted) throw new VaultError('cancelled');
+      notifyAudit(audit, { type: 'decryption-succeeded' });
       const memoHex = hex(bytes);
       const parsed = parseVaultMemo(memoHex, note.transport, scope.network, scope.auctionId);
       if (!parsed) results.push(Object.freeze({ status: 'empty', id: note.id }));
       else {
+        try { assertDistinctRefund(parsed.bid.refund, scope.vault, scope.network); } catch { throw new VaultError('refund'); }
         const hash = await commitment(parsed.bid);
+        if (signal?.aborted) throw new VaultError('cancelled');
         if (hash !== note.commitment) throw new VaultError('commitment');
         if (hashes.has(hash)) throw new VaultError('duplicate');
         if (note.amount !== formatZec(parseZec(parsed.bid.price) * BigInt(parsed.bid.quantity))) throw new VaultError('escrow');
         hashes.add(hash); results.push(Object.freeze({ status: 'accepted', id: note.id, parsed, commitment: hash, memoHex }));
+        notifyAudit(audit, { type: 'scan-memo-validated', bytes: parsed.jsonBytes });
       }
     } catch (error: unknown) {
       if (error instanceof VaultError && error.code === 'cancelled') throw error;
       const issue = error instanceof VaultError ? error : new VaultError('format');
+      notifyAudit(audit, { type: 'note-rejected', authentication: issue.code === 'authentication' });
       results.push(Object.freeze({ status: 'rejected', id: /^NOTE-[0-9]{4}$/.test(note.id) ? note.id : 'INVALID NOTE', code: issue.code, message: issue.message }));
     } finally { bytes?.fill(0); }
     progress?.(results.length, snapshot.length);
   }
   if (signal?.aborted) throw new VaultError('cancelled');
+  notifyAudit(audit, { type: 'scan-completed', accepted: results.filter(row => row.status === 'accepted').length,
+    rejected: results.filter(row => row.status === 'rejected').length, empty: results.filter(row => row.status === 'empty').length });
   return Object.freeze(results);
 }
 
 export async function incomingDemoNote(index: number, key: CryptoKey): Promise<MockNote> {
   if (!Number.isInteger(index) || index < 1 || index > 128) throw new VaultError('format');
   const fixture = DEMO_BIDS[(index - 1) % DEMO_BIDS.length]; if (!fixture) throw new VaultError('format');
-  const bid = { ...fixture, auctionId: SIMULATION_CONFIG.auctionId, salt: await freshSalt(SIMULATION_CONFIG.auctionId), refund: FIXTURE_ADDRESS };
+  const bid = { ...fixture, auctionId: SIMULATION_CONFIG.auctionId, salt: await freshSalt(SIMULATION_CONFIG.auctionId), refund: FIXTURE_REFUND_ADDRESS };
   const transport: MemoTransport = index % 2 === 0 ? 'base64url' : 'json';
   const memo = serializeBidMemo(bid, 'testnet'); const field = paddedMockField(transport === 'json' ? memo : encodeMemo(memo));
   try { return await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: `NOTE-${String(index).padStart(4, '0')}`, commitment: await commitment(bid), amount: formatZec(parseZec(bid.price) * BigInt(bid.quantity)), transport }, field, key); }

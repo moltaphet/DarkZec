@@ -8,10 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "node scripts/serve.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "verify": "npm test && npm run build && npm run test:e2e"
+    "test:e2e": "npm run build && playwright test",
+    "verify": "npm test && npm run test:e2e"
   },
-  "engines": { "node": ">=24.0.0" },
+  "engines": { "node": "^22.18.0 || ^24.0.0 || >=26.0.0" },
   "dependencies": {
     "@noble/hashes": "2.4.0",
     "@scure/base": "2.4.0"

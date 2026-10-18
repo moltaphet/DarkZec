@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { encodeOrchardAddress } from '../../src/protocol/address';
-import { unhex } from '../../src/protocol/crypto';
 import { FIXTURE_ADDRESS } from '../../src/fixtures';
-
-// Another PUBLIC official receiver. Used only in intercepted browser tests; no wallet is opened.
-const receiver = 'cc802699330bc4748e34dd598c7124e72299e6a6d5bcc32e90409c8024868b2705aadfab6068d458f69b0c';
-const testAddress = encodeOrchardAddress(unhex(receiver), 'testnet');
+import { WALLET_REFUND, WALLET_VAULT } from '../fixtures';
 
 test('complete local auction stays offline, reveals deliberately, audits and resets', async ({ page, context }) => {
   const external: string[] = []; const failures: string[] = []; const sockets: string[] = [];
@@ -57,7 +52,7 @@ test('wallet builder rejects fixtures and gates explicit handoff, invalidating s
   await page.goto('/');
   await page.getByRole('button', { name: 'Wallet request' }).click();
   await page.locator('#wallet-vault').fill('t1transparent');
-  await page.locator('#wallet-refund').fill(testAddress);
+  await page.locator('#wallet-refund').fill(WALLET_REFUND);
   await page.locator('#wallet-price').fill('0.72');
   await page.locator('#wallet-quantity').fill('4');
   await page.locator('#wallet-prepare').click();
@@ -65,7 +60,7 @@ test('wallet builder rejects fixtures and gates explicit handoff, invalidating s
   await page.locator('#wallet-vault').fill(FIXTURE_ADDRESS);
   await page.locator('#wallet-prepare').click();
   await expect(page.locator('#error')).toContainText('Public demo fixtures');
-  await page.locator('#wallet-vault').fill(testAddress);
+  await page.locator('#wallet-vault').fill(WALLET_VAULT);
   await page.locator('#wallet-prepare').click();
   await expect(page.locator('#wallet-output')).toBeVisible();
   await expect(page.locator('#wallet-uri')).toHaveValue(/^zcash:utest1.+amount=2\.88&memo=/);

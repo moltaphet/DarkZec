@@ -5,6 +5,8 @@ import type { ViewingKeyKind, ViewingKeySession } from '../lib/viewing-key-sessi
 import { createDemoNotes, incomingDemoNote, mockNoteKey, MOCK_SCAN_SCOPE, scanMockNotes } from '../lib/mock-note-scanner';
 import type { MockNote, ScannedNote } from '../lib/mock-note-scanner';
 import { VaultError } from '../lib/vault-memo';
+import { notifyAudit } from '../lib/security-events';
+import type { AuditObserver, VaultAuditEvent, VaultOperation } from '../lib/security-events';
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const result = document.createElement(tag); result.className = className; result.textContent = text; return result;
@@ -21,6 +23,7 @@ function metric(id: string, label: string): HTMLElement {
 export class ViewingKeyVault implements Disposable {
   readonly #host: HTMLElement;
   readonly #session: ViewingKeySession;
+  readonly #audit: AuditObserver<VaultAuditEvent> | undefined;
   readonly #lifetime = new Lifetime();
   #rowLifetime = new Lifetime();
   readonly #keyInput = node('input');
@@ -51,8 +54,8 @@ export class ViewingKeyVault implements Disposable {
   #operation: AbortController | undefined;
   #disposed = false;
 
-  constructor(host: HTMLElement, session = browserViewingKeySession()) {
-    this.#host = host; this.#session = session;
+  constructor(host: HTMLElement, session = browserViewingKeySession(), audit?: AuditObserver<VaultAuditEvent>) {
+    this.#host = host; this.#session = session; this.#audit = audit;
     host.setAttribute('data-independent-controls', '');
     this.#build(); this.#events(); this.#render(); this.#controls();
     const saved = session.status();
@@ -112,19 +115,21 @@ export class ViewingKeyVault implements Disposable {
 
   #events(): void {
     const signal = this.#lifetime.signal;
-    this.#form.addEventListener('submit', event => { event.preventDefault(); void this.#run(async signal => {
+    this.#form.addEventListener('submit', event => { event.preventDefault(); void this.#run('save', async signal => {
       const value = this.#keyInput.value.trim(); const passphrase = this.#passphrase.value;
       this.#clearInputs();
       const kind = await this.#session.save(value, passphrase); this.#check(signal);
       const key = kind === 'mock' ? await mockNoteKey(value) : undefined; this.#check(signal);
       this.#key = key; this.#kind = kind; this.#results = [];
+      notifyAudit(this.#audit, { type: 'vault-saved' }); notifyAudit(this.#audit, { type: 'vault-unlocked', mock: kind === 'mock' });
       this.#message(kind === 'mock' ? 'Mock vault unlocked. Load demo notes to scan locally; no real Orchard decryption occurs.' : 'Unified key saved and unlocked locally. Real Orchard scanning is unavailable; use a mock key for the demo.');
     }); }, { signal });
-    this.#unlock.addEventListener('click', () => { void this.#run(async signal => {
+    this.#unlock.addEventListener('click', () => { void this.#run('unlock', async signal => {
       const passphrase = this.#passphrase.value; this.#clearInputs();
       const value = await this.#session.unlock(passphrase); this.#check(signal);
       const kind = viewingKeyKind(value); const key = kind === 'mock' ? await mockNoteKey(value) : undefined; this.#check(signal);
       this.#kind = kind; this.#key = key;
+      notifyAudit(this.#audit, { type: 'vault-unlocked', mock: kind === 'mock' });
       this.#message(kind === 'mock' ? 'Saved mock vault unlocked. Load or rescan the local notes.' : 'Unified key unlocked. The mock scanner cannot decrypt Orchard notes.');
     }); }, { signal });
     this.#demo.addEventListener('click', () => {
@@ -134,15 +139,15 @@ export class ViewingKeyVault implements Disposable {
     this.#lock.addEventListener('click', () => this.lock(), { signal });
     this.#forget.addEventListener('click', () => {
       this.lock();
-      try { this.#session.forget(); this.#notes = []; this.#message('Saved encrypted key forgotten. Local notes and private results cleared.'); }
+      try { this.#session.forget(); this.#notes = []; notifyAudit(this.#audit, { type: 'vault-forgotten' }); this.#message('Saved encrypted key forgotten. Local notes and private results cleared.'); }
       catch (error: unknown) { this.#showError(error); }
       this.#render(); this.#controls();
     }, { signal });
-    this.#load.addEventListener('click', () => { void this.#run(async signal => {
+    this.#load.addEventListener('click', () => { void this.#run('load', async signal => {
       const notes = await createDemoNotes(); this.#check(signal); this.#notes = notes; await this.#scanNotes(signal);
     }); }, { signal });
-    this.#scan.addEventListener('click', () => { void this.#run(signal => this.#scanNotes(signal)); }, { signal });
-    this.#incoming.addEventListener('click', () => { void this.#run(async signal => {
+    this.#scan.addEventListener('click', () => { void this.#run('scan', signal => this.#scanNotes(signal)); }, { signal });
+    this.#incoming.addEventListener('click', () => { void this.#run('incoming', async signal => {
       if (this.#notes.length >= 128) throw new Error('Local scanner limit: 128 notes.');
       const producerKey = await mockNoteKey(DEMO_VIEWING_KEY);
       const note = await incomingDemoNote(this.#notes.length + 1, producerKey); this.#check(signal);
@@ -157,12 +162,13 @@ export class ViewingKeyVault implements Disposable {
     this.#error.textContent = error instanceof Error ? error.message : 'Vault operation failed. Lock and try again.';
     this.#error.hidden = false;
   }
-  async #run(operation: (signal: AbortSignal) => Promise<void>): Promise<void> {
+  async #run(name: VaultOperation, operation: (signal: AbortSignal) => Promise<void>): Promise<void> {
     if (this.#busy || this.#disposed) return;
     const epoch = ++this.#epoch; const controller = new AbortController(); this.#operation = controller;
     this.#busy = true; this.#error.hidden = true; this.#controls();
+    notifyAudit(this.#audit, { type: 'vault-attempt', operation: name });
     try { await operation(controller.signal); }
-    catch (error: unknown) { if (epoch === this.#epoch && !this.#disposed) this.#showError(error); }
+    catch (error: unknown) { if (epoch === this.#epoch && !this.#disposed) { notifyAudit(this.#audit, { type: 'vault-failed', operation: name }); this.#showError(error); } }
     finally { if (epoch === this.#epoch && !this.#disposed) { this.#busy = false; this.#operation = undefined; this.#render(); this.#controls(); } }
   }
   async #scanNotes(signal: AbortSignal): Promise<void> {
@@ -170,7 +176,7 @@ export class ViewingKeyVault implements Disposable {
     this.#results = []; this.#render();
     const rows = await scanMockNotes(this.#notes, key, MOCK_SCAN_SCOPE, signal, (done, total) => {
       if (!signal.aborted) this.#message(`SCANNING LOCAL NOTES / ${done} of ${total} authenticated envelopes processed.`);
-    });
+    }, event => { if (!signal.aborted && !this.#disposed) notifyAudit(this.#audit, event); });
     this.#check(signal); this.#results = rows;
     const accepted = rows.filter(row => row.status === 'accepted').length;
     const rejected = rows.filter(row => row.status === 'rejected').length;
@@ -228,10 +234,12 @@ export class ViewingKeyVault implements Disposable {
   }
 
   lock(): void {
+    const active = this.#kind !== undefined || this.#busy;
     this.#epoch++; this.#operation?.abort(); this.#operation = undefined; this.#session.cancel(); this.#busy = false;
     this.#key = undefined; this.#kind = undefined; this.#results = []; this.#clearInputs(); this.#error.hidden = true;
     this.#message('Vault locked. Live keys and decrypted rows cleared; the saved session remains encrypted.');
     this.#render(); this.#controls();
+    if (active) notifyAudit(this.#audit, { type: 'vault-locked' });
   }
   destroy(): void { this.lock(); this.#disposed = true; this.#notes = []; this.#rowLifetime.destroy(); this.#lifetime.destroy(); this.#host.replaceChildren(); }
 }

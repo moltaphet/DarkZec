@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bech32m } from '@scure/base';
-import { FIXTURE_ADDRESS, SIMULATION_CONFIG } from '../src/fixtures';
+import { FIXTURE_ADDRESS, FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../src/fixtures';
 import { f4jumble } from '../src/protocol/address';
 import { commitment, hex, utf8 } from '../src/protocol/crypto';
 import { encodeMemo, serializeBidMemo } from '../src/protocol/memo';
@@ -9,7 +9,7 @@ import { createDemoNotes, encryptMockNote, mockNoteKey, MOCK_SCAN_SCOPE, paddedM
 import { DEMO_VIEWING_KEY, ViewingKeySession, VIEWING_SESSION_KEY, viewingKeyKind } from '../src/lib/viewing-key-session';
 import type { SessionStore } from '../src/lib/viewing-key-session';
 
-const bid = { auctionId: SIMULATION_CONFIG.auctionId, price: '0.74', quantity: 4, salt: 'a'.repeat(64), refund: FIXTURE_ADDRESS };
+const bid = { auctionId: SIMULATION_CONFIG.auctionId, price: '0.74', quantity: 4, salt: 'a'.repeat(64), refund: FIXTURE_REFUND_ADDRESS };
 const memo = serializeBidMemo(bid, 'testnet');
 
 describe('authenticated memo field parsing', () => {
@@ -38,7 +38,7 @@ describe('authenticated memo field parsing', () => {
     for (const value of ['00'.repeat(511), '00'.repeat(513), 'gg'.repeat(512)]) expect(() => parseVaultMemo(value, 'json', 'testnet', bid.auctionId)).toThrow('512-byte');
     for (const value of ['Zg==', 'Zh', 'a', '+/8', 'a'.repeat(684)]) expect(() => decodeBase64url(value)).toThrow();
     expect(() => parseVaultMemo(hex(paddedMockField(memo)), 'json', 'testnet', 'OTHER')).toThrow('another auction');
-    for (const value of [memo.replace('"v":1', '"v":2'), memo.replace('0.74', '0.740'), memo.replace('"q":4', '"q":1.5'), memo.replace('a'.repeat(64), 'bad'), memo.replace(FIXTURE_ADDRESS, 't1bad'), memo.replace('{', '{"extra":1,')]) {
+    for (const value of [memo.replace('"v":1', '"v":2'), memo.replace('0.74', '0.740'), memo.replace('"q":4', '"q":1.5'), memo.replace('a'.repeat(64), 'bad'), memo.replace(FIXTURE_REFUND_ADDRESS, 't1bad'), memo.replace('{', '{"extra":1,')]) {
       expect(() => parseVaultMemo(hex(paddedMockField(value)), 'json', 'testnet', bid.auctionId)).toThrow('schema');
     }
   });
@@ -81,6 +81,12 @@ describe('mock note scan isolation', () => {
     await expect(scanMockNotes(notes, key, MOCK_SCAN_SCOPE, abort.signal, () => abort.abort())).rejects.toMatchObject({ code: 'cancelled' });
     const note = notes[0]; if (!note) throw new Error('Missing note');
     await expect(scanMockNotes(Array.from({ length: 129 }, () => note), key, MOCK_SCAN_SCOPE)).rejects.toThrow('128');
+  });
+  it('quarantines an authentic memo that refunds to the receiving vault', async () => {
+    const self = { ...bid, refund: FIXTURE_ADDRESS }; const field = paddedMockField(serializeBidMemo(self, 'testnet'));
+    const key = await mockNoteKey(DEMO_VIEWING_KEY);
+    const note = await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: 'NOTE-0001', commitment: await commitment(self), amount: '2.96', transport: 'json' }, field, key);
+    expect((await scanMockNotes([note], key, MOCK_SCAN_SCOPE))[0]).toMatchObject({ status: 'rejected', code: 'refund' });
   });
 });
 

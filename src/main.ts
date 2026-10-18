@@ -2,6 +2,7 @@ import './style.css';
 import './components/terminal-effects.css';
 import './components/ProtocolSpecs.css';
 import './components/ViewingKeyVault.css';
+import './components/LiveTerminalStream.css';
 import { element, Lifetime } from './lib/dom';
 import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
@@ -10,7 +11,10 @@ import { BlindOrderflow } from './components/BlindOrderflow';
 import { TelemetryRail } from './components/TelemetryRail';
 import { mountProtocolSpecs } from './components/ProtocolSpecs';
 import { ViewingKeyVault } from './components/ViewingKeyVault';
-import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, SIMULATION_CONFIG } from './fixtures';
+import { LiveTerminalStream } from './components/LiveTerminalStream';
+import { SecurityAudit } from './lib/security-events';
+import { monitorSecurityPolicy } from './lib/security-monitor';
+import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, FIXTURE_REFUND_ADDRESS, FIXTURE_REFUND_RECEIVER, SIMULATION_CONFIG } from './fixtures';
 import type { Network } from './protocol/address';
 import { decodeUnifiedAddress } from './protocol/address';
 import { parseQuantity } from './protocol/amount';
@@ -29,16 +33,20 @@ const text = (id: string, value: string): void => { el(id).textContent = value; 
 const visible = (id: string, show: boolean): void => { el(id).hidden = !show; };
 
 const effects = new Lifetime();
-const viewingKeyVault = new ViewingKeyVault(el('viewing-key-view'));
+const securityAudit = new SecurityAudit(); effects.own(() => securityAudit.destroy());
+const securityPolicy = monitorSecurityPolicy(securityAudit); effects.own(() => securityPolicy.destroy());
+securityAudit.log('boot');
+const stream = new LiveTerminalStream(el('live-terminal-stream'), securityAudit); effects.own(() => stream.destroy());
+const viewingKeyVault = new ViewingKeyVault(el('viewing-key-view'), undefined, event => securityAudit.vault(event));
 effects.own(() => viewingKeyVault.destroy());
 const protocolSpecs = mountProtocolSpecs(el('protocol-specs'));
 effects.own(() => protocolSpecs.destroy());
-const telemetry = new TelemetryRail(el('telemetry-rail'), button('telemetry-toggle'), el('telemetry-log'), el('telemetry-leaks'), el('telemetry-bytes'), el('telemetry-shield'));
+const telemetry = new TelemetryRail(el('telemetry-rail'), button('telemetry-toggle'), el('telemetry-log'), el('telemetry-leaks'), el('telemetry-bytes'), el('telemetry-shield'), securityAudit);
 const orderflow = new BlindOrderflow(element('blind-mesh', HTMLCanvasElement), el('mesh-caption'), el('mesh-state'));
 const memoPreview = new MemoScramble(el('memo-scramble'), el('memo-payload'), el('memo-hex-stream'), el('memo-draft-state'),
-  () => prepareBid({ auctionId: SIMULATION_CONFIG.auctionId, price: input('bid-price').value,
-    quantity: parseQuantity(input('bid-quantity').value), vault: FIXTURE_ADDRESS, refund: FIXTURE_ADDRESS, network: 'testnet' }),
-  audit => telemetry.memo(audit));
+  observer => prepareBid({ auctionId: SIMULATION_CONFIG.auctionId, price: input('bid-price').value,
+    quantity: parseQuantity(input('bid-quantity').value), vault: FIXTURE_ADDRESS, refund: FIXTURE_REFUND_ADDRESS, network: 'testnet' }, observer),
+  audit => telemetry.memo(audit), event => securityAudit.protocol(event, 'composer'));
 const header = document.querySelector<HTMLElement>('.masthead');
 const brand = document.querySelector<HTMLElement>('.brand');
 if (header && brand) { const effect = mountNetworkHeader(header, brand); effects.own(() => effect.destroy()); }
@@ -50,7 +58,7 @@ let sandbox: Sandbox | undefined;
 let prepared: PreparedBid | undefined;
 let walletPrepared: PreparedBid | undefined;
 let working = false;
-let seeded = false;
+let demoSeedProgress = 0;
 let walletView = false;
 let scannerView = false;
 let lastResult: ClearingResult | undefined;
@@ -74,7 +82,7 @@ function eraseWallet(): void {
   input('wallet-reviewed').checked = false;
   for (const id of ['wallet-amount', 'wallet-bytes']) text(id, '');
   visible('wallet-output', false); updateWalletLink();
-  if (walletView) telemetry.memo({ bytes: 0, state: 'empty' });
+  if (walletView) telemetry.memo({ bytes: 0, state: 'empty' }, 'wallet');
 }
 function updateWalletLink(): void {
   const link = element('open-wallet', HTMLAnchorElement);
@@ -85,13 +93,16 @@ function updateWalletLink(): void {
 }
 function controls(): void {
   const phase = sandbox?.publicSnapshot().phase;
+  memoPreview.setEnabled(phase === 'open' && !walletView && !scannerView);
+  if (!scannerView) securityAudit.encryption(!walletView && phase !== 'cleared' && (sandbox?.publicSnapshot().commitments.length ?? 0) > 0 ? 'auction-sealed' : 'idle');
   for (const control of document.querySelectorAll<HTMLButtonElement>('button')) if (!control.closest('[data-independent-controls]')) control.disabled = working || !sandbox;
   for (const control of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select')) if (!control.closest('[data-independent-controls]')) control.disabled = working || !sandbox;
   for (const id of ['prepare', 'seed', 'commit']) button(id).disabled = working || phase !== 'open';
-  button('seed').disabled ||= seeded;
+  button('seed').disabled ||= demoSeedProgress === DEMO_BIDS.length;
   button('commit').disabled ||= !prepared;
   button('close').disabled = working || phase !== 'open';
   button('clear').disabled = working || phase !== 'closed';
+  for (const id of ['bid-price', 'bid-quantity']) input(id).disabled = working || phase !== 'open';
   updateWalletLink();
 }
 function renderBook(): void {
@@ -129,6 +140,7 @@ async function action(operation: () => Promise<void>): Promise<void> {
 function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
   if (working) return;
   walletView = view === 'wallet'; scannerView = view === 'scanner';
+  securityAudit.encryption('idle');
   if (!scannerView) viewingKeyVault.lock();
   visible('sandbox-view', view === 'sandbox'); visible('wallet-view', walletView); visible('viewing-key-view', scannerView);
   for (const [id, active] of [['sandbox-tab', view === 'sandbox'], ['wallet-tab', walletView], ['vault-tab', scannerView]] as const) {
@@ -137,6 +149,7 @@ function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
   visible('error', false);
   clearPrepared(); eraseWallet();
   memoPreview.clear();
+  memoPreview.setEnabled(view === 'sandbox' && vault().publicSnapshot().phase === 'open');
   if (view === 'sandbox' && vault().publicSnapshot().phase === 'open') memoPreview.update();
   status(scannerView ? 'Private mock-note scanner. Viewing keys are stored only as passphrase-encrypted session ciphertext. No RPC.' : walletView ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
   controls();
@@ -153,7 +166,10 @@ element('bid-form', HTMLFormElement).addEventListener('submit', event => {
     status('Bid prepared privately. Review the memo audit, then commit to the local vault.');
   });
 });
-for (const id of ['bid-price', 'bid-quantity']) input(id).addEventListener('input', () => { clearPrepared(); memoPreview.update(); controls(); });
+for (const id of ['bid-price', 'bid-quantity']) input(id).addEventListener('input', () => {
+  if (working || walletView || scannerView || sandbox?.publicSnapshot().phase !== 'open') return;
+  clearPrepared(); memoPreview.update(); controls();
+});
 element('sensitive-details', HTMLDetailsElement).addEventListener('toggle', () => {
   area('demo-uri').value = element('sensitive-details', HTMLDetailsElement).open ? prepared?.uri ?? '' : '';
 });
@@ -174,21 +190,22 @@ button('commit').addEventListener('click', () => {
 });
 button('seed').addEventListener('click', () => {
   void action(async () => {
-    if (seeded) return;
-    for (const bid of DEMO_BIDS) {
-      await vault().submit(await prepareBid({ ...bid, auctionId: SIMULATION_CONFIG.auctionId, vault: FIXTURE_ADDRESS, refund: FIXTURE_ADDRESS, network: 'testnet' }));
+    while (demoSeedProgress < DEMO_BIDS.length) {
+      const bid = DEMO_BIDS[demoSeedProgress]; if (!bid) throw new Error('Missing local demo fixture.');
+      await vault().submit(await prepareBid({ ...bid, auctionId: SIMULATION_CONFIG.auctionId, vault: FIXTURE_ADDRESS, refund: FIXTURE_REFUND_ADDRESS, network: 'testnet' }, event => securityAudit.protocol(event, 'auction')));
+      demoSeedProgress++;
     }
-    seeded = true;
     telemetry.log('seeded');
     status('Three local demo bids committed. Their prices stay sealed until you close and unseal the auction.');
   });
 });
 button('close').addEventListener('click', () => {
   void action(async () => {
-    vault().close(); clearPrepared(); memoPreview.clear(); telemetry.log('closed'); visible('audit-panel', true);
+    vault().close(); clearPrepared(); memoPreview.setEnabled(false);
     const count = vault().publicSnapshot().commitments.length;
     if (count > 0) text('merkle-root', (await vault().audit(0)).root);
     else text('merkle-root', 'No commitments. Inclusion proofs require at least one bid.');
+    telemetry.log('closed'); if (count > 0) telemetry.log('merkle'); visible('audit-panel', true);
     status('Auction closed. The commitment set is frozen; bids remain sealed until you choose Unseal & clear.');
   });
 });
@@ -220,11 +237,15 @@ element('audit-form', HTMLFormElement).addEventListener('submit', event => {
 });
 button('reset').addEventListener('click', () => {
   void action(async () => {
-    sandbox = await Sandbox.create(SIMULATION_CONFIG); clearPrepared(); eraseWallet();
-    seeded = false; lastResult = undefined;
-    memoPreview.clear(); telemetry.reset();
+    memoPreview.setEnabled(false); clearPrepared(); eraseWallet();
+    sandbox = await Sandbox.create(SIMULATION_CONFIG);
+    demoSeedProgress = 0; lastResult = undefined;
+    for (const id of ['bid-form', 'wallet-form', 'audit-form']) element(id, HTMLFormElement).reset();
+    text('error', ''); telemetry.reset();
     visible('audit-panel', false); visible('results-panel', false); text('merkle-root', ''); text('audit-result', '');
     text('result-rows', ''); text('clearing-price', ''); text('filled-lots', '');
+    memoPreview.setEnabled(!walletView && !scannerView);
+    if (!walletView && !scannerView) memoPreview.update();
     status('Local session reset. A new session key is active and the book is empty.');
   });
 });
@@ -242,11 +263,11 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
     const vaultAddress = area('wallet-vault').value.trim(); const refund = area('wallet-refund').value.trim();
     for (const address of [vaultAddress, refund]) {
       const receivers = decodeUnifiedAddress(address, network);
-      if (receivers.some(receiver => receiver.type === 3 && hex(receiver.bytes) === FIXTURE_RECEIVER)) throw new Error('Public demo fixtures cannot be used for wallet requests. Use verified addresses you control or trust.');
+      if (receivers.some(receiver => receiver.type === 3 && [FIXTURE_RECEIVER, FIXTURE_REFUND_RECEIVER].includes(hex(receiver.bytes)))) throw new Error('Public demo fixtures cannot be used for wallet requests. Use verified addresses you control or trust.');
     }
     walletPrepared = await prepareBid({ auctionId: input('wallet-auction').value, price: input('wallet-price').value,
-      quantity: parseQuantity(input('wallet-quantity').value), vault: vaultAddress, refund, network });
-    telemetry.memo({ bytes: walletPrepared.byteLength, state: 'ready' }); telemetry.log('wallet');
+      quantity: parseQuantity(input('wallet-quantity').value), vault: vaultAddress, refund, network }, event => securityAudit.protocol(event, 'wallet'));
+    telemetry.memo({ bytes: walletPrepared.byteLength, state: 'ready' }, 'wallet'); telemetry.log('wallet');
     area('wallet-uri').value = walletPrepared.uri;
     text('wallet-amount', `${walletPrepared.amount} ZEC`); text('wallet-bytes', `${walletPrepared.byteLength} / 512 BYTES`);
     visible('wallet-output', true);
@@ -269,5 +290,5 @@ window.addEventListener('pageshow', event => {
 void action(async () => {
   if (!window.isSecureContext || !crypto.subtle) throw new Error('Open DarkZec on localhost or HTTPS to enable browser cryptography.');
   sandbox = await Sandbox.create(SIMULATION_CONFIG);
-  telemetry.shield(true); memoPreview.update();
+  memoPreview.setEnabled(true); memoPreview.update();
 });

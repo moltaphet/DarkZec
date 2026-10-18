@@ -6,12 +6,13 @@ import { formatZec, MAX_MONEY, parseQuantity, parseZec } from '../src/protocol/a
 import { canonicalPreimage, commitment, deriveSalt, freshSalt, unhex, utf8 } from '../src/protocol/crypto';
 import { buildPaymentUri, encodeMemo, memoBytes, parseBidMemo, prepareBid, serializeBidMemo } from '../src/protocol/memo';
 import { merkleProof, merkleRoot, verifyProof } from '../src/protocol/merkle';
+import { TEST_REFUND } from './fixtures';
 
 // Published zcash/zcash-test-vectors unified_address.json, account 2, diversifier 0.
 const official = 'u1ay3aawlldjrmxqnjf5medr5ma6p3acnet464ht8lmwplq5cd3ugytcmlf96rrmtgwldc75x94qn4n8pgen36y8tywlq6yjk7lkf3fa8wzjrav8z2xpxqnrnmjxh8tmz6jhfh425t7f3vy6p4pd3zmqayq49efl2c4xydc0gszg660q9p';
 const orchardHex = '953f3c78d103c32b60559299462ebb27348964b892acad10482fe502c99f0d524959ba7be4f188e3a27138';
 export const testAddress = encodeOrchardAddress(unhex(orchardHex), 'testnet');
-const bid = { auctionId: 'NODE07-001', price: '0.72', quantity: 4, salt: 'a'.repeat(64), refund: testAddress };
+const bid = { auctionId: 'NODE07-001', price: '0.72', quantity: 4, salt: 'a'.repeat(64), refund: TEST_REFUND };
 
 describe('ZIP-316 validation', () => {
   it('decodes an official UA and reproduces its exact F4Jumble encoding', () => {
@@ -22,10 +23,10 @@ describe('ZIP-316 validation', () => {
     const raw = new Uint8Array([...receivers.flatMap(r => [r.type, r.bytes.length, ...r.bytes]), ...padding]);
     expect(bech32m.encode('u', bech32m.toWords(f4jumble(raw)), 2048)).toBe(official);
   });
-  it('requires a valid Orchard-only address and the right network', () => {
+  it('requires a valid Orchard receiver and the right network', () => {
     expect(validateOrchardAddress(testAddress, 'testnet')).toBe(testAddress);
     expect(() => validateOrchardAddress(testAddress, 'mainnet')).toThrow('mainnet');
-    expect(() => validateOrchardAddress(official, 'mainnet')).toThrow('Orchard-only');
+    expect(validateOrchardAddress(official, 'mainnet')).toBe(official);
     for (const invalid of ['t1abc', 'u1fake', testAddress.toUpperCase(), testAddress.slice(0, -1) + (testAddress.endsWith('q') ? 'p' : 'q')]) {
       expect(() => validateOrchardAddress(invalid, 'testnet')).toThrow();
     }
@@ -38,7 +39,8 @@ describe('ZIP-316 validation', () => {
     expect(() => validateOrchardAddress(wrap([3, 43, ...new Uint8Array(43)]), 'testnet')).toThrow('payment point');
     expect(() => decodeUnifiedAddress(wrap([3, 43, ...r, 3, 43, ...r]), 'testnet')).toThrow('ordering');
     expect(() => decodeUnifiedAddress(wrap([253, 3, 0, 43, ...r]), 'testnet')).toThrow('CompactSize');
-    expect(() => validateOrchardAddress(wrap([0, 20, ...new Uint8Array(20), 3, 43, ...r]), 'testnet')).toThrow('Orchard-only');
+    expect(validateOrchardAddress(wrap([0, 20, ...new Uint8Array(20), 3, 43, ...r]), 'testnet')).toMatch(/^utest1/);
+    expect(() => validateOrchardAddress(wrap([2, 43, ...r]), 'testnet')).toThrow('Orchard receiver');
   });
 });
 
@@ -51,7 +53,7 @@ describe('exact amounts and commitments', () => {
     for (const bad of ['0', '1.5', '-1', '1000000']) expect(() => parseQuantity(bad)).toThrow();
   });
   it('matches independent SHA-256 and HMAC known answers', async () => {
-    const preimage = `NODE07-001:0.72:4:${'a'.repeat(64)}`;
+    const preimage = JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
     expect(canonicalPreimage(bid)).toBe(preimage);
     expect(await commitment(bid)).toBe(createHash('sha256').update(preimage).digest('hex'));
     const entropy = new Uint8Array(32).fill(42); const nonce = '0'.repeat(32);
