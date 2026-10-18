@@ -1,13 +1,13 @@
 :root {
-  color: #d8e6dd;
+  color: #dfdee0;
   font-synthesis: none;
-  --green: #0f6;
-  --muted: #8caa98;
-  --line: #263a2c;
-  --panel: #0b110e;
+  --green: #00f058;
+  --muted: #9b96a0;
+  --line: #302e32;
+  --panel: #0e0d0f;
   --amber: #ffce73;
   color-scheme: dark;
-  background: #050806;
+  background: #070707;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-weight: 400;
 }
@@ -111,7 +111,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   height: 6px;
   margin-right: 9px;
   display: inline-block;
-  box-shadow: 0 0 9px #00ff6640;
+  box-shadow: 0 0 9px #00f05840;
 }
 
 .muted {
@@ -199,9 +199,9 @@ h1 span {
 }
 
 .notice {
-  color: #b0c4b6;
-  background: #0b160f;
-  border: 1px solid #25422f;
+  color: #bab7bd;
+  background: #101011;
+  border: 1px solid #343136;
   align-items: center;
   gap: 16px;
   min-height: 48px;
@@ -216,7 +216,7 @@ h1 span {
   color: var(--green);
   letter-spacing: 1px;
   white-space: nowrap;
-  border: 1px solid #2d5b3c;
+  border: 1px solid #444147;
   padding: 3px 7px;
   font-size: 11px;
 }
@@ -328,7 +328,7 @@ h1 span {
 }
 
 label {
-  color: #c3d5c9;
+  color: #cccace;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
@@ -343,9 +343,9 @@ label > span {
 }
 
 input, textarea, select {
-  color: #e0eee4;
-  background: #060b08;
-  border: 1px solid #2d4434;
+  color: #e7e6e8;
+  background: #080809;
+  border: 1px solid #38363b;
   border-radius: 0;
   width: 100%;
   padding: 13px 14px;
@@ -354,7 +354,7 @@ input, textarea, select {
 }
 
 input:hover, textarea:hover, select:hover {
-  border-color: #4c6c56;
+  border-color: #5c5860;
 }
 
 input:disabled {
@@ -370,7 +370,7 @@ textarea {
 }
 
 input::placeholder, textarea::placeholder {
-  color: #7c9685;
+  color: #89848e;
 }
 
 .input-unit {
@@ -426,18 +426,18 @@ input::placeholder, textarea::placeholder {
 
 .button.primary {
   background: var(--green);
-  color: #031007;
+  color: #0a090a;
   border-color: var(--green);
   font-weight: 600;
 }
 
 .button.primary:hover:enabled {
-  background: #7dffae;
+  background: #87f5af;
 }
 
 .button.quiet {
-  color: #c4d8cb;
-  background: #0e1912;
+  color: #ceccd0;
+  background: #141314;
 }
 
 .composer .button {
@@ -472,7 +472,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .book-visual {
-  background: radial-gradient(#10231960, #0000 70%);
+  background: radial-gradient(#1a181b60, #0000 70%);
   justify-content: center;
   align-items: center;
   gap: 28px;
@@ -481,7 +481,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .seal-bracket {
-  color: #264a33;
+  color: #38353b;
   font-size: 95px;
   font-weight: 200;
   line-height: 1;
@@ -495,8 +495,8 @@ input::placeholder, textarea::placeholder {
 }
 
 .note-sheet {
-  background: #0b1910;
-  border: 1px solid #32593e;
+  background: #121113;
+  border: 1px solid #464249;
   width: 238px;
   height: 109px;
   padding: 15px 18px;
@@ -505,23 +505,23 @@ input::placeholder, textarea::placeholder {
 }
 
 .note-sheet.back {
-  color: #355f42;
+  color: #4a474d;
   transform: rotate(12deg) translate(7px, -13px);
 }
 
 .note-sheet.middle {
-  color: #355f42;
+  color: #4a474d;
   transform: rotate(6deg) translate(3px, -6px);
 }
 
 .note-sheet.front {
   color: var(--green);
-  background: #102218;
-  border-color: #487552;
+  background: #19181a;
+  border-color: #5e5a63;
 }
 
 .note-sheet.front > .micro {
-  color: #8eaf99;
+  color: #9e9aa3;
   letter-spacing: 1px;
   font-size: 11px;
 }
@@ -533,7 +533,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .note-stamp {
-  color: #477d55;
+  color: #625e66;
   font-size: 25px;
   font-weight: 700;
   position: absolute;
@@ -551,7 +551,7 @@ input::placeholder, textarea::placeholder {
 
 .book-thesis > span {
   letter-spacing: 1.5px;
-  color: #d4e8dc;
+  color: #dedddf;
   font-size: 11px;
 }
 
@@ -567,7 +567,7 @@ input::placeholder, textarea::placeholder {
 .book-columns {
   letter-spacing: 1px;
   color: var(--muted);
-  background: #0e1711;
+  background: #121213;
   font-size: 11px;
 }
 
@@ -594,7 +594,7 @@ input::placeholder, textarea::placeholder {
 
 .commitment-row code {
   overflow-wrap: anywhere;
-  color: #b6d2bf;
+  color: #c4c1c7;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -682,7 +682,7 @@ input::placeholder, textarea::placeholder {
 
 .prepared {
   border-top: 1px solid var(--line);
-  background: #0b1b11;
+  background: #131214;
 }
 
 .receipt {
@@ -706,7 +706,7 @@ input::placeholder, textarea::placeholder {
 
 .hash {
   overflow-wrap: anywhere;
-  color: #c5e1ce;
+  color: #d3d1d5;
   user-select: all;
   margin: 8px 0 16px;
   font-size: 11px;
@@ -782,7 +782,7 @@ output {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-color: #00ff6680 #050806;
+  scrollbar-color: #00f05880 #070707;
 }
 
 .table-scroll:focus-visible {
@@ -796,11 +796,11 @@ output {
   gap: 10px;
   margin: 0;
   padding: 12px 18px;
-  border-top: 1px solid #00ff6633;
+  border-top: 1px solid #00f05833;
   color: var(--green);
   font-size: 11px;
   line-height: 1.7;
-  background: #00ff6608;
+  background: #00f05808;
 }
 
 @media (max-width: 760px) {
@@ -872,7 +872,7 @@ td:first-child {
 
 .wallet-output {
   border-top: 1px solid var(--line);
-  background: #0b1b11;
+  background: #131214;
   padding-top: 24px;
 }
 
