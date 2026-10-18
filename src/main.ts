@@ -3,6 +3,7 @@ import './components/terminal-effects.css';
 import './components/ProtocolSpecs.css';
 import './components/ViewingKeyVault.css';
 import './components/LiveTerminalStream.css';
+import './theme.css';
 import { element, Lifetime } from './lib/dom';
 import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
