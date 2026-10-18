@@ -5,10 +5,11 @@ import { encodeOrchardAddress } from '../src/protocol/address';
 import { unhex } from '../src/protocol/crypto';
 import { parseZec } from '../src/protocol/amount';
 import { verifyProof } from '../src/protocol/merkle';
+import { TEST_REFUND } from './fixtures';
 
 const address = encodeOrchardAddress(unhex('953f3c78d103c32b60559299462ebb27348964b892acad10482fe502c99f0d524959ba7be4f188e3a27138'), 'testnet');
 const config = { auctionId: 'NODE07-001', supply: 10, reserve: '0.5', vault: address, network: 'testnet' as const };
-const prepare = (price: string, quantity: number, auctionId = config.auctionId) => prepareBid({ auctionId, price, quantity, vault: address, refund: address, network: 'testnet' });
+const prepare = (price: string, quantity: number, auctionId = config.auctionId) => prepareBid({ auctionId, price, quantity, vault: address, refund: TEST_REFUND, network: 'testnet' });
 
 describe('local sealed auction', () => {
   it('enforces close -> clear, hides bids, freezes the root and conserves every zatoshi', async () => {
@@ -54,7 +55,7 @@ describe('local sealed auction', () => {
     expect(result.filled).toBe(2); expect(result.clearingPrice).toBe('0.5');
     expect(result.allocations.find(a => a.price === '0.4')?.refundAmount).toBe('2');
   });
-  it('breaks ties by commitment and protects config/snapshot ownership', async () => {
+  it('breaks ties by accepted submission order and protects config/snapshot ownership', async () => {
     const mutable = { ...config, supply: 3 };
     const sandbox = await Sandbox.create(mutable); mutable.supply = 99;
     const a = await prepare('1', 2); const b = await prepare('1', 2);
@@ -62,6 +63,6 @@ describe('local sealed auction', () => {
     const snapshot = sandbox.publicSnapshot(); expect(Object.isFrozen(snapshot.commitments)).toBe(true);
     sandbox.close(); const result = await sandbox.clear();
     expect(result.filled).toBe(3);
-    expect(result.allocations.find(row => row.commitment === [a.commitment, b.commitment].sort()[0])?.filled).toBe(2);
+    expect(result.allocations.find(row => row.commitment === a.commitment)?.filled).toBe(2);
   });
 });

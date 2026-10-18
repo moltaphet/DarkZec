@@ -1,108 +1,141 @@
-# DarkZec engineering report
+# DarkZec engineering report — active repository
 
-Date: 2026-10-17. Module: **Zero-Leakage Sealed Bidding & ZIP-321 URI Generator**, using the example in the supplied module placeholder.
+Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream, Phase 1/Phase 2 refinements and targeted security/UI hardening.
 
-## Delivered behavior
+## Repository and implementation status
 
-The NODE 07 terminal supports private bid preparation, exact escrow computation, ZIP-321 generation, session-only sealed commitment submission, auction close, uniform-price clearing, partial fills, refund accounting, Merkle inclusion verification and reset. A separate wallet request view supports explicit Zodl/Orchard-wallet handoff. No real transaction, wallet connection, key import, RPC or external service is required for the judge walkthrough.
+The workspace is an active **Git repository on `main`**, with origin configured for [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Verification covers the current working tree, including uncommitted implementation work. No commit, push or deployment was performed during these refinements.
 
-## Created / modified files
+This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-All paths below are relative to the workspace. These are newly created files; the pre-existing `DARKZEC-STANDARD.md` was read and left unchanged. The workspace did not contain a Git checkout, so no branch, worktree or commit was created.
+Current observed verification: **62 unit/privacy/CLI tests across 9 files, 30 E2E tests, and 39 transformed production modules**. This retains the previous 58/27 suite and adds four unit checks and three browser scenarios. The earlier 15-unit/9-E2E/29-module target describes a smaller stage; it is not the current result. The real-viewing-key storage acceptance test now requires rejection under the mock-only policy.
 
-| Relative path | Responsibility |
+## Runtime and dependency compatibility
+
+`package.json` and the lockfile root declare:
+
+```text
+^22.18.0 || ^24.0.0 || >=26.0.0
+```
+
+Node 22.18.0 is the floor for running the erasable TypeScript server without additional flags. The supported release lines also match the installed Vitest engine constraints; Node 23 and 25 are not declared supported. See [Node's native TypeScript guide](https://nodejs.org/learn/typescript/run-natively).
+
+| Runtime tested | Full unit/privacy/CLI suite | Strict type check and production bundle |
+| --- | --- | --- |
+| Node 22.18.0 | 62 passed | Passed; 39 modules. |
+| Node 24.0.0 | 62 passed | Passed; 39 modules. |
+| Node 26.10.0 | 62 passed | Passed; 39 modules. |
+
+The Node 22/24 matrix used official release archives, verified against their published SHA-256 checksums, outside the repository. E2E verification used Node 26.10.0 and cached Chromium. This does not claim that every future Node/browser release has been tested.
+
+The project `.npmrc` selects official npm. The regenerated lockfile contains **88 official registry artifacts with SHA-512 integrity**, with dependency versions unchanged by the registry migration. A fresh official-artifact installation and clean `npm ci` succeeded during Phase 1. Optional platform artifacts explain the difference from 45 packages installed on this machine. The registry test checks provenance on every unit-suite run. The comprehensive hardening pass removed the installed tree and lockfile from resolution, regenerated from the verified official cache and repeated clean `npm ci`; the recreated lockfile was byte-identical and all versions stayed fixed. No runtime dependencies were added.
+
+## Active file inventory
+
+| Relative paths | Responsibility |
 | --- | --- |
-| `.gitignore` | Excludes dependencies, build output and browser artifacts. |
-| `package.json` | Exact dependency versions, Node requirement and development/verification commands. |
-| `package-lock.json` | Reproducible dependency resolution. |
-| `tsconfig.json` | Strict TypeScript configuration for browser, server, tests and configuration. |
-| `vite.config.ts` | Local production bundling; no source maps; unit test selection. |
-| `playwright.config.ts` | Chromium browser tests and local server setup; optional browser executable override. |
-| `index.html` | Accessible auction/wallet interface and restrictive CSP fallback. |
-| `src/env.d.ts` | Explicitly typed CSS import declaration. |
-| `src/style.css` | Responsive NODE 07 styling, local monospace, focus states and reduced motion. |
-| `src/main.ts` | UI state, private request visibility, wallet review, clearing/audit/reset interactions. |
-| `src/fixtures.ts` | Public, unfunded test receiver and local auction configuration. |
-| `src/protocol/address.ts` | ZIP-316 Bech32m, F4Jumble, CompactSize, padding and Orchard-point checks. |
-| `src/protocol/amount.ts` | Canonical amounts, BigInt zatoshis, monetary limits and quantity/ID validation. |
-| `src/protocol/crypto.ts` | Web Crypto HMAC salts and the mandated SHA-256 commitment. |
-| `src/protocol/memo.ts` | Canonical bid JSON, UTF-8 auditing, Base64url and ZIP-321 serialization. |
-| `src/protocol/merkle.ts` | Domain-separated SHA-256 tree, size-bound root and inclusion proofs. |
-| `src/simulation.ts` | Isolated local vault, AES-GCM envelopes, guarded phases and clearing/accounting. |
-| `scripts/serve.ts` | Loopback static server with security headers and no request logging. |
-| `tests/protocol.test.ts` | Official address fixture, malformed inputs, hash vectors, memo/URI and proof checks. |
-| `tests/simulation.test.ts` | State transitions, tampering, races, ties, reserve, fills and conservation. |
-| `tests/privacy.test.ts` | Guards application sources against network/persistence APIs, unsafe sinks and external resources. |
-| `tests/e2e/terminal.spec.ts` | Full browser loop, wallet review gating, responsive rendering and network isolation. |
-| `docs/superpowers/plans/2026-10-17-sealed-bidding.md` | Implementation scope, interfaces, invariants and verification plan. |
-| `README.md` | Setup, judge walkthrough, wallet behavior and verification commands. |
-| `docs/engineering-report.md` | This report. |
+| `package.json`, `package-lock.json`, `.npmrc`, `tsconfig.json`, `vite.config.ts`, `playwright.config.ts` | Exact dependencies, official registry, supported runtimes, strict checking, builds and verification. |
+| `scripts/serve.ts` | Loopback static server, readable-build preflight, restrictive headers and no request logging. |
+| `index.html`, `src/main.ts`, `src/style.css` | Terminal layout, view/action state, form defaults, private artifact erasure and lifecycle integration. |
+| `src/protocol/address.ts` | Revision 0 UA decoding, Orchard validation/projection and equivalent receiver refund guard. |
+| `src/protocol/amount.ts`, `src/protocol/crypto.ts`, `src/protocol/memo.ts` | Integer amounts, private salts, refund-bound commitments, canonical bid JSON, UTF-8 sizing and ZIP-321. |
+| `src/protocol/merkle.ts` | Domain-separated, size-bound SHA-256 roots and inclusion proofs. |
+| `src/lib/darkpool.ts`, `src/simulation.ts` | Pure uniform-price allocation and authenticated local sandbox lifecycle. |
+| `src/fixtures.ts` | Distinct public vault/refund receiving fixtures; no private test-vector keys. |
+| `src/components/NetworkHeader.ts`, `ActionRipples.ts`, `terminal-effects.css` | Local header/glitch effects, click feedback and matte phosphor styling. |
+| `src/components/MemoScramble.ts`, `BlindOrderflow.ts` | Gated private memo preview and commitment-only interactive canvas, including corrected unselected ArrowLeft. |
+| `src/components/ProtocolSpecs.ts`, `ProtocolSpecs.css` | Bundled protocol manual and native keyboard disclosures. |
+| `src/components/ViewingKeyVault.tsx`, `ViewingKeyVault.css` | Local credential controls, mock scanning, private rows and lock/forget behavior. |
+| `src/lib/viewing-key-session.ts`, `vault-memo.ts`, `mock-note-scanner.ts` | Passphrase-encrypted tab session, strict 512-byte field parsing and authenticated mock envelopes. |
+| `src/components/LiveTerminalStream.tsx`, `LiveTerminalStream.css`, `TelemetryRail.ts` | Bounded typewriter views and synchronized payload/security counters. |
+| `src/lib/security-events.ts`, `security-monitor.ts` | Typed fixed metadata, truthful encryption status and passive CSP observation. |
+| `src/lib/dom.ts`, `motion.ts`, `blind-mesh.ts` | Cleanup ownership, visibility/reduced-motion scheduling and public-commitment-only geometry. |
+| `tests/*.test.ts`, `tests/fixtures.ts`, `tests/e2e/*.spec.ts` | Unit/privacy/CLI invariants, synthetic/public encodings and complete browser flows. |
+| `LICENSE`, `.github/workflows/ci.yml` | MIT licensing and SHA-pinned, read-only push/PR build/unit CI on Node 22/24. |
+| `README.md`, `DARKZEC-STANDARD.md`, `docs/` | Current entry point, protocol rules, stage reports, local badge asset and implementation records. |
 
-Generated `dist/`, `node_modules/` and `test-results/` are ignored artifacts, rather than maintained source files. Browser screenshots: `test-results/terminal-desktop.png` and `test-results/terminal-mobile.png`.
+Dependencies, `dist/`, browser traces/reports and `test-results/` are ignored artifacts. Source and protocol changes remain reviewable in Git.
 
-## Privacy and integrity invariants
+## Protocol and privacy invariants
 
-**Strict inputs and amounts.** TypeScript uses `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, unknown catch values and unused-code checks. No application-owned TypeScript contains an `any` type. Untrusted memo JSON starts as `unknown`, must match an exact versioned schema and must round-trip to canonical JSON. Quantities are whole lots from 1 to 999999. Prices use at most eight decimal places and are normalized before committing. BigInt zatoshis avoid floating-point rounding; individual escrow cannot exceed 21 million ZEC. Auction IDs reject delimiters, preventing ambiguity in the standard's colon-separated commitment formula.
+**Address policy.** The validator checks lowercase Bech32m, network HRP/padding, inverse F4Jumble, canonical CompactSize, receiver ordering/length and nonidentity Orchard payment-point validity. Standard UAs containing Orchard plus other receivers are accepted as input. Payment URIs and prepared refund instructions use an Orchard-only projection; bare transparent addresses and UAs without Orchard are rejected. Different UA strings carrying the vault's same Orchard receiver cannot bypass the refund guard. Encoding validation does not establish ownership.
 
-**Salt and commitment.** Each bid receives a fresh 32-byte `crypto.getRandomValues` secret and a fresh 16-byte nonce. HMAC-SHA256 derives a deterministic salt from that secret and the domain-separated `DARKZEC/salt/v1:auctionId:nonce` context. Reproducibility requires the same secret and context; salts are never derived from public bid fields alone. Temporary entropy buffers are overwritten after derivation. The commitment is exactly `SHA256(auction_id + ':' + canonical_bid_price + ':' + quantity + ':' + salt)`. Web Crypto creates the HMAC and hash locally.
+**Memo and amount integrity.** The exact `{v,a,p,q,s,r}` schema uses canonical JSON, positive canonical decimal prices, whole quantities, an auction identifier, a 256-bit salt and refund UA. Invalid Unicode and noncanonical schema/values are refused. UTF-8 is validated at **at most 512 bytes before encoding**; ZIP-321 uses unpadded Base64url. Arithmetic uses integer zatoshis and enforces monetary bounds. A URI is readable sensitive data; real wallet transaction machinery performs Orchard encryption.
 
-**Orchard destinations.** The validator checks Bech32m checksum, lowercase encoding, network HRP, inverse F4Jumble, HRP padding, canonical CompactSize, ascending unique typecodes, receiver lengths and a valid nonidentity Orchard Pallas payment point. The payment policy is deliberately stricter than generic ZIP-316: only a single Orchard receiver is accepted. Mixed-receiver UAs, unknown extensions, transparent receivers and bare transparent/Sapling addresses are refused. This prevents fallback to a transparent receiver in wallet selection. Known official mixed UAs are decoded in interoperability tests, but are not accepted for payment. The validator supports the requested active Revision 0 `u` / `utest` encodings with a local 2048-character bound; draft Revision 2 prefixes are not supported. It checks encoding and point validity, not ownership or the vault operator's trustworthiness.
+**Runtime types.** Public commitment preparation rejects non-string auction/price/salt fields and nonnumeric quantities before hashing. The pure clearing engine rejects coerced supply values before allocation. Schema validation and TypeScript checking remain independent layers.
 
-**Memo format and byte audit.** Memos pack `{v,a,p,q,s,r}` for version, auction ID, canonical price, whole quantity, 256-bit salt and Orchard refund/settlement UA. `TextEncoder().encode(text).length` is checked against **512 bytes before encoding**. Invalid UTF-16 is rejected instead of silently replacing surrogates. Base64url substitutes `-` and `_` and strips all padding. ASCII and multibyte 512-byte boundaries, 513/516-byte rejection, and `+`/`/` replacement have explicit tests. The canonical URI is `zcash:<orchard-only-UA>?amount=<decimal-ZEC>&memo=<unpadded-Base64url>`. No plaintext label, bid price or salt is added as a separate public metadata parameter.
+**Commitment revision.** Phase 1 binds the refund instruction while preserving auction separation and field boundaries:
 
-**Private/public state boundary.** Public simulator snapshots contain only phase and commitment hashes. Caller-owned configuration and snapshots are frozen/copied. Submitted memo, escrow, byte audit, URI and commitment must agree before accepting a bid. Memos are retained only as AES-256-GCM ciphertext with random 96-bit IVs and the commitment as authenticated additional data. The session key is nonextractable. The simulator does not retain the payment URI or plaintext memo after submission; the UI clears prepared artifacts on submission, editing and view switches. There is no private-key/seed input surface.
+```text
+SHA256(UTF8(JSON.stringify([
+  "DARKZEC/bid/v2", auction_id, refund_ua, salt, canonical_price, quantity
+])))
+```
 
-**Explicit unsealing.** Closing refuses concurrent submission and freezes the commitment set. Unsealing is a separate deliberate action that authenticates/decrypts envelopes, rechecks commitments and reveals demo bid data. Clearing sorts bids by descending limit price and then lexicographic commitment. Exhausted supply pays the marginal accepted price; undersubscribed supply pays reserve. Below-reserve bids receive a full refund. Every allocation's paid amount plus refund equals original escrow exactly. Results are immutable, and clear cannot be repeated. A local 128-bid limit bounds browser resource use.
+Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA256. Salt grinding remains possible; accepted submission order removes hash-based tie advantages. This is not proof of key ownership, Sybil resistance or decentralized ordering. Legacy commitment receipts do not verify under the new algorithm; memo schema remains `v:1`.
 
-**Participant audit.** Merkle leaves hash `0x00 || commitmentBytes`; parents hash `0x01 || left || right`. Odd final nodes duplicate. A nonempty final root hashes `0x02 || uint64be(leafCount) || treeRoot`, binding the count to prevent odd-leaf duplication ambiguity. The empty tree uses a separate domain string. Proofs check leaf index, count, side, depth, duplicated siblings and root. The audit view operates on commitments only; it does not expose bid amounts or addresses. Inclusion proves membership in this local frozen set; it is not a zero-knowledge proof of correct clearing, proof of payment or an independently anchored anti-omission log.
+**Clearing.** Bids sort by price and accepted submission order. Eligible demand at or below supply, or one eligible envelope, pays reserve. When one envelope wins all supply, its own excess demand is excluded and the highest losing eligible envelope sets the price, floored at reserve. With multiple winners, the highest unfilled eligible lot sets the price; a partial marginal bid can set it. The single-lot/unit-demand case produces second-price clearing, without a multi-lot VCG claim. Every allocation preserves exact escrow conservation. The built-in 10-lot walkthrough still clears at `0.68 ZEC` with the default submitted bid and three fixtures.
 
-**Zero external application requests.** All runtime code, cryptography and CSS are bundled locally; fonts are system monospace. The app has no RPC, analytics, remote fonts, trackers, fetch/XHR/WebSocket/EventSource, cookies, localStorage, sessionStorage, IndexedDB, service workers or request logging. The loopback server serves static files only. HTTP and fallback HTML CSP set `connect-src 'none'`, `font-src 'none'`, `form-action 'none'`, `worker-src 'none'` and self-only scripts/styles. Headers include no-referrer, no-store, nosniff and frame-ancestors none. The dev command serves the production bundle without a development websocket. Dependency installation/browser setup may use the network; operating the terminal does not.
+**Local sealing and viewing vault.** Sandbox bids are retained as AES-256-GCM ciphertext with random IVs and commitment AAD under a nonextractable session key. The separate mock scanner authenticates 528-byte envelopes before recovering exact 512-byte fields. It strips padding after authentication, decodes the declared transport, validates schema/commitment/escrow/refund and isolates rejected notes. Only `mock:node07:` followed by exactly 64 lowercase hex characters is accepted. Real Unified Viewing Keys cannot be saved or unlocked until an audited WASM adapter is ready; the previous storage-only path and its acceptance test have been removed.
 
-**User-directed disclosures.** A URI is readable plaintext, including its encoded memo. Its sensitive preview and clipboard copy require user action. Wallet review explicitly names the destination/network/amount. The wallet link is absent until review is acknowledged, is invalidated on edits and uses the standard `zcash:` scheme. It never reports payment success. The built-in public test receiver is blocked from wallet handoff on either network. Wallet handoff transfers sensitive data to the chosen local URI handler by explicit user action; no universal-link server is involved. The selected wallet's own networking and privacy behavior are outside this application's zero-request boundary.
+**Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes mock-key tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Invalid/non-mock input is rejected before storage access. Stored ciphertext must have the exact mock-key-plus-tag length, and decrypted credentials are validated again, so legacy non-mock records cannot unlock. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
 
-## Verification
+**Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing.
+
+## Phase 2 lifecycle and audit corrections
+
+- From no canvas selection, ArrowLeft now chooses the final node; normal wrapping, one-node navigation and Escape remain correct.
+- Closing disables auction input fields and the preview's own enable gate, clears pending timers/private buffers and invalidates late promise callbacks. Synthetic input events cannot restart closed-auction cryptographic work. Independent wallet/scanner controls remain available.
+- Reset restores auction, wallet and audit form defaults; clears review/output/error/result/root state; replaces the sandbox/session key; resets seed progress; and starts one valid `0.72`/`4` preview. Reset does not silently remove the separate encrypted viewing-key record; its owner remains Lock/Forget.
+- Demo seeding tracks accepted fixture progress. Retrying after a later fixture fails encrypting continues at that fixture, rather than duplicating earlier accepted bids.
+- Commit logs successful local encrypted acceptance. The separate **Merkle leaf generated** event appears only after close-time root/proof compilation succeeds for a nonempty set. Empty books and compilation failures produce no success label. A failed compilation leaves the book closed and inputs locked; Reset starts a new session.
+- **ORCHARD SHIELD** is an explicitly local mock payload indicator: **IDLE** at startup/plaintext/reset/lock/unsealed view, **ACTIVE** for sealed auction payloads or authenticated and validated mock bids, and **OFFLINE** after failed local verification. Detail text identifies mock AES-GCM and the absence of real Orchard decryption. Changing workspaces updates the context; merely validating a UA or generating a URI never activates encryption status.
+- CSP block counts remain passive, observed external enforcement events, deduplicated for the existing HTTP/meta pair. They are not a device-wide traffic audit. Log clear preserves security state; reset clears local payload state and preserves observed block counts.
+
+## Offline operation, accessibility and performance
+
+Application code makes no external runtime requests. Scripts/styles are local, fonts are system monospace, icons are inline, and there is no RPC, analytics, remote QR service or background polling. HTTP and fallback meta CSP enforce `connect-src 'none'`, `font-src 'none'`, self-only scripts/styles and no workers/forms. The loopback server also applies no-referrer, no-store, nosniff, frame and permissions restrictions. Explicit wallet handoff leaves this boundary; the selected wallet controls its networking.
+
+The audit API stores fixed messages and bounded numeric metadata, never keys, addresses, salts, amounts, payloads, raw exceptions or blocked URLs. The full history retains 128 events, with 18 rendered in the rail. Pause freezes the full view only. Frame work is capped, pauses while hidden/offscreen, and respects reduced motion; subscriptions, timers and observers are disposed on page exit. The log is keyboard-readable without character-by-character screen-reader announcements. Canvas geometry never uses bid amounts.
+
+All CSS terminal text and canvas labels have an 11px minimum, including responsive overrides and telemetry streams. A DOM-updated telemetry symbol replaces the earlier zero-font-size hiding technique. Mobile navigation and telemetry labels wrap at readable sizes. Both bid forms provide price/quantity examples; auction and vault result tables use bounded horizontal scroll regions, keyboard focus outlines and visible mobile scroll hints. Browser checks cover 320, 390, 768, 1280 and 1440px widths, including the expanded manual and telemetry.
+
+## Build, serve and verification
 
 ```sh
-npm ci
+npm ci --ignore-scripts --registry=https://registry.npmjs.org
+npm run dev
+```
+
+Open the [local terminal](http://127.0.0.1:4173). `dev` builds and serves the production bundle without HMR. Rebuild/refresh or restart after edits. `preview` requires a readable `dist/index.html`; absent/incomplete builds now print an actionable build command and exit nonzero before opening a socket.
+
+```sh
 npm test
-npm run build
-npx playwright install chromium
 npm run test:e2e
-# After browser installation:
+# Equivalent complete verification; E2E already performs the build:
 npm run verify
 ```
 
-The tests run with no blockchain/RPC setup. Unit checks cover independent Node SHA-256/HMAC results, official ZIP-316 encoding, malformed checksum/network/padding/receiver/point cases, exact amount bounds, noncanonical preimages, memo limits, URI round-trip, duplicate/tampered/wrong-auction submission, racing operations, reserve, ties, partial fills, escrow conservation and proof tampering. The privacy regression guard scans application-owned sources for prohibited network/persistence APIs and unsafe DOM sinks.
+Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to an existing compatible executable. `test:e2e` is **`npm run build && playwright test`**, and `verify` is **`npm test && npm run test:e2e`**; the combined command builds once.
 
-The browser suite exercises the complete auction and the wallet builder, verifies review gating and stale-request erasure, tests a CSP-blocked outbound fetch, and observes zero external requests, zero WebSockets, zero cookies, empty local/session storage and no page errors during the full auction flow. Desktop (1440px) and mobile (390px) screenshots were visually inspected; mobile has no horizontal overflow.
-
-Validation environment: Node 26.10.0. A cached Chromium 1243 executable was used through a temporary local Playwright config because the installed Playwright expected uncached revision 1248. The equivalent portable override is `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chrome-headless-shell npm run test:e2e`. The application and maintained default config contain no machine-specific executable path. A plain approved `npm run dev` successfully served localhost after an environment-prefixed test launch encountered a sandbox bind restriction. No elevated permissions were used.
-
-Final verification results:
-
-| Command | Observed result |
+| Check | Observed current result |
 | --- | --- |
-| `npm test` | 3 files passed; **15 tests passed**, zero failures. |
-| `npm run build` | Strict TypeScript and Vite production build succeeded; 18 modules bundled. |
-| `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | **4 browser tests passed**, zero failures, using the cached-browser override described above. |
+| `npm test` | 62 tests passed across 9 files. |
+| `npm run build` | Strict TypeScript passed; 39 transformed modules. |
+| `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | Fresh build followed by 30 passing E2E tests. |
+| Node 22.18.0 / 24.0.0 matrix | Each: 62 tests, strict check and 39-module bundle passed. |
+| Production bundle | JavaScript 87.88 kB / 30.85 kB gzip; CSS 37.63 kB / 8.62 kB gzip. |
+| CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24 and install/build/unit steps. Hosted execution requires pushing the workflow. |
 
-The temporary override is environment-specific and is not part of the delivered source. The maintained test configuration uses Playwright's normal browser installation unless `PLAYWRIGHT_CHROMIUM_EXECUTABLE` is supplied.
+The temporary browser config only selects cached Chromium for this workspace. The maintained configuration is portable. Browser coverage includes existing protocol/wallet/vault/security flows, the five reproduced Phase 2 regressions, failed Merkle compilation and an oversized winning bid priced against competing demand; unit coverage includes missing-build CLI failures. Source privacy, registry origin and strict typing checks remain enabled. Desktop/mobile screenshots are generated under `test-results/` and visually reviewed. No public CI or independent audit result is claimed.
 
-## Production boundaries
+The targeted pass additionally rejects checksum-valid real viewing keys before storage and authentic legacy encrypted non-mock records during unlock. Source and runtime privacy guards now restrict the storage exception to encrypted mock credentials. A timing race in the CSP/log-clear test was fixed by waiting for the initial memo operation to finish before asserting that history clears; legitimate later events are not suppressed. See the [targeted hardening report](targeted-hardening-report.md) for the full changed-file inventory and verification commands.
 
-- AES-GCM is a local vault simulation. It is **not Orchard note encryption**, not a real IVK implementation and not a replacement for audited Zcash libraries. Real shielded note creation, IVK scanning, escrow custody, consensus timing, anti-replay across sessions and settlement transactions remain integration work.
-- The simulator has both encryption and decryption authority in one browser. This models a trusted vault; it does not protect against a hostile browser, extension, compromised device, vault operator or script execution within that session.
-- JavaScript strings, garbage-collected keys and OS clipboards cannot be reliably zeroized. Buffers are cleared best-effort; reset drops references. No durable reveal backup is exported. Reload intentionally loses bids.
-- The wallet builder generates a request without submitting it to the simulator or tracking chain acceptance. Zodl handler behavior and live mainnet/testnet payments were not tested. Verify the network, full address, Orchard selection and amount inside the installed wallet.
-- Full bid reveal here is a clearly labeled judge demonstration. A production private-market design must restrict viewing-key authority and define selective disclosure, root anchoring and audit permissions before deployment.
-- The mandated commitment formula binds auction ID, price, quantity and salt. It does not bind the refund address or authenticate bidder identity. AES-GCM authenticates the memo accepted by this local vault, but a production protocol must separately authenticate the original refund/settlement instruction.
-- This implementation is a hackathon module with verified local invariants, not an independently audited institutional custody system or a ZK proof system.
+## References, provenance and remaining integration work
 
-## Primary references and fixture provenance
+- [ZIP-316](https://zips.z.cash/zip-0316), [ZIP-302](https://zips.z.cash/zip-0302) and [ZIP-321](https://zips.z.cash/zip-0321) define the relevant address, memo and request formats. The local validator deliberately targets Revision 0.
+- Public receiving bytes come from the [Zcash unified-address vectors](https://github.com/zcash/zcash-test-vectors/blob/master/test-vectors/json/unified_address.json), account 2/diversifier indices 0 and 5. Only public receiver data is used; no vector seed, spending key or viewing key is shipped. The vectors are MIT/Apache-2.0; attribution is retained in source/test comments. Browser-only synthetic encodings are never funded or opened in a wallet.
+- [Zodl](https://github.com/zodl-inc) is the wallet UX/handoff reference; device compatibility and actual payment execution require testing. [NEAR Intents](https://docs.near-intents.org/) is a future settlement reference; no solver/API integration is active.
+- Production requires audited Orchard adapters, restricted viewing/spending authority, authenticated bidder/settlement instructions, durable receipts, root publication, deadlines and selective disclosure. The browser/operator/device remain trusted. This is a verified local prototype, not an audited custody system or a ZK proof of auction execution.
 
-- [ZIP-321 payment request URIs](https://zips.z.cash/zip-0321): scheme, decimal amounts, unpadded Base64url and decoded memo limit.
-- [ZIP-316 Unified Addresses, active Revision 0](https://zips.z.cash/zip-0316): receiver encoding, Bech32m checksum, F4Jumble and HRP padding. Draft Revision 2 is intentionally outside this module's accepted prefix policy.
-- [ZIP-302 memo format](https://zips.z.cash/zip-0302): memo-field interpretation. The 512-byte field and wallet encryption also depend on the Zcash protocol; Base64url is transport encoding, not encryption.
-- [Zcash unified-address test vectors](https://github.com/zcash/zcash-test-vectors/blob/master/test-vectors/json/unified_address.json): account 2, diversifier indices 0 and 5. Only public receiving bytes/addresses are used. No vector seed, spending key or viewing key is shipped. The built-in fixture is Orchard receiver `953f…7138` re-encoded with the testnet HRP; it is not a wallet to fund. Zcash test vectors are published under MIT / Apache-2.0; fixture attribution is retained here and in test comments.
-- [Zcash reference F4Jumble](https://github.com/zcash/zcash-test-vectors/blob/master/zcash_test_vectors/f4jumble.py).
-- [Zodl](https://github.com/zodl-inc): wallet UX/URI handoff reference. This project does not embed a wallet SDK or claim verified Zodl compatibility.
+See the [comprehensive hardening audit](repo-hardening-report.md), [Phase 1 security audit](phase1-security-report.md), [Phase 2 QA audit](phase2-qa-report.md), [vault report](viewing-key-vault-report.md), [live-stream report](live-terminal-report.md) and [UI report](ui-polish-report.md). Earlier stage reports retain historical measurements; this report and the README describe the active combined checkout.

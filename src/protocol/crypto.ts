@@ -1,10 +1,12 @@
 import { formatZec, parseQuantity, parseZec, validateAuctionId } from './amount';
+import { validateOrchardAddress } from './address';
 
 export interface BidPreimage {
   readonly auctionId: string;
   readonly price: string;
   readonly quantity: number;
   readonly salt: string;
+  readonly refund: string;
 }
 export const utf8 = (value: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(value);
 export const hex = (bytes: Uint8Array): string => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
@@ -32,12 +34,18 @@ export async function freshSalt(auctionId: string): Promise<string> {
 }
 
 export function canonicalPreimage(bid: BidPreimage): string {
+  if (typeof bid.auctionId !== 'string' || typeof bid.price !== 'string') throw new Error('Auction ID and bid price must be strings.');
+  if (!Number.isSafeInteger(bid.quantity)) throw new Error('Bid quantity must be a whole number.');
   validateAuctionId(bid.auctionId);
   parseQuantity(String(bid.quantity));
   if (parseZec(bid.price) === 0n || formatZec(parseZec(bid.price)) !== bid.price) throw new Error('Bid price must be positive and canonical.');
-  if (!/^[a-f0-9]{64}$/.test(bid.salt)) throw new Error('A 256-bit salt is required.');
-  return `${bid.auctionId}:${bid.price}:${bid.quantity}:${bid.salt}`;
+  if (typeof bid.salt !== 'string' || !/^[a-f0-9]{64}$/.test(bid.salt)) throw new Error('A 256-bit salt is required.');
+  if (typeof bid.refund !== 'string') throw new Error('An Orchard refund Unified Address is required.');
+  validateOrchardAddress(bid.refund, bid.refund.startsWith('utest1') ? 'testnet' : 'mainnet');
+  // Typed tuple prevents field-boundary ambiguity and retains auction replay separation.
+  return JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
 }
-export async function commitment(bid: BidPreimage): Promise<string> {
+export async function computeBidCommitment(bid: BidPreimage): Promise<string> {
   return sha256(utf8(canonicalPreimage(bid)));
 }
+export const commitment = computeBidCommitment;

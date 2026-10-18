@@ -1,8 +1,10 @@
-import { validateOrchardAddress } from './address';
+import { assertDistinctRefund, orchardPaymentAddress, validateOrchardAddress } from './address';
 import type { Network } from './address';
 import { formatZec, MAX_MONEY, parseZec } from './amount';
 import { canonicalPreimage, commitment, freshSalt, utf8 } from './crypto';
 import type { BidPreimage } from './crypto';
+import { notifyAudit } from '../lib/security-events';
+import type { AuditObserver, ProtocolAuditEvent } from '../lib/security-events';
 
 export const MEMO_LIMIT = 512;
 export function memoBytes(text: string): Uint8Array<ArrayBuffer> {
@@ -17,7 +19,7 @@ export function encodeMemo(text: string): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export interface BidMemo extends BidPreimage { readonly refund: string }
+export type BidMemo = BidPreimage;
 export function serializeBidMemo(bid: BidMemo, network: Network): string {
   canonicalPreimage(bid);
   validateOrchardAddress(bid.refund, network);
@@ -46,10 +48,10 @@ export interface PaymentRequest {
 }
 /** A URI is a sensitive plaintext payment instruction. The wallet encrypts its on-chain memo. */
 export function buildPaymentUri(request: PaymentRequest): string {
-  validateOrchardAddress(request.address, request.network);
+  const address = orchardPaymentAddress(request.address, request.network);
   const amount = parseZec(request.amount);
   if (amount === 0n) throw new Error('Payment amount must be positive.');
-  return `zcash:${request.address}?amount=${formatZec(amount)}&memo=${encodeMemo(request.memo)}`;
+  return `zcash:${address}?amount=${formatZec(amount)}&memo=${encodeMemo(request.memo)}`;
 }
 
 export interface PreparedBid {
@@ -67,12 +69,25 @@ export interface PrepareBidInput {
   readonly vault: string;
   readonly network: Network;
 }
-export async function prepareBid(input: PrepareBidInput): Promise<PreparedBid> {
-  const bid: BidMemo = { ...input, price: formatZec(parseZec(input.price)), salt: await freshSalt(input.auctionId) };
-  const memo = serializeBidMemo(bid, input.network);
-  const total = parseZec(bid.price) * BigInt(bid.quantity);
-  if (total > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
-  const amount = formatZec(total);
-  return Object.freeze({ commitment: await commitment(bid), memo, byteLength: memoBytes(memo).length, amount,
-    uri: buildPaymentUri({ address: input.vault, amount, memo, network: input.network }) });
+export async function prepareBid(input: PrepareBidInput, audit?: AuditObserver<ProtocolAuditEvent>): Promise<PreparedBid> {
+  let phase: 'input' | 'memo' | 'commitment' | 'uri' = 'input';
+  try {
+    input = Object.freeze({ ...input });
+    const vault = orchardPaymentAddress(input.vault, input.network); const refund = orchardPaymentAddress(input.refund, input.network);
+    assertDistinctRefund(refund, vault, input.network);
+    const price = formatZec(parseZec(input.price));
+    const salt = await freshSalt(input.auctionId);
+    const bid: BidMemo = { auctionId: input.auctionId, price, quantity: input.quantity, refund, salt };
+    phase = 'memo';
+    const memo = serializeBidMemo(bid, input.network); const byteLength = memoBytes(memo).length;
+    notifyAudit(audit, { type: 'memo-validated', bytes: byteLength });
+    const total = parseZec(bid.price) * BigInt(bid.quantity);
+    if (total > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
+    const amount = formatZec(total);
+    phase = 'commitment'; const hash = await commitment(bid);
+    notifyAudit(audit, { type: 'commitment-created' });
+    phase = 'uri'; const uri = buildPaymentUri({ address: vault, amount, memo, network: input.network });
+    notifyAudit(audit, { type: 'uri-generated' });
+    return Object.freeze({ commitment: hash, memo, byteLength, amount, uri });
+  } catch (error: unknown) { notifyAudit(audit, { type: 'preparation-rejected', phase }); throw error; }
 }

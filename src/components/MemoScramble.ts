@@ -2,6 +2,8 @@ import { encodeMemo } from '../protocol/memo';
 import type { PreparedBid } from '../protocol/memo';
 import { motionLoop } from '../lib/motion';
 import type { MotionLoop } from '../lib/motion';
+import { notifyAudit } from '../lib/security-events';
+import type { AuditObserver, ProtocolAuditEvent } from '../lib/security-events';
 
 export type MemoState = 'empty' | 'scrambling' | 'ready' | 'invalid';
 export interface MemoAudit { readonly bytes: number; readonly state: MemoState }
@@ -12,7 +14,8 @@ export class MemoScramble {
   readonly #payload: HTMLElement;
   readonly #stream: HTMLElement;
   readonly #label: HTMLElement;
-  readonly #load: () => Promise<PreparedBid>;
+  readonly #load: (audit?: AuditObserver<ProtocolAuditEvent>) => Promise<PreparedBid>;
+  readonly #protocolAudit: AuditObserver<ProtocolAuditEvent> | undefined;
   readonly #audit: (audit: MemoAudit) => void;
   readonly #loop: MotionLoop;
   #revision = 0;
@@ -22,15 +25,17 @@ export class MemoScramble {
   #state: MemoState = 'empty';
   #target = '';
   #started = 0;
+  #enabled = true;
 
   constructor(root: HTMLElement, payload: HTMLElement, stream: HTMLElement, label: HTMLElement,
-    load: () => Promise<PreparedBid>, audit: (audit: MemoAudit) => void) {
+    load: (audit?: AuditObserver<ProtocolAuditEvent>) => Promise<PreparedBid>, audit: (audit: MemoAudit) => void, protocolAudit?: AuditObserver<ProtocolAuditEvent>) {
     this.#root = root; this.#payload = payload; this.#stream = stream; this.#label = label;
-    this.#load = load; this.#audit = audit;
+    this.#load = load; this.#audit = audit; this.#protocolAudit = protocolAudit;
     this.#loop = motionLoop(root, (time, reduced) => this.#draw(time, reduced), () => this.#state === 'scrambling');
   }
 
   update(): void {
+    if (!this.#enabled) return;
     this.clear();
     this.#state = 'scrambling'; this.#started = performance.now();
     this.#root.dataset.state = this.#state;
@@ -43,6 +48,7 @@ export class MemoScramble {
   }
 
   async prepare(): Promise<PreparedBid> {
+    if (!this.#enabled) throw new Error('Bid preparation is locked. Open or reset the local auction first.');
     clearTimeout(this.#timer); this.#timer = undefined;
     if (this.#draft) return this.#draft;
     return this.#pending ?? this.#request(this.#revision);
@@ -50,7 +56,10 @@ export class MemoScramble {
 
   #request(revision: number): Promise<PreparedBid> {
     this.#state = 'scrambling'; this.#root.dataset.state = this.#state;
-    const pending = Promise.resolve().then(this.#load).then(draft => {
+    const pending = Promise.resolve().then(() => {
+      if (!this.#enabled || revision !== this.#revision) throw new Error('The draft is no longer active.');
+      return this.#load(event => { if (this.#enabled && revision === this.#revision) notifyAudit(this.#protocolAudit, event); });
+    }).then(draft => {
       if (revision !== this.#revision) throw new Error('The draft changed. Prepare the current bid again.');
       this.#draft = draft; this.#target = encodeMemo(draft.memo); this.#started = performance.now();
       this.#audit({ bytes: draft.byteLength, state: 'ready' });
@@ -91,6 +100,11 @@ export class MemoScramble {
     this.#payload.textContent = 'NO ACTIVE MEMO DRAFT'; this.#stream.textContent = '— — — — — — — — — — — —';
     this.#label.textContent = 'MEMO BUFFER / CLEARED'; this.#root.dataset.state = this.#state;
     this.#audit({ bytes: 0, state: 'empty' });
+  }
+  setEnabled(enabled: boolean): void {
+    if (enabled === this.#enabled) return;
+    this.#enabled = enabled;
+    if (!enabled) { this.clear(); this.#label.textContent = 'MEMO PREVIEW / LOCKED'; }
   }
   destroy(): void { this.clear(); this.#loop.destroy(); }
 }
