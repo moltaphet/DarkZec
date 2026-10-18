@@ -8,6 +8,7 @@ import { element, Lifetime } from './lib/dom';
 import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
 import { mountHeroLogo } from './components/HeroLogo';
+import { mountScene } from './components/Scene3D';
 import { mountBrandDecode } from './components/BrandDecode';
 import { MemoScramble } from './components/MemoScramble';
 import { BlindOrderflow } from './components/BlindOrderflow';
@@ -55,6 +56,10 @@ const brand = document.querySelector<HTMLElement>('.brand');
 if (header && brand) { const effect = mountNetworkHeader(header, brand); effects.own(() => effect.destroy()); }
 const heroLogo = mountHeroLogo(element('hero-logo', HTMLCanvasElement));
 effects.own(() => heroLogo.destroy());
+// The full-page WebGL scene supersedes the flat hero mark; without WebGL the flat mark remains.
+const root = document.documentElement;
+const scene = mountScene(element('scene-3d', HTMLCanvasElement), () => root.classList.remove('has-scene'));
+if (scene) { root.classList.add('has-scene'); effects.own(() => { root.classList.remove('has-scene'); scene.destroy(); }); }
 const brandWord = document.querySelector<HTMLElement>('.brand-word');
 if (brand && brandWord) { const decode = mountBrandDecode(brandWord, brand); effects.own(() => decode.destroy()); }
 const ripples = mountActionRipples(document.body);
