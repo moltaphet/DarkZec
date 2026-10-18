@@ -58,8 +58,20 @@ const heroLogo = mountHeroLogo(element('hero-logo', HTMLCanvasElement));
 effects.own(() => heroLogo.destroy());
 // The full-page WebGL scene supersedes the flat hero mark; without WebGL the flat mark remains.
 const root = document.documentElement;
-const scene = mountScene(element('scene-3d', HTMLCanvasElement), () => root.classList.remove('has-scene'));
-if (scene) { root.classList.add('has-scene'); effects.own(() => { root.classList.remove('has-scene'); scene.destroy(); }); }
+const hudDistance = document.getElementById('hud-distance');
+const scene = mountScene(element('scene-3d', HTMLCanvasElement), () => { root.classList.remove('has-scene'); delete root.dataset.phase; }, progress => {
+  const meters = Math.round(4 * (1 - progress));
+  if (hudDistance && hudDistance.textContent !== `${meters} M`) hudDistance.textContent = `${meters} M`;
+  root.style.setProperty('--journey', progress.toFixed(3));
+  const phase = progress >= 0.985 ? 'app' : 'journey';
+  if (root.dataset.phase !== phase) root.dataset.phase = phase;
+});
+if (scene) {
+  root.classList.add('has-scene');
+  const reveal = new IntersectionObserver(entries => entries.forEach(entry => entry.target.classList.toggle('in', entry.isIntersecting)), { threshold: 0.12 });
+  document.querySelectorAll('.callout').forEach(node => reveal.observe(node));
+  effects.own(() => { root.classList.remove('has-scene'); delete root.dataset.phase; reveal.disconnect(); scene.destroy(); });
+}
 const brandWord = document.querySelector<HTMLElement>('.brand-word');
 if (brand && brandWord) { const decode = mountBrandDecode(brandWord, brand); effects.own(() => decode.destroy()); }
 const ripples = mountActionRipples(document.body);
