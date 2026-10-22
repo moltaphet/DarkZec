@@ -70,7 +70,7 @@ test('mobile history remains bounded during repeated scans and normal motion typ
   for (let i = 0; i < 8; i++) { await page.locator('#vault-scan').click(); await expect(page.locator('#vault-scan')).toBeEnabled(); }
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded();
   await expect(log.locator('.terminal-event')).toHaveCount(128); await expect(log).toContainText('Mock scan complete:');
-  await expect(page.locator('#stream-retention')).not.toContainText('0 EVICTED');
+  await expect(page.locator('#stream-retention')).not.toHaveText(/· 0 EVICTED/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(log.locator('.terminal-event').last()).toContainText('3 accepted / 1 quarantined / 1 empty');

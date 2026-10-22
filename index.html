@@ -9,6 +9,11 @@
     <link rel="icon" href="data:," />
   </head>
   <body>
+    <canvas id="scene-3d" class="scene-3d" aria-hidden="true"></canvas>
+    <div class="hud" aria-hidden="true">
+      <div class="hud-distance"><span>DISTANCE TO GATE</span><strong id="hud-distance">4 M</strong><i class="hud-bar"></i></div>
+      <div class="hud-scroll"><i></i></div>
+    </div>
     <div class="terminal">
       <header class="masthead">
         <a class="brand" href="#" aria-label="DarkZec home"><span class="brand-mark">[ Z ]</span> <span class="brand-word" data-text="DARKZEC">DARKZEC</span><span class="brand-slash">/</span></a>
@@ -24,11 +29,39 @@
       </nav>
 
       <main>
-        <section class="intro">
-          <div><div class="eyebrow">ZECATHON / PRIVATE MARKETS</div><h1>Price discovery.<br /><span>Without exposure.</span></h1></div>
-          <p class="intro-copy">A sealed book. A verifiable outcome.<br />Prepare a private bid, commit locally,<br />and audit your place in the auction.</p>
+        <section class="journey" id="journey" aria-label="DarkZec introduction">
+          <div class="intro">
+            <div><div class="eyebrow">ZECATHON / PRIVATE MARKETS</div><h1>Price discovery.<br /><span>Without exposure.</span></h1></div>
+            <p class="intro-copy">A <b class="hl">sealed book</b>. A <b class="hl">verifiable</b> outcome.<br />Prepare a private bid, commit locally,<br />and audit your place in the auction.</p>
+            <canvas id="hero-logo" class="hero-logo" aria-hidden="true"></canvas>
+          </div>
+          <div class="callouts">
+            <aside class="callout c1 right" aria-label="Sealed book">
+              <h2>Sealed book</h2>
+              <div class="callout-stats"><div><strong>HASH</strong><small>WHAT THE PUBLIC SEES</small></div><div class="acc"><strong>0</strong><small>PRICES REVEALED</small></div></div>
+              <ul><li><span>Commitment</span><b>SHA-256</b></li><li><span>Salt</span><b>256-bit</b></li><li><span>Memo</span><b>&le; 512 bytes</b></li><li><span>Public book</span><b>Hashes only</b></li></ul>
+              <p class="callout-note">Sealed toward the public, not the operator</p>
+            </aside>
+            <aside class="callout c2 left" aria-label="One clearing price">
+              <h2>One clearing price</h2>
+              <ul><li><span>Rule</span><b>Uniform price</b></li><li><span>Fill</span><b>Highest limits first</b></li><li><span>Paid</span><b>Price &times; lots</b></li><li><span>Refund</span><b>Escrow &minus; paid</b></li></ul>
+              <p class="callout-note">Conserved to the last zatoshi</p>
+            </aside>
+            <aside class="callout c3 right" aria-label="Prove inclusion">
+              <h2>Prove you're in</h2>
+              <ul><li><span>Leaf</span><b>0x00 || commitment</b></li><li><span>Node</span><b>0x01 || left || right</b></li><li><span>Root</span><b>Bound to leaf count</b></li><li><span>Proof</span><b>Hashes only</b></li></ul>
+              <p class="callout-note">Local root &middot; not yet anchored</p>
+            </aside>
+            <aside class="callout c4 left" aria-label="Who sees what">
+              <h2>Who sees what</h2>
+              <ul><li><span>Public</span><b>Commitments</b></li><li><span>Wallet</span><b>Full request</b></li><li><span>Operator</span><b>Every bid (IVK)</b></li><li><span>You</span><b>Your own bid</b></li></ul>
+              <p class="callout-note">No RPC &middot; no payment tracking</p>
+            </aside>
+          </div>
         </section>
 
+        <div class="deal-frame" id="app-frame">
+          <h2 class="deal-title">Run a sealed auction</h2>
         <div id="session-status" class="notice" role="status" aria-live="polite"><span class="notice-tag">SANDBOX</span><span>Session-only simulation. No funds move. Reloading erases all bids.</span></div>
         <div id="error" class="error" role="alert" hidden></div>
         <section id="protocol-specs" aria-label="Protocol specs and FAQ"></section>
@@ -124,6 +157,8 @@
         <section id="viewing-key-view" hidden aria-label="Viewing-key scanner"></section>
 
         <div id="live-terminal-stream"></div>
+        </div>
+
         <section class="privacy-strip" aria-label="Privacy properties"><div><span class="green">▣</span><strong>Browser-local</strong><span>Keys stay on your device</span></div><div><span class="green">◇</span><strong>Orchard only</strong><span>No receiver fallback</span></div><div><span class="green">⌘</span><strong>512-byte audit</strong><span>UTF-8 checked before encoding</span></div></section>
       </main>
       <footer><span>DARKZEC <span class="muted">/</span> NODE 07</span><span>PRIVATE BY CONSTRUCTION. VERIFIABLE BY DESIGN.</span><span class="green">● SESSION IN MEMORY</span></footer>

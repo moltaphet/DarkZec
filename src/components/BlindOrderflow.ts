@@ -82,10 +82,10 @@ export class BlindOrderflow {
     this.#lastTime = time;
     const w = this.#width; const h = this.#height; const cx = w / 2; const cy = h / 2;
     ctx.clearRect(0, 0, w, h);
-    ctx.lineWidth = 0.7; ctx.strokeStyle = '#123223';
+    ctx.lineWidth = 0.7; ctx.strokeStyle = '#222024';
     for (let x = 0; x < w; x += 34) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
     for (let y = 0; y < h; y += 34) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-    ctx.strokeStyle = '#225437'; ctx.setLineDash([2, 7]);
+    ctx.strokeStyle = '#3b383e'; ctx.setLineDash([2, 7]);
     for (const radius of [0.25, 0.41]) {
       ctx.beginPath(); ctx.ellipse(cx, cy, w * radius, h * radius, 0, 0, Math.PI * 2); ctx.stroke();
     }
@@ -94,23 +94,23 @@ export class BlindOrderflow {
     points.forEach((point, i) => {
       for (let j = i + 1; j < points.length; j++) {
         const other = points[j]; if (!other || Math.hypot(point.x - other.x, point.y - other.y) > w * 0.42) continue;
-        ctx.strokeStyle = '#25533b77'; ctx.beginPath(); ctx.moveTo(point.x, point.y); ctx.lineTo(other.x, other.y); ctx.stroke();
+        ctx.strokeStyle = '#3c393f77'; ctx.beginPath(); ctx.moveTo(point.x, point.y); ctx.lineTo(other.x, other.y); ctx.stroke();
       }
       const selected = i === this.#selected;
       const pulse = 0.6 + Math.sin(time / 850 + (this.#nodes[i]?.phase ?? 0)) * 0.25;
       if (selected) {
-        ctx.strokeStyle = '#ffce73'; ctx.lineWidth = 1; ctx.setLineDash([4, 6]); ctx.lineDashOffset = -time / 45;
+        ctx.strokeStyle = '#7dffae'; ctx.lineWidth = 1; ctx.setLineDash([4, 6]); ctx.lineDashOffset = -time / 45;
         ctx.beginPath(); ctx.moveTo(point.x, point.y); ctx.lineTo(cx, cy); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
       }
-      ctx.strokeStyle = selected ? '#ffce7399' : `rgba(0,255,102,${pulse * 0.45})`;
+      ctx.strokeStyle = selected ? '#7dffae99' : `rgba(0,255,102,${pulse * 0.45})`;
       ctx.beginPath(); ctx.arc(point.x, point.y, selected ? 12 : 7 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = selected ? '#ffce73' : '#00ff66'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = selected ? 18 : 10;
+      ctx.fillStyle = selected ? '#7dffae' : '#00ff66'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = selected ? 18 : 10;
       ctx.fillRect(point.x - 2.5, point.y - 2.5, 5, 5); ctx.shadowBlur = 0;
-      ctx.fillStyle = selected ? '#ffce73' : '#709a80'; ctx.font = '12px ui-monospace, monospace'; ctx.textAlign = point.x > cx ? 'right' : 'left';
+      ctx.fillStyle = selected ? '#7dffae' : '#85808a'; ctx.font = '12px Consolas, monospace'; ctx.textAlign = point.x > cx ? 'right' : 'left';
       const node = this.#nodes[i];
       ctx.fillText(node?.fixture ? `IDLE_${String(i + 1).padStart(2, '0')}` : (node?.id.slice(0, 6).toUpperCase() ?? ''), point.x + (point.x > cx ? -12 : 12), point.y - 10);
     });
-    ctx.fillStyle = '#050d09'; ctx.strokeStyle = '#36764c'; ctx.lineWidth = 1;
+    ctx.fillStyle = '#090909'; ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(cx, cy - 47); ctx.lineTo(cx + 66, cy); ctx.lineTo(cx, cy + 47); ctx.lineTo(cx - 66, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   destroy(): void { this.#lifetime.destroy(); this.#nodes = []; this.#context?.clearRect(0, 0, this.#width, this.#height); }
