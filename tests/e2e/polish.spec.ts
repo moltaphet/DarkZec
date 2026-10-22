@@ -17,7 +17,7 @@ test('live private preview tracks rapid edits and is the exact prepared payment 
   expect(payload).toMatch(/^[A-Za-z0-9_-]+$/);
   const decoded = Buffer.from(payload ?? '', 'base64url').toString('utf8');
   const memo: unknown = JSON.parse(decoded);
-  expect(memo).toMatchObject({ p: '0.83', q: 9 });
+  expect(memo).toMatchObject({ v: 2, t: 'commit' }); expect(memo).not.toHaveProperty('p'); expect(memo).not.toHaveProperty('s');
   await expect(page.locator('#telemetry-bytes')).toHaveText(`${Buffer.byteLength(decoded)}/512`);
   await page.locator('#prepare').click();
   await expect(page.locator('#prepared-panel')).toBeVisible();
@@ -50,7 +50,7 @@ test('invalid automatic drafts fail quietly and recover after editing', async ({
   await page.locator('#memo-scramble').scrollIntoViewIfNeeded();
   await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
   await page.locator('#prepare').click();
-  await expect(page.locator('#prepared-amount')).toHaveText('2.16 ZEC');
+  await expect(page.locator('#prepared-amount')).toHaveText('10 ZEC');
   expect(failures).toEqual([]);
 });
 

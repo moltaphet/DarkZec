@@ -3,98 +3,116 @@ import { formatZec, parseQuantity, parseZec, validateAuctionId } from './protoco
 import { clearUniformAuction } from './lib/darkpool';
 import type { AuctionConfig, ClearingResult, VerifiedBid } from './lib/darkpool';
 export type { AuctionConfig, Allocation, ClearingResult } from './lib/darkpool';
-import { commitment, utf8 } from './protocol/crypto';
-import { buildPaymentUri, memoBytes, parseBidMemo } from './protocol/memo';
-import type { PreparedBid } from './protocol/memo';
+import { commitment } from './protocol/crypto';
+import { DEFAULT_COLLATERAL, parseBidMemo, serializeBidMemo } from './protocol/memo';
+import type { BidMemo, CommitSubmission } from './protocol/memo';
 import { merkleProof, merkleRoot } from './protocol/merkle';
 import type { InclusionProof } from './protocol/merkle';
 
-export type Phase = 'open' | 'closed' | 'cleared';
-export interface PublicSnapshot { readonly phase: Phase; readonly commitments: readonly string[] }
-interface Envelope { readonly commitment: string; readonly iv: Uint8Array<ArrayBuffer>; readonly ciphertext: ArrayBuffer }
+export type Phase = 'open' | 'reveal' | 'cleared';
+export interface PublicSnapshot {
+  readonly phase: Phase; readonly commitments: readonly string[]; readonly revealed: readonly string[];
+  readonly revealDeadline: number | null; readonly canClear: boolean;
+  readonly revealOpen: boolean;
+}
 export interface Audit { readonly commitment: string; readonly root: string; readonly proof: InclusionProof }
+export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly heldCollateral: string }
+interface RecordEntry { readonly commitment: string; readonly collateral: string; reveal?: BidMemo }
 
-/** Local demonstration of a trusted vault, not Orchard encryption or IVK scanning. */
+/** Hash-only local ledger. No preimage, ciphertext or bidder decryption key enters commit storage. */
 export class Sandbox {
   readonly #config: AuctionConfig;
-  readonly #key: CryptoKey;
-  readonly #envelopes: Envelope[] = [];
+  readonly #clock: () => number;
+  readonly #records: RecordEntry[] = [];
   #phase: Phase = 'open';
   #busy = false;
-  private constructor(config: AuctionConfig, key: CryptoKey) { this.#config = Object.freeze({ ...config }); this.#key = key; }
-
-  static async create(config: AuctionConfig): Promise<Sandbox> {
-    config = Object.freeze({ ...config });
+  #deadline: number | null = null;
+  #auditHashes: readonly string[] = [];
+  #root = '';
+  private constructor(config: AuctionConfig, clock: () => number) { this.#config = config; this.#clock = clock; }
+  static async create(input: AuctionConfig, clock: () => number = Date.now): Promise<Sandbox> {
+    const config = { ...input };
     validateAuctionId(config.auctionId); parseQuantity(String(config.supply));
     if (parseZec(config.reserve) === 0n) throw new Error('Reserve must be positive.');
     if (config.network !== 'testnet') throw new Error('The simulation supports testnet fixtures only.');
-    config = Object.freeze({ ...config, vault: orchardPaymentAddress(config.vault, config.network) });
-    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-    return new Sandbox(config, key);
+    const collateral = formatZec(parseZec(config.collateral ?? DEFAULT_COLLATERAL));
+    if (parseZec(collateral) === 0n) throw new Error('Posted collateral must be positive.');
+    const revealWindowMs = config.revealWindowMs ?? 60_000;
+    if (!Number.isSafeInteger(revealWindowMs) || revealWindowMs < 1 || revealWindowMs > 86_400_000) throw new Error('Invalid reveal window.');
+    return new Sandbox(Object.freeze({ ...config, collateral, revealWindowMs, vault: orchardPaymentAddress(config.vault, config.network) }), clock);
   }
-
+  #now(): number { const now = this.#clock(); if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid auction clock.'); return now; }
+  #canClear(): boolean { return this.#phase === 'reveal' && (this.#records.every(record => record.reveal !== undefined) || this.#now() >= (this.#deadline ?? Infinity)); }
   publicSnapshot(): PublicSnapshot {
-    return Object.freeze({ phase: this.#phase, commitments: Object.freeze(this.#envelopes.map(item => item.commitment)) });
+    return Object.freeze({ phase: this.#phase, commitments: Object.freeze(this.#records.map(item => item.commitment)),
+      revealed: Object.freeze(this.#records.filter(item => item.reveal).map(item => item.commitment)), revealDeadline: this.#deadline, canClear: this.#canClear(),
+      revealOpen: this.#phase === 'reveal' && this.#now() < (this.#deadline ?? 0) });
   }
-
-  async submit(prepared: PreparedBid): Promise<void> {
+  async submit(input: CommitSubmission): Promise<void> {
     if (this.#busy) throw new Error('A vault operation is in progress.');
-    if (this.#phase !== 'open') throw new Error('The auction is closed.');
-    if (this.#envelopes.length >= 128) throw new Error('Local simulation limit: 128 bids.');
+    if (this.#phase !== 'open') throw new Error('The commit phase is closed.');
+    if (this.#records.length >= 128) throw new Error('Local simulation limit: 128 bids.');
+    // Reject rich prepared objects at this boundary, including accidental receipt/preimage fields.
+    if (Object.keys(input).sort().join(',') !== 'auctionId,collateral,commitment') throw new Error('Commit accepts only auction ID, commitment hash and posted collateral.');
+    const { auctionId, commitment: hash, collateral } = input;
+    if (auctionId !== this.#config.auctionId) throw new Error('Wrong auction ID.');
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid commitment hash.');
+    if (collateral !== this.#config.collateral) throw new Error('Posted collateral mismatch.');
+    if (this.#records.some(record => record.commitment === hash)) throw new Error('Duplicate commitment.');
     this.#busy = true;
     try {
-      // Snapshot caller-owned data before the first await.
-      const { memo, amount, uri, byteLength, commitment: hash } = prepared;
-      const bid = parseBidMemo(memo, this.#config.network);
-      assertDistinctRefund(bid.refund, this.#config.vault, this.#config.network);
-      if (bid.auctionId !== this.#config.auctionId) throw new Error('Wrong auction ID.');
-      if (await commitment(bid) !== hash) throw new Error('Bid commitment mismatch.');
-      if (this.#envelopes.some(item => item.commitment === hash)) throw new Error('Duplicate commitment.');
-      const expectedAmount = formatZec(parseZec(bid.price) * BigInt(bid.quantity));
-      if (amount !== expectedAmount) throw new Error('Bid escrow mismatch.');
-      if (uri !== buildPaymentUri({ address: this.#config.vault, amount, memo, network: this.#config.network })) throw new Error('Payment URI mismatch.');
-      if (memoBytes(memo).length !== byteLength) throw new Error('Memo byte audit mismatch.');
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const bytes = memoBytes(memo);
-      try {
-        const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: utf8(hash) }, this.#key, bytes);
-        this.#envelopes.push({ commitment: hash, iv, ciphertext });
-      } finally { bytes.fill(0); }
+      // Preserve atomic asynchronous adapter semantics without accepting a bid preimage.
+      await Promise.resolve();
+      this.#records.push({ commitment: hash, collateral });
     } finally { this.#busy = false; }
   }
-
   close(): void {
     if (this.#busy) throw new Error('A vault operation is in progress.');
     if (this.#phase !== 'open') throw new Error('Auction is already closed.');
-    this.#phase = 'closed';
+    this.#deadline = this.#now() + (this.#config.revealWindowMs ?? 60_000); this.#phase = 'reveal';
   }
-
-  async audit(index: number): Promise<Audit> {
-    if (this.#phase === 'open') throw new Error('Close the auction to freeze its audit root.');
-    const hashes = this.#envelopes.map(item => item.commitment);
-    const hash = hashes[index]; if (!hash) throw new Error('No commitment at this index.');
-    return { commitment: hash, root: await merkleRoot(hashes), proof: await merkleProof(hashes, index) };
-  }
-
-  async clear(): Promise<ClearingResult> {
+  async reveal(input: BidMemo): Promise<void> {
     if (this.#busy) throw new Error('A vault operation is in progress.');
-    if (this.#phase === 'open') throw new Error('Close the auction before unsealing.');
+    if (this.#phase !== 'reveal') throw new Error('Reveal is allowed only in the closed reveal window.');
+    if (this.#now() >= (this.#deadline ?? 0)) throw new Error('Reveal window has expired.');
+    this.#busy = true;
+    try {
+      if (Object.keys(input).sort().join(',') !== 'auctionId,price,quantity,refund,salt') throw new Error('Invalid reveal schema.');
+      const bid = Object.freeze(parseBidMemo(serializeBidMemo({ ...input }, this.#config.network), this.#config.network));
+      if (bid.auctionId !== this.#config.auctionId) throw new Error('Wrong auction ID.');
+      assertDistinctRefund(bid.refund, this.#config.vault, this.#config.network);
+      const hash = await commitment(bid);
+      if (this.#now() >= (this.#deadline ?? 0)) throw new Error('Reveal window has expired.');
+      const record = this.#records.find(item => item.commitment === hash);
+      if (!record) throw new Error('Reveal does not match a recorded commitment.');
+      if (record.reveal) throw new Error('Commitment has already been revealed.');
+      if (parseZec(bid.price) * BigInt(bid.quantity) > parseZec(record.collateral)) throw new Error('Insufficient collateral for reveal.');
+      record.reveal = bid;
+    } finally { this.#busy = false; }
+  }
+  async clear(): Promise<SettlementResult> {
+    if (this.#busy) throw new Error('A vault operation is in progress.');
+    if (this.#phase === 'open') throw new Error('Close the auction before revealing and clearing.');
     if (this.#phase === 'cleared') throw new Error('Auction has already cleared.');
+    if (!this.#canClear()) throw new Error('Reveal window is still open. Wait for its deadline or all valid reveals.');
     this.#busy = true;
     try {
       const bids: VerifiedBid[] = [];
-      for (const envelope of this.#envelopes) {
-        const bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: envelope.iv, additionalData: utf8(envelope.commitment) }, this.#key, envelope.ciphertext));
-        try {
-          const bid = parseBidMemo(new TextDecoder('utf-8', { fatal: true }).decode(bytes), this.#config.network);
-          assertDistinctRefund(bid.refund, this.#config.vault, this.#config.network);
-          if (await commitment(bid) !== envelope.commitment) throw new Error('Unsealed commitment mismatch.');
-          bids.push({ commitment: envelope.commitment, bid });
-        } finally { bytes.fill(0); }
+      for (const record of this.#records) if (record.reveal) {
+        if (await commitment(record.reveal) !== record.commitment) throw new Error('Verified reveal integrity failed.');
+        bids.push({ commitment: record.commitment, bid: record.reveal, collateral: record.collateral });
       }
       const result = clearUniformAuction(this.#config, bids);
-      this.#phase = 'cleared';
-      return result;
+      const hashes = Object.freeze(bids.map(bid => bid.commitment)); const root = await merkleRoot(hashes);
+      const excluded = this.#records.length - bids.length;
+      const held = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
+      this.#root = root; this.#auditHashes = hashes; this.#phase = 'cleared';
+      return Object.freeze({ ...result, root, excluded, heldCollateral: formatZec(held) });
     } finally { this.#busy = false; }
+  }
+  async audit(index: number): Promise<Audit> {
+    if (this.#phase !== 'cleared') throw new Error('Finalize valid reveals before requesting an audit proof.');
+    const hash = this.#auditHashes[index]; if (!hash) throw new Error('No verified reveal at this index.');
+    return Object.freeze({ commitment: hash, root: this.#root, proof: await merkleProof(this.#auditHashes, index) });
   }
 }

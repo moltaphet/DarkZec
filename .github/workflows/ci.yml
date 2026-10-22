@@ -9,9 +9,9 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Node ${{ matrix.node }} / build and unit tests
+    name: Node ${{ matrix.node }} / build, unit and E2E tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -28,8 +28,12 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+      - name: Install Chromium and Linux browser dependencies
+        run: npx --no-install playwright install --with-deps chromium
       - name: Build production terminal
         run: npm run build
       - name: Run unit and privacy tests
         run: npm test
+      - name: Run end-to-end tests
+        run: npm run test:e2e

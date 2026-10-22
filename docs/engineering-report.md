@@ -1,6 +1,6 @@
 # DarkZec engineering report — active repository
 
-Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream, Phase 1/Phase 2 refinements and targeted security/UI hardening.
+Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream, Phase 1/Phase 2 refinements, targeted security/UI hardening and final production polish.
 
 ## Repository and implementation status
 
@@ -51,7 +51,7 @@ The project `.npmrc` selects official npm. The regenerated lockfile contains **8
 | `src/lib/security-events.ts`, `security-monitor.ts` | Typed fixed metadata, truthful encryption status and passive CSP observation. |
 | `src/lib/dom.ts`, `motion.ts`, `blind-mesh.ts` | Cleanup ownership, visibility/reduced-motion scheduling and public-commitment-only geometry. |
 | `tests/*.test.ts`, `tests/fixtures.ts`, `tests/e2e/*.spec.ts` | Unit/privacy/CLI invariants, synthetic/public encodings and complete browser flows. |
-| `LICENSE`, `.github/workflows/ci.yml` | MIT licensing and SHA-pinned, read-only push/PR build/unit CI on Node 22/24. |
+| `LICENSE`, `.github/workflows/ci.yml` | MIT licensing and SHA-pinned, read-only push/PR clean-install/build/unit/E2E CI on Node 22/24. |
 | `README.md`, `DARKZEC-STANDARD.md`, `docs/` | Current entry point, protocol rules, stage reports, local badge asset and implementation records. |
 
 Dependencies, `dist/`, browser traces/reports and `test-results/` are ignored artifacts. Source and protocol changes remain reviewable in Git.
@@ -98,7 +98,7 @@ Application code makes no external runtime requests. Scripts/styles are local, f
 
 The audit API stores fixed messages and bounded numeric metadata, never keys, addresses, salts, amounts, payloads, raw exceptions or blocked URLs. The full history retains 128 events, with 18 rendered in the rail. Pause freezes the full view only. Frame work is capped, pauses while hidden/offscreen, and respects reduced motion; subscriptions, timers and observers are disposed on page exit. The log is keyboard-readable without character-by-character screen-reader announcements. Canvas geometry never uses bid amounts.
 
-All CSS terminal text and canvas labels have an 11px minimum, including responsive overrides and telemetry streams. A DOM-updated telemetry symbol replaces the earlier zero-font-size hiding technique. Mobile navigation and telemetry labels wrap at readable sizes. Both bid forms provide price/quantity examples; auction and vault result tables use bounded horizontal scroll regions, keyboard focus outlines and visible mobile scroll hints. Browser checks cover 320, 390, 768, 1280 and 1440px widths, including the expanded manual and telemetry.
+All CSS terminal text and canvas labels have a 12px minimum, including responsive overrides. Primary inputs, auction values, receipt values, memo payloads, result cells, commitment readouts and telemetry values/events use at least 14px. A DOM-updated telemetry symbol replaces the earlier zero-font-size hiding technique. Mobile navigation, action buttons and telemetry labels wrap at readable sizes. Both bid forms use exact `0.00 ZEC` and `0 Qty` placeholders. Auction and vault result tables use bounded `max-w-full overflow-x-auto` scroll regions, keyboard focus outlines and visible mobile scroll hints. These utility classes are implemented in the local stylesheet; no Tailwind runtime or dependency is added. Browser checks cover 320, 390, 768, 1280 and 1440px widths, including the expanded manual and telemetry.
 
 ## Build, serve and verification
 
@@ -124,12 +124,16 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 | `npm run build` | Strict TypeScript passed; 39 transformed modules. |
 | `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | Fresh build followed by 30 passing E2E tests. |
 | Node 22.18.0 / 24.0.0 matrix | Each: 62 tests, strict check and 39-module bundle passed. |
-| Production bundle | JavaScript 87.88 kB / 30.85 kB gzip; CSS 37.63 kB / 8.62 kB gzip. |
-| CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24 and install/build/unit steps. Hosted execution requires pushing the workflow. |
+| Production bundle | JavaScript 87.90 kB / 30.87 kB gzip; CSS 37.79 kB / 8.65 kB gzip. |
+| `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |
+| CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24, `npm ci`, Chromium dependencies and sequential build/unit/E2E steps. |
+| CI-mode browser suite | 30 tests passed with two workers, focused tests forbidden and automatic dedicated preview-server startup/cleanup, using a temporary cached-Chromium config. |
 
 The temporary browser config only selects cached Chromium for this workspace. The maintained configuration is portable. Browser coverage includes existing protocol/wallet/vault/security flows, the five reproduced Phase 2 regressions, failed Merkle compilation and an oversized winning bid priced against competing demand; unit coverage includes missing-build CLI failures. Source privacy, registry origin and strict typing checks remain enabled. Desktop/mobile screenshots are generated under `test-results/` and visually reviewed. No public CI or independent audit result is claimed.
 
 The targeted pass additionally rejects checksum-valid real viewing keys before storage and authentic legacy encrypted non-mock records during unlock. Source and runtime privacy guards now restrict the storage exception to encrypted mock credentials. A timing race in the CSP/log-clear test was fixed by waiting for the initial memo operation to finish before asserting that history clears; legitimate later events are not suppressed. See the [targeted hardening report](targeted-hardening-report.md) for the full changed-file inventory and verification commands.
+
+The later [production polish report](production-polish-report.md) records the 12px/14px typography upgrade, exact placeholders, explicit scrolling utilities and complete CI verification. CI has no failure-tolerating steps. GitHub-hosted execution requires pushing the workflow; enforcing merge blocking additionally requires the repository's `main` branch protection to require both Node matrix checks, up-to-date branches and restricted direct pushes/bypasses. Local changes do not assert that those repository settings have been configured.
 
 ## References, provenance and remaining integration work
 

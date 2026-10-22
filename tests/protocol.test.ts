@@ -4,7 +4,7 @@ import { bech32m } from '@scure/base';
 import { decodeUnifiedAddress, encodeOrchardAddress, f4jumble, validateOrchardAddress } from '../src/protocol/address';
 import { formatZec, MAX_MONEY, parseQuantity, parseZec } from '../src/protocol/amount';
 import { canonicalPreimage, commitment, deriveSalt, freshSalt, unhex, utf8 } from '../src/protocol/crypto';
-import { buildPaymentUri, encodeMemo, memoBytes, parseBidMemo, prepareBid, serializeBidMemo } from '../src/protocol/memo';
+import { buildPaymentUri, encodeMemo, memoBytes, parseBidMemo, parseCommitMemo, prepareBid, serializeBidMemo } from '../src/protocol/memo';
 import { merkleProof, merkleRoot, verifyProof } from '../src/protocol/merkle';
 import { TEST_REFUND } from './fixtures';
 
@@ -53,7 +53,7 @@ describe('exact amounts and commitments', () => {
     for (const bad of ['0', '1.5', '-1', '1000000']) expect(() => parseQuantity(bad)).toThrow();
   });
   it('matches independent SHA-256 and HMAC known answers', async () => {
-    const preimage = JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
+    const preimage = `${bid.price}:${bid.quantity}:${bid.salt}:${bid.refund}`;
     expect(canonicalPreimage(bid)).toBe(preimage);
     expect(await commitment(bid)).toBe(createHash('sha256').update(preimage).digest('hex'));
     const entropy = new Uint8Array(32).fill(42); const nonce = '0'.repeat(32);
@@ -83,17 +83,18 @@ describe('ZIP-302 / ZIP-321', () => {
   });
   it('builds a shielded URI with exact decimal escrow and canonical JSON', async () => {
     const prepared = await prepareBid({ ...bid, price: '0.7200', vault: testAddress, network: 'testnet' });
-    expect(prepared.amount).toBe('2.88');
+    expect(prepared.amount).toBe('10');
     const [base, query = ''] = prepared.uri.split('?');
     expect(base).toBe(`zcash:${testAddress}`);
     const params = new URLSearchParams(query);
-    expect(params.get('amount')).toBe('2.88');
+    expect(params.get('amount')).toBe('10');
     const encoded = params.get('memo') ?? '';
     expect(encoded).not.toMatch(/[+/=]/);
     const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
     expect(decoded).toBe(prepared.memo);
-    const parsed = parseBidMemo(decoded, 'testnet');
-    expect(await commitment(parsed)).toBe(prepared.commitment);
+    expect(parseCommitMemo(decoded)).toEqual({ auctionId: bid.auctionId, commitment: prepared.commitment });
+    expect(await commitment(prepared.reveal)).toBe(prepared.commitment);
+    for (const field of ['p', 'q', 's', 'r']) expect(JSON.parse(decoded)).not.toHaveProperty(field);
     expect(prepared.byteLength).toBe(Buffer.byteLength(decoded, 'utf8'));
   });
   it('rejects invalid refund, schema, destination, empty payments and overflow', async () => {

@@ -43,7 +43,7 @@ export class ViewingKeyVault implements Disposable {
   readonly #saved = node('span', 'micro');
   readonly #rows = node('tbody');
   readonly #received = metric('vault-received', 'RECEIVED NOTES');
-  readonly #accepted = metric('vault-accepted', 'ACCEPTED BIDS');
+  readonly #accepted = metric('vault-accepted', 'ACCEPTED COMMITS');
   readonly #rejected = metric('vault-rejected', 'QUARANTINED');
   #notes: readonly MockNote[] = [];
   #results: readonly ScannedNote[] = [];
@@ -70,7 +70,7 @@ export class ViewingKeyVault implements Disposable {
     heading.append(node('h2', '', '03 / Viewing Key Vault & Decryption Engine'), this.#mode); this.#mode.id = 'vault-mode';
     const intro = node('div', 'vault-intro');
     intro.append(node('span', 'eyebrow', 'INCOMING VIEW AUTHORITY / LOCAL SIMULATION'), node('h2', '', 'Unseal the note. Keep the key local.'),
-      node('p', '', 'An isolated scanner for simulated shielded notes. Unlock the vault, authenticate incoming envelopes and inspect validated bids. No chain connection or spending authority.'));
+      node('p', '', 'An isolated scanner for simulated shielded notes. Unlock the vault, authenticate incoming envelopes and inspect validated commitment hashes. No chain connection or spending authority.'));
     const grid = node('div', 'vault-grid'); const credentials = node('section', 'vault-credentials');
     credentials.append(node('h3', '', 'Vault access'), this.#saved); this.#saved.id = 'vault-saved-state';
     this.#form.id = 'vault-key-form'; this.#form.autocomplete = 'off';
@@ -93,7 +93,7 @@ export class ViewingKeyVault implements Disposable {
       ['01 / AUTHENTICATE', 'Mock AES-GCM verifies each envelope and its note metadata. Wrong keys and modified notes are refused.'],
       ['02 / EXTRACT', 'The encrypted envelope is 528 bytes including its tag. Only the decrypted ZIP-302 memo field is exactly 512 bytes.'],
       ['03 / DECODE', 'Remove trailing 0x00 padding, decode UTF-8, then decode strict unpadded Base64url when the mock transport requires it.'],
-      ['04 / VALIDATE', 'Check v:1, auction, price, quantity, salt, Orchard refund, commitment and escrow before accepting a bid.'],
+      ['04 / VALIDATE', 'Check v:2 commit-only schema, auction, recorded hash and the public fixed collateral. Bid price, quantity, salt and refund are never in these notes.'],
     ]) {
       const step = node('li'); step.append(node('strong', '', title ?? ''), node('p', '', copy ?? '')); stages.append(step);
     }
@@ -103,14 +103,14 @@ export class ViewingKeyVault implements Disposable {
     this.#error.id = 'vault-error'; this.#error.setAttribute('role', 'alert'); this.#error.hidden = true;
     const stats = node('dl', 'vault-metrics'); stats.append(this.#received, this.#accepted, this.#rejected);
     const toolbar = node('div', 'vault-scanner-actions'); toolbar.append(this.#load, this.#scan, this.#incoming);
-    const tableWrap = node('div', 'table-scroll vault-table');
+    const tableWrap = node('div', 'table-scroll vault-table max-w-full overflow-x-auto');
     const scrollHint = node('p', 'table-scroll-hint', '↔ Scroll horizontally to inspect all note fields'); scrollHint.id = 'vault-scroll-hint';
     tableWrap.id = 'vault-table-scroll'; tableWrap.tabIndex = 0; tableWrap.setAttribute('role', 'region');
     tableWrap.setAttribute('aria-label', 'Private mock note scan results'); tableWrap.setAttribute('aria-describedby', scrollHint.id);
     const table = node('table'); table.setAttribute('aria-label', 'Privately decrypted simulated bids');
-    const caption = node('caption', '', 'Private scan results · never added to the public book or telemetry');
+    const caption = node('caption', '', 'Commit-only scan results · no bid preimages in vault notes');
     const thead = node('thead'); const tr = node('tr');
-    for (const label of ['Note / state', 'Auction', 'Price / ZEC', 'Quantity', 'Memo audit', 'Private details']) { const th = node('th', '', label); th.scope = 'col'; tr.append(th); }
+    for (const label of ['Note / state', 'Auction', 'Commitment', 'Collateral', 'Memo audit', 'Note details']) { const th = node('th', '', label); th.scope = 'col'; tr.append(th); }
     thead.append(tr); this.#rows.id = 'vault-result-rows'; table.append(caption, thead, this.#rows); tableWrap.append(table);
     const footer = node('div', 'vault-footer', 'Session ciphertext stays in this tab. Unlocked data is visible to scripts running in this origin. Lock clears private rows and live key references; Forget removes the saved record.');
     panel.append(heading, intro, grid, this.#status, this.#error, stats, toolbar, scrollHint, tableWrap, footer); this.#host.replaceChildren(panel);
@@ -184,7 +184,7 @@ export class ViewingKeyVault implements Disposable {
     const accepted = rows.filter(row => row.status === 'accepted').length;
     const rejected = rows.filter(row => row.status === 'rejected').length;
     const empty = rows.filter(row => row.status === 'empty').length;
-    this.#message(`Scan complete: ${accepted} accepted bids, ${rejected} quarantined notes, ${empty} empty memos. Results remain private to this view.`);
+    this.#message(`Scan complete: ${accepted} accepted commitments, ${rejected} quarantined notes, ${empty} empty memos. Results remain private to this view.`);
   }
 
   #controls(): void {
@@ -220,13 +220,13 @@ export class ViewingKeyVault implements Disposable {
       if (row.status !== 'accepted') {
         const cell = node('td', 'vault-note-issue', row.status === 'empty' ? 'ZIP-302 no-memo marker / skipped.' : row.message); cell.colSpan = 5; tr.append(cell);
       } else {
-        tr.append(node('td', '', row.parsed.bid.auctionId), node('td', 'vault-price', row.parsed.bid.price), node('td', '', String(row.parsed.bid.quantity)),
+        tr.append(node('td', '', row.parsed.commit.auctionId), node('td', 'vault-price', row.commitment.slice(0, 16) + '…'), node('td', '', '10 ZEC / posted'),
           node('td', 'vault-memo-audit', `512B field / ${row.parsed.transportBytes}B ${row.parsed.transport} / ${row.parsed.jsonBytes}B JSON`));
         const cell = node('td'); const details = node('details', 'vault-note-details'); details.append(node('summary', '', 'Inspect memo'));
         const content = node('div'); content.tabIndex = 0; content.setAttribute('aria-label', 'Private memo details');
         details.addEventListener('toggle', () => {
           content.replaceChildren(); if (!details.open) return;
-          for (const [label, value] of [['COMMITMENT', row.commitment], ['PRIVATE SALT', row.parsed.bid.salt], ['ORCHARD REFUND', row.parsed.bid.refund], ['DECRYPTED MEMO HEX / 512 BYTES', row.memoHex]]) {
+          for (const [label, value] of [['COMMITMENT', row.commitment], ['DECRYPTED MEMO HEX / 512 BYTES', row.memoHex]]) {
             content.append(node('span', 'micro', label ?? ''), node('code', 'hash', value ?? ''));
           }
         }, { signal: this.#rowLifetime.signal });

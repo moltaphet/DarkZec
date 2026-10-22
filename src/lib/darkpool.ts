@@ -10,6 +10,8 @@ export interface AuctionConfig {
   readonly reserve: string;
   readonly vault: string;
   readonly network: Network;
+  readonly collateral?: string;
+  readonly revealWindowMs?: number;
 }
 export interface Allocation {
   readonly commitment: string;
@@ -21,7 +23,7 @@ export interface Allocation {
   readonly refundAddress: string;
 }
 export interface ClearingResult { readonly clearingPrice: string; readonly filled: number; readonly allocations: readonly Allocation[] }
-export interface VerifiedBid { readonly commitment: string; readonly bid: BidMemo }
+export interface VerifiedBid { readonly commitment: string; readonly bid: BidMemo; readonly collateral?: string }
 
 /** Inputs are authenticated by the caller, in accepted submission order. No hash-based priority. */
 export function clearUniformAuction(config: AuctionConfig, bids: readonly VerifiedBid[]): ClearingResult {
@@ -33,14 +35,16 @@ export function clearUniformAuction(config: AuctionConfig, bids: readonly Verifi
   orchardPaymentAddress(config.vault, config.network);
   if (bids.length > 128) throw new Error('Local auction limit: 128 bids.');
   const seen = new Set<string>();
-  const ordered = bids.map(({ bid, commitment }, sequence) => {
+  const ordered = bids.map(({ bid, commitment, collateral }, sequence) => {
     bid = Object.freeze({ ...bid }); canonicalPreimage(bid);
     if (bid.auctionId !== config.auctionId) throw new Error('Wrong auction ID.');
     if (!/^[a-f0-9]{64}$/.test(commitment) || seen.has(commitment)) throw new Error('Invalid or duplicate commitment.');
     seen.add(commitment);
     assertDistinctRefund(bid.refund, config.vault, config.network);
-    const price = parseZec(bid.price); const escrow = price * BigInt(bid.quantity);
-    if (escrow > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
+    const price = parseZec(bid.price); const maximum = price * BigInt(bid.quantity);
+    if (maximum > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
+    const escrow = collateral === undefined ? maximum : parseZec(collateral);
+    if (escrow < maximum) throw new Error('Insufficient collateral.');
     return { bid, commitment, sequence, price, escrow };
   });
   ordered.sort((a, b) => a.price === b.price ? a.sequence - b.sequence : a.price > b.price ? -1 : 1);

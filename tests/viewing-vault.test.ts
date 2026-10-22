@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { bech32m } from '@scure/base';
-import { FIXTURE_ADDRESS, FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../src/fixtures';
+import { FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../src/fixtures';
 import { f4jumble } from '../src/protocol/address';
 import { commitment, hex, utf8 } from '../src/protocol/crypto';
-import { encodeMemo, serializeBidMemo } from '../src/protocol/memo';
+import { encodeMemo, serializeBidMemo, serializeCommitMemo } from '../src/protocol/memo';
 import { decodeBase64url, parseVaultMemo } from '../src/lib/vault-memo';
 import { createDemoNotes, encryptMockNote, mockNoteKey, MOCK_SCAN_SCOPE, paddedMockField, scanMockNotes } from '../src/lib/mock-note-scanner';
 import { DEMO_VIEWING_KEY, ViewingKeySession, VIEWING_SESSION_KEY, viewingKeyKind } from '../src/lib/viewing-key-session';
@@ -58,7 +58,7 @@ describe('mock note scan isolation', () => {
     expect(result.map(row => row.status)).toEqual(['accepted', 'accepted', 'accepted', 'rejected', 'empty']);
     expect(result[3]).toMatchObject({ code: 'schema' }); expect(progress).toEqual([1, 2, 3, 4, 5]);
     const accepted = result[0]; if (accepted?.status !== 'accepted') throw new Error('Expected bid');
-    expect(accepted.memoHex).toHaveLength(1024); expect(accepted.commitment).toBe(await commitment(accepted.parsed.bid));
+    expect(accepted.memoHex).toHaveLength(1024); expect(accepted.commitment).toBe(accepted.parsed.commit.commitment);
     expect(await scanMockNotes(notes, key, MOCK_SCAN_SCOPE)).toEqual(result);
   });
   it('rejects wrong keys, modified ciphertext, modified AAD and duplicate IDs without accepting them', async () => {
@@ -71,8 +71,8 @@ describe('mock note scan isolation', () => {
     expect(scanned[2]).toMatchObject({ code: 'duplicate' });
   });
   it('rejects commitment/escrow mismatches inside authentic envelopes and wrong destinations/auctions', async () => {
-    const key = await mockNoteKey(DEMO_VIEWING_KEY); const field = paddedMockField(memo);
-    const metadata = { ...MOCK_SCAN_SCOPE, id: 'NOTE-0001', commitment: await commitment(bid), amount: '2.96', transport: 'json' as const };
+    const key = await mockNoteKey(DEMO_VIEWING_KEY); const field = paddedMockField(serializeCommitMemo(bid.auctionId, await commitment(bid)));
+    const metadata = { ...MOCK_SCAN_SCOPE, id: 'NOTE-0001', commitment: await commitment(bid), amount: '10', transport: 'json' as const };
     for (const [changes, code] of [[{ commitment: 'f'.repeat(64) }, 'commitment'], [{ amount: '1' }, 'escrow'], [{ auctionId: 'OTHER' }, 'auction'], [{ network: 'mainnet' as const }, 'destination']] as const) {
       const note = await encryptMockNote({ ...metadata, ...changes }, field, key);
       expect((await scanMockNotes([note], key, MOCK_SCAN_SCOPE))[0]).toMatchObject({ status: 'rejected', code });
@@ -87,11 +87,13 @@ describe('mock note scan isolation', () => {
     const note = notes[0]; if (!note) throw new Error('Missing note');
     await expect(scanMockNotes(Array.from({ length: 129 }, () => note), key, MOCK_SCAN_SCOPE)).rejects.toThrow('128');
   });
-  it('quarantines an authentic memo that refunds to the receiving vault', async () => {
-    const self = { ...bid, refund: FIXTURE_ADDRESS }; const field = paddedMockField(serializeBidMemo(self, 'testnet'));
-    const key = await mockNoteKey(DEMO_VIEWING_KEY);
-    const note = await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: 'NOTE-0001', commitment: await commitment(self), amount: '2.96', transport: 'json' }, field, key);
-    expect((await scanMockNotes([note], key, MOCK_SCAN_SCOPE))[0]).toMatchObject({ status: 'rejected', code: 'refund' });
+  it('quarantines authentic legacy bid preimages rather than exposing them in a commitment scanner', async () => {
+    const field = paddedMockField(memo); const key = await mockNoteKey(DEMO_VIEWING_KEY);
+    const note = await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: 'NOTE-0001', commitment: await commitment(bid), amount: '10', transport: 'json' }, field, key);
+    expect((await scanMockNotes([note], key, MOCK_SCAN_SCOPE))[0]).toMatchObject({ status: 'rejected', code: 'schema' });
+    const notes = await createDemoNotes(); const result = await scanMockNotes(notes, key, MOCK_SCAN_SCOPE);
+    const encoded = JSON.stringify(result);
+    for (const secret of ['"price"', '"quantity"', '"salt"', '"refund"', '0.74']) expect(encoded).not.toContain(secret);
   });
 });
 
