@@ -8,7 +8,7 @@ The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Thi
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification (Node 26.10.0): **69 unit/privacy/CLI tests across 9 files, 34 E2E tests and 46 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
+Current observed verification (Node 26.10.0): **69 unit/privacy/CLI tests across 9 files, 35 E2E tests and 46 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -80,6 +80,8 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 
 **Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes mock-key tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Invalid/non-mock input is rejected before storage access. Stored ciphertext must have the exact mock-key-plus-tag length, and decrypted credentials are validated again, so legacy non-mock records cannot unlock. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
 
+**Non-reveal penalty.** A commitment not revealed (and verified) before the reveal deadline forfeits its full collateral to the vault: `SettlementResult.forfeitedCollateral` is the sum of those collaterals and `payments + refunds + forfeited` equals every posted collateral. Unrevealed commitments stay in the frozen Merkle tree. Actual settlement of the forfeiture is outside the sandbox.
+
 **Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing. The tree covers every accepted commitment and is frozen when the commit phase closes, so a bidder can verify inclusion before reveals and the clear-time root must equal it.
 
 ## Phase 2 lifecycle and audit corrections
@@ -122,7 +124,7 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 | --- | --- |
 | `npm test` | 69 tests passed across 9 files. |
 | `npm run build` | Strict TypeScript passed; 46 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 34 passing E2E tests. |
+| `npm run test:e2e` | Fresh build followed by 35 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |

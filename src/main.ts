@@ -267,8 +267,8 @@ button('clear').addEventListener('click', () => {
       rows.append(row);
     }
     visible('results-panel', true);
-    text('excluded-bids', `${lastResult.excluded} excluded / ${lastResult.heldCollateral} ZEC collateral held`);
-    status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their collateral remains held for a future recovery policy. No settlement transaction was sent.');
+    text('excluded-bids', `${lastResult.excluded} unrevealed / ${lastResult.forfeitedCollateral} ZEC collateral forfeited to the vault`);
+    status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their full collateral is forfeited to the vault as the non-reveal penalty. No settlement transaction was sent.');
   });
 });
 element('audit-form', HTMLFormElement).addEventListener('submit', event => {

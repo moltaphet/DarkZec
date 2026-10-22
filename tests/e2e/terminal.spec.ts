@@ -112,3 +112,20 @@ test('CSP blocks outbound fetch before a network request leaves the page', async
   expect(blocked).toBe(true); expect(outbound).toEqual([]);
   await expect(page.locator('#telemetry-leaks')).toHaveText('1');
 });
+
+test('unrevealed commitments are excluded from clearing and forfeit their collateral', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
+  await page.locator('#seed').click(); await expect(page.locator('#bid-count')).toHaveText('03');
+  await page.locator('#close').click(); await expect(page.locator('#phase')).toHaveText('CLOSED / REVEAL WINDOW');
+  await page.locator('#reveal-own').click();
+  await expect(page.locator('#reveal-status')).toContainText('1/3 valid reveals');
+  await expect(page.locator('#clear')).toBeDisabled();
+  await page.locator('#reveal-expire').click(); await expect(page.locator('#clear')).toBeEnabled();
+  await expect(page.locator('#reveal-status')).toContainText('collateral is forfeited');
+  await page.locator('#clear').click();
+  await expect(page.locator('#excluded-bids')).toHaveText('2 unrevealed / 20 ZEC collateral forfeited to the vault');
+  await expect(page.locator('#result-rows tr')).toHaveCount(1);
+  await expect(page.locator('#reveal-status')).toContainText('forfeited');
+  await page.locator('#audit-index').fill('3'); await page.getByRole('button', { name: 'Verify inclusion' }).click();
+  await expect(page.locator('#audit-result')).toContainText('VERIFIED / Entry 3');
+});
