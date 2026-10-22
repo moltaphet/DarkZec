@@ -28,8 +28,10 @@ import { hex } from './protocol/crypto';
 import type { PreparedBid } from './protocol/memo';
 import { commitSubmission, prepareBid, serializeBidMemo } from './protocol/memo';
 import { verifyProof } from './protocol/merkle';
-import { Sandbox } from './simulation';
+import { Sandbox, settlementBalance } from './simulation';
 import type { SettlementResult } from './simulation';
+import { compareWithRequest, memoFingerprint, parseReceivedCommitMemo } from './lib/memo-import';
+import { downloadText, receiptFilename } from './lib/receipt-file';
 
 const el = (id: string): HTMLElement => element(id, HTMLElement);
 const input = (id: string): HTMLInputElement => element(id, HTMLInputElement);
@@ -187,7 +189,7 @@ function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
     el(id).classList.toggle('active', active); el(id).setAttribute('aria-pressed', String(active));
   }
   visible('error', false);
-  clearPrepared(); eraseWallet();
+  clearPrepared(); eraseWallet(); clearMemoVerification();
   memoPreview.clear();
   memoPreview.setEnabled(view === 'sandbox' && vault().publicSnapshot().phase === 'open');
   if (view === 'sandbox' && vault().publicSnapshot().phase === 'open') memoPreview.update();
@@ -234,7 +236,7 @@ button('seed').addEventListener('click', () => {
     while (demoSeedProgress < DEMO_BIDS.length) {
       const bid = DEMO_BIDS[demoSeedProgress]; if (!bid) throw new Error('Missing local demo fixture.');
       const receipt = await prepareBid({ ...bid, auctionId: SIMULATION_CONFIG.auctionId, vault: FIXTURE_ADDRESS, refund: FIXTURE_REFUND_ADDRESS, network: 'testnet' }, event => securityAudit.protocol(event, 'auction'));
-      await vault().submit(commitSubmission(receipt)); revealPanel.remember(receipt);
+      await vault().submit(commitSubmission(receipt)); revealPanel.remember(receipt, true);
       demoSeedProgress++;
     }
     telemetry.log('seeded');
@@ -267,6 +269,9 @@ button('clear').addEventListener('click', () => {
       rows.append(row);
     }
     visible('results-panel', true);
+    const balance = settlementBalance(lastResult); const balanceLine = el('settlement-balance');
+    balanceLine.textContent = `${balance.balanced ? 'BALANCED' : 'MISMATCH'} / payments ${balance.paid} + refunds ${balance.refunded} + forfeited ${balance.forfeited} = ${balance.posted} ZEC posted collateral`;
+    balanceLine.classList.toggle('is-ok', balance.balanced); balanceLine.classList.toggle('is-bad', !balance.balanced);
     text('excluded-bids', `${lastResult.excluded} unrevealed / ${lastResult.forfeitedCollateral} ZEC collateral forfeited to the vault`);
     status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their full collateral is forfeited to the vault as the non-reveal penalty. No settlement transaction was sent.');
   });
@@ -282,14 +287,14 @@ element('audit-form', HTMLFormElement).addEventListener('submit', event => {
 });
 button('reset').addEventListener('click', () => {
   void action(async () => {
-    memoPreview.setEnabled(false); clearPrepared(); eraseWallet();
+    memoPreview.setEnabled(false); clearPrepared(); eraseWallet(); clearMemoVerification();
     clearTimeout(revealDeadlineTimer);
     judgeTimeOffset = 0; sandbox = await Sandbox.create(SIMULATION_CONFIG, judgeClock); revealPanel.reset();
     demoSeedProgress = 0; lastResult = undefined;
     for (const id of ['bid-form', 'wallet-form', 'audit-form']) element(id, HTMLFormElement).reset();
     text('error', ''); telemetry.reset();
     visible('audit-panel', false); visible('results-panel', false); text('merkle-root', ''); text('audit-result', '');
-    text('result-rows', ''); text('clearing-price', ''); text('filled-lots', '');
+    text('result-rows', ''); text('clearing-price', ''); text('filled-lots', ''); text('settlement-balance', '');
     memoPreview.setEnabled(!walletView && !scannerView);
     if (!walletView && !scannerView) memoPreview.update();
     status('Local commit/reveal session reset. Hash ledger and bidder receipts erased; the book is empty.');
@@ -322,6 +327,33 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
   });
 });
 input('wallet-reviewed').addEventListener('change', updateWalletLink);
+button('download-wallet-receipt').addEventListener('click', () => {
+  void action(async () => {
+    if (!walletPrepared) throw new Error('Prepare a request first.');
+    downloadText(receiptFilename(walletPrepared.reveal, walletPrepared.commitment), area('wallet-reveal').value);
+    status('Reveal receipt downloaded. It holds your private price, quantity, salt and refund address: store it securely and never share it.');
+  });
+});
+function clearMemoVerification(): void {
+  area('memo-verify-input').value = ''; text('memo-verify-result', '');
+  const result = el('memo-verify-result'); result.classList.remove('is-ok', 'is-bad');
+}
+element('memo-verify-form', HTMLFormElement).addEventListener('submit', event => {
+  event.preventDefault();
+  void action(async () => {
+    const result = el('memo-verify-result'); result.classList.remove('is-ok', 'is-bad');
+    try {
+      const imported = parseReceivedCommitMemo(area('memo-verify-input').value);
+      const comparison = compareWithRequest(imported, walletPrepared ? { auctionId: walletPrepared.reveal.auctionId, commitment: walletPrepared.commitment } : undefined);
+      result.textContent = `VALID COMMIT MEMO / auction ${imported.auctionId} / hash ${memoFingerprint(imported.commitment)} / ${imported.bytes} of 512 bytes / read as ${imported.transport}. ${comparison.detail}`;
+      result.classList.add(comparison.matches ? 'is-ok' : 'is-bad');
+      status('Memo validated locally. Nothing was sent anywhere.');
+    } catch (error: unknown) {
+      result.textContent = `REJECTED / ${error instanceof Error ? error.message : 'The memo could not be verified.'}`; result.classList.add('is-bad');
+    }
+  });
+});
+button('memo-verify-clear').addEventListener('click', clearMemoVerification);
 button('copy-wallet').addEventListener('click', () => { void action(() => copy(walletPrepared?.uri ?? '')); });
 button('erase-wallet').addEventListener('click', () => { eraseWallet(); telemetry.log('erased'); controls(); status('Sensitive payment request erased from the interface.'); });
 element('open-wallet', HTMLAnchorElement).addEventListener('click', event => {

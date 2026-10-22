@@ -6,7 +6,7 @@
 
 DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** settled through Zcash's Orchard shielded pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
 
-[Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Security boundaries](#security--privacy-boundaries)
+[Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
 
 ## What is real and what is mock
 
@@ -15,6 +15,7 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 | ZIP-316 Unified Address validation (Bech32m, F4Jumble, receiver ordering, Orchard point check) | **Real**, tested against official vectors. Mixed wallet UAs are accepted and projected to Orchard-only destinations. |
 | ZIP-302 memo sizing (exact UTF-8 ≤ 512 bytes) and ZIP-321 `zcash:` URI generation (unpadded Base64url) | **Real**. |
 | Salted, domain-separated bid commitments and SHA-256 Merkle inclusion proofs | **Real**, computed locally with Web Crypto. |
+| Memo round trip: verify a commit memo copied from a real wallet against your prepared request; reveal receipt download/import | **Real**, local checks (see [testnet round trip](docs/testnet-interop.md)). |
 | Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; refunds are accounting results, not transactions. |
 | Viewing Key Vault and note scanner | **Mock**: `mock:node07:` keys only, authenticated AES-GCM mock notes. Real viewing keys are rejected. |
 | Orchard IVK scanning, transaction submission, escrow, NEAR Intents settlement | **Not implemented** (integration work). No RPC, relayer or solver runs. |
@@ -103,6 +104,23 @@ The typed tuple avoids ambiguous concatenation, binds the refund instruction and
 
 In production, a restricted viewing-key service would scan incoming Orchard notes and recover commit memos; viewing authority permits observation without spending ([ZIP-316](https://zips.z.cash/zip-0316)). A viewing key is not a time lock: its holder can inspect incoming notes at any time, so the holder, disclosure timing and abuse constraints must be specified. The current **Viewing Key Vault** is a mock: only `mock:node07:` plus exactly 64 lowercase hex characters is accepted, real `uview1…` keys are refused before storage is touched, and scanned notes are authenticated AES-GCM envelopes containing commit memos.
 
+## Threat model
+
+During the commit phase the vault operator sees only an auction ID and a salted hash, so resting orders cannot be front-run; prices, quantities and refund addresses appear only when a bidder reveals. That is the main difference from a plain auction server, where the operator reads every bid on submission. The operator is **still trusted** after reveal, and this build does not hide that.
+
+| Moment | Operator sees | Public observer sees |
+| --- | --- | --- |
+| Commit (fixed 10 ZEC) | Auction ID, commitment hash | A shielded transaction only |
+| Close | Commitment list, frozen root | Root, if published |
+| Reveal | Price, quantity, salt, refund of each reveal | Nothing in the prototype |
+| Clear | All revealed bids and allocations | Price, lots filled, root, forfeited total |
+
+The full table, the attack-by-attack responses and the roadmap to reduce operator trust (threshold or TEE reveal, anchored root, published reveal set) are in [docs/threat-model.md](docs/threat-model.md).
+
+### Real-wallet round trip
+
+The Wallet request tab can verify a memo copied out of a real wallet: build a request, pay it on testnet, paste the memo the vault wallet received into **Verify received memo**, and DarkZec reports whether it is exactly your commitment (text, unpadded Base64url or zero-padded hex accepted; bid preimages are rejected). Step-by-step instructions are in [docs/testnet-interop.md](docs/testnet-interop.md). This is a local check; nothing is sent anywhere.
+
 ## Ecosystem synergy
 
 - **Zodl Wallet** ([iOS](https://github.com/zodl-inc/zodl-ios), [Android](https://github.com/zodl-inc/zodl-android)) is the intended UX reference for reviewing shielded payment requests. DarkZec supplies a standard `zcash:` instruction; the wallet handles review, signing and broadcast. No certified compatibility or partnership is claimed.
@@ -128,8 +146,8 @@ Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)**. The stack is Vite + str
 1. Open **Auction sandbox** and choose **+ Load 3 demo bids**. The book shows three commitments; prices stay out of it.
 2. Keep the default `0.72` / `4`, choose **Prepare sealed bid**, inspect the commit-memo byte audit, then **Commit to local vault**. The book has four commitments.
 3. Choose **Close auction**. The Merkle root is frozen. In **Inclusion audit** select entry `4` and **Verify inclusion**.
-4. In **Commit → Reveal**, choose **Reveal all local receipts / demo** (or reveal one receipt). To see the non-reveal penalty, reveal only one receipt with **Reveal selected receipt**, then use **Advance reveal deadline / judge only**: finalizing shows `2 unrevealed / 20 ZEC collateral forfeited to the vault`.
-5. Choose **Finalize & clear**. Expect `0.68 ZEC`, `10 / 10` lots and payment + refund equal to collateral for each reveal.
+4. In **Commit → Reveal**, first **Download receipt (.json)** for your own bid (the panel warns while receipts are unsaved: a lost receipt cannot be revealed and forfeits its collateral). Then choose **Reveal all local receipts / demo**, or reveal one receipt, or **Import receipt file** to load a downloaded one. To see the non-reveal penalty, reveal only one receipt with **Reveal selected receipt**, then use **Advance reveal deadline / judge only**: finalizing shows `2 unrevealed / 20 ZEC collateral forfeited to the vault`.
+5. Choose **Finalize & clear**. Expect `0.68 ZEC`, `10 / 10` lots and a green line `BALANCED / payments … + refunds … + forfeited … = … ZEC posted collateral`, an independent conservation check.
 6. **Reset local session** restarts the demo. Reload also discards the in-memory auction; receipts are not exported.
 
 Fixtures are public test-vector receiving data, not deposit instructions; no wallet link is offered for them.
@@ -157,7 +175,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **69 unit/privacy tests (9 files), 35 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **73 unit/privacy tests (10 files), 39 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 
@@ -165,7 +183,7 @@ npm run test:e2e
 - **Private data stays out of logs:** the audit API accepts fixed event types and validated numeric metadata.
 - **Controlled persistence:** bids, receipts and logs are never persisted. Only the passphrase-encrypted mock-key record lives in tab session storage.
 - **Local trust:** the browser, same-origin scripts, extensions and device are inside the trust boundary. JavaScript strings, GC-managed keys and clipboard contents cannot be reliably zeroized. The sandbox hosts the bidder and operator roles in one browser and does not isolate them from a compromised device.
-- **Known prototype limits:** the forfeiture goes to the vault operator (a production design may redistribute it or burn a fraction), no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, and no real Orchard scanning or settlement. These are production work.
+- **Known prototype limits:** the forfeiture goes to the vault operator (a production design may redistribute it or burn a fraction), the operator reads revealed bids and is trusted to clear honestly (see the threat model), no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, and no real Orchard scanning or settlement. These are production work.
 
 ## Repository map
 
@@ -173,7 +191,7 @@ npm run test:e2e
 src/
   components/   Terminal UI, WebGL intro, protocol manual, reveal panel, viewing vault, live stream
   protocol/     Address, amount, memo, commitment and Merkle primitives
-  lib/          Mock-note scanner, session encryption, security events and UI helpers
+  lib/          Mock-note scanner, session encryption, security events, wallet-memo import and receipt files
   fixtures.ts   Public test-vector receiver and local auction configuration
   simulation.ts Commit/reveal ledger and uniform-price clearing
   main.ts       Application integration and lifecycle
@@ -185,6 +203,8 @@ docs/           Engineering reports and local badge asset
 | Document | Purpose |
 | --- | --- |
 | [DARKZEC-STANDARD](DARKZEC-STANDARD.md) | Governing protocol and privacy invariants. |
+| [Threat model](docs/threat-model.md) | Roles, who sees what, attacks, trust assumptions and roadmap. |
+| [Testnet round trip](docs/testnet-interop.md) | Verify a memo from a real wallet against your prepared request. |
 | [Engineering report](docs/engineering-report.md) | Current repository state, design and verification matrix. |
 | Stage reports in [docs/](docs/) | Historical per-stage notes (UI polish, vault, live stream, Phase 1/2, hardening, production polish). Their test counts, commitment wording and sandbox-encryption descriptions predate the commit/reveal ledger; this README and the standard describe the current build. |
 

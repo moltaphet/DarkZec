@@ -16,7 +16,16 @@ export interface PublicSnapshot {
   readonly revealOpen: boolean;
 }
 export interface Audit { readonly commitment: string; readonly root: string; readonly proof: InclusionProof }
-export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly forfeitedCollateral: string }
+export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly forfeitedCollateral: string; readonly postedCollateral: string }
+export interface SettlementBalance { readonly paid: string; readonly refunded: string; readonly forfeited: string; readonly posted: string; readonly balanced: boolean }
+
+/** Independent conservation check: payments + refunds + forfeited collateral must equal every posted collateral, to the zatoshi. */
+export function settlementBalance(result: SettlementResult): SettlementBalance {
+  const paid = result.allocations.reduce((total, row) => total + parseZec(row.paid), 0n);
+  const refunded = result.allocations.reduce((total, row) => total + parseZec(row.refundAmount), 0n);
+  const forfeited = parseZec(result.forfeitedCollateral); const posted = parseZec(result.postedCollateral);
+  return Object.freeze({ paid: formatZec(paid), refunded: formatZec(refunded), forfeited: formatZec(forfeited), posted: formatZec(posted), balanced: paid + refunded + forfeited === posted });
+}
 interface RecordEntry { readonly commitment: string; readonly collateral: string; reveal?: BidMemo }
 
 /** Hash-only local ledger. No preimage, ciphertext or bidder decryption key enters commit storage. */
@@ -107,7 +116,8 @@ export class Sandbox {
       // Non-reveal penalty: the full collateral of every unrevealed commitment is forfeited to the vault.
       const forfeited = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
       this.#phase = 'cleared';
-      return Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited) });
+      const posted = this.#records.reduce((total, record) => total + parseZec(record.collateral), 0n);
+      return Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited), postedCollateral: formatZec(posted) });
     } finally { this.#busy = false; }
   }
   /** Inclusion proof over the full commitment set, frozen when the commit phase closes. */
