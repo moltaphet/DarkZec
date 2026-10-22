@@ -1,6 +1,6 @@
 import type { Network } from '../protocol/address';
 import { utf8 } from '../protocol/crypto';
-import { parseBidMemo } from '../protocol/memo';
+import { parseBidMemo, parseCommitMemo } from '../protocol/memo';
 import type { BidMemo } from '../protocol/memo';
 
 export type MemoTransport = 'json' | 'base64url';
@@ -41,6 +41,35 @@ export interface ParsedVaultMemo {
   readonly transport: MemoTransport;
   readonly transportBytes: number;
   readonly jsonBytes: number;
+}
+
+export interface ParsedCommitMemo {
+  readonly commit: { readonly auctionId: string; readonly commitment: string };
+  readonly transport: MemoTransport;
+  readonly transportBytes: number;
+  readonly jsonBytes: number;
+}
+/** Commit scanners never parse a bid preimage, even when the envelope is authenticated. */
+export function parseVaultCommitMemo(memoHex: string, transport: MemoTransport, auctionId: string): ParsedCommitMemo | null {
+  if (transport !== 'json' && transport !== 'base64url') throw new VaultError('encoding');
+  const bytes = decodeHex(memoHex, 512); let payload: Uint8Array<ArrayBuffer> | undefined;
+  try {
+    if (bytes[0] === 0xf6 && bytes.slice(1).every(byte => byte === 0)) return null;
+    if ((bytes[0] ?? 255) >= 0xf5) throw new VaultError('encoding');
+    let end = bytes.length; while (end > 0 && bytes[end - 1] === 0) end--;
+    if (end === 0) return null;
+    payload = bytes.slice(0, end); let text: string;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(payload); } catch { throw new VaultError('encoding'); }
+    if (transport === 'base64url') {
+      const decoded = decodeBase64url(text);
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(decoded); } catch { throw new VaultError('encoding'); }
+      finally { decoded.fill(0); }
+    }
+    let commit: ParsedCommitMemo['commit'];
+    try { commit = parseCommitMemo(text); } catch { throw new VaultError('schema'); }
+    if (commit.auctionId !== auctionId) throw new VaultError('auction');
+    return Object.freeze({ commit, transport, transportBytes: end, jsonBytes: utf8(text).length });
+  } finally { bytes.fill(0); payload?.fill(0); }
 }
 
 /** Input is the authenticated, decrypted field. Ciphertext is never stripped or decoded here. */

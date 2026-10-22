@@ -98,12 +98,12 @@ describe('bounded local security audit', () => {
     audit.vault({ type: 'scan-completed', accepted: 0, rejected: 5, empty: 0 }); expect(audit.snapshot().shield).toBe('OFFLINE');
     audit.reset(); expect(audit.snapshot().shield).toBe('IDLE');
   });
-  it('keeps encrypted submission and Merkle compilation as distinct fixed events', () => {
+  it('keeps hash submission and verified-reveal Merkle compilation as distinct fixed events', () => {
     const audit = new SecurityAudit(); audit.log('committed');
     expect(JSON.stringify(audit.snapshot())).not.toContain('Merkle leaf');
     audit.log('closed'); audit.log('merkle');
     expect(audit.snapshot().entries.map(entry => entry.message)).toEqual([
-      'Bid payload encrypted and committed locally', 'Commitment set frozen', 'Merkle leaf generated for frozen commitment set; root compiled',
+      'Commitment hash and posted collateral recorded; no bid preimage', 'Commitment set frozen; reveal window opened', 'Merkle leaf generated for verified reveal set; root compiled',
     ]);
   });
 });

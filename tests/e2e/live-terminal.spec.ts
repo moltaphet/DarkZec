@@ -1,3 +1,4 @@
+import { revealLocalReceipts } from './auction-helpers';
 import { test, expect } from '@playwright/test';
 import { DEMO_UNLOCK_PASSPHRASE, DEMO_VIEWING_KEY } from '../../src/lib/viewing-key-session';
 
@@ -20,9 +21,9 @@ test('stream observes URI/memo/auction operations, pauses, clears and shares cou
   await expect(log).toContainText('Private payment request ready for review');
   const payload = await page.locator('#memo-payload').textContent();
   expect(await log.innerText()).not.toContain(payload ?? 'MISSING PAYLOAD'); expect(await log.innerText()).not.toContain('0.937142');
-  await page.locator('#commit').click(); await page.locator('#seed').click(); await page.locator('#close').click(); await page.locator('#clear').click();
+  await page.locator('#commit').click(); await page.locator('#seed').click(); await page.locator('#close').click(); await revealLocalReceipts(page); await page.locator('#clear').click();
   await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('SIM / Local uniform-price clearing completed');
-  await expect(log).toContainText('SIM / Merkle leaf generated for frozen commitment set');
+  await expect(log).toContainText('SIM / Merkle leaf generated for verified reveal set');
   await page.locator('#stream-pause').click(); await page.locator('#stream-clear').click();
   await expect(log.locator('.terminal-event')).toHaveCount(0); await expect(page.locator('#telemetry-log .telemetry-line')).toHaveCount(0);
   await expect(page.locator('#stream-shield')).toHaveText('IDLE'); await expect(page.locator('#stream-leaks')).toHaveText('0');

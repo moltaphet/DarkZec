@@ -1,3 +1,4 @@
+import { revealLocalReceipts } from './auction-helpers';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { DEMO_UNLOCK_PASSPHRASE, VIEWING_SESSION_KEY } from '../../src/lib/viewing-key-session';
@@ -8,7 +9,9 @@ async function assertReadable(page: Page): Promise<void> {
     if (!element.getClientRects().length || style.visibility !== 'visible') return [];
     const hasText = [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
     if (!hasText && !element.matches('input, textarea, select')) return [];
-    return Number.parseFloat(style.fontSize) < 11 ? [`${element.tagName}#${element.id}.${element.className}: ${style.fontSize}`] : [];
+    const primary = element.matches('input, textarea, select, output, .auction-strip strong, .receipt dd, .result-stats strong, .table-scroll td, .telemetry-counters dd, .stream-metrics dd, .memo-payload, .commitment-row code, .book-count > span, .clearing-anchor strong, .terminal-event');
+    const minimum = primary ? 14 : 12;
+    return Number.parseFloat(style.fontSize) < minimum ? [`${element.tagName}#${element.id}.${element.className}: ${style.fontSize} < ${minimum}px`] : [];
   }));
   expect(undersized).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -37,12 +40,14 @@ test('mobile bid placeholders and scroll hints expose full auction and vault res
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
   for (const prefix of ['bid', 'wallet']) {
-    await expect(page.locator(`#${prefix}-price`)).toHaveAttribute('placeholder', /ZEC per lot/);
-    await expect(page.locator(`#${prefix}-quantity`)).toHaveAttribute('placeholder', /whole lots/);
+    await expect(page.locator(`#${prefix}-price`)).toHaveAttribute('placeholder', '0.00 ZEC');
+    await expect(page.locator(`#${prefix}-quantity`)).toHaveAttribute('placeholder', '0 Qty');
   }
-  await page.locator('#seed').click(); await page.locator('#close').click(); await page.locator('#clear').click();
+  await page.locator('#seed').click(); await page.locator('#close').click(); await revealLocalReceipts(page); await page.locator('#clear').click();
   await expect(page.locator('#results-scroll-hint')).toBeVisible();
   const allocations = page.getByRole('region', { name: 'Auction clearing allocations' });
+  await expect(allocations).toHaveClass(/overflow-x-auto/);
+  expect(await allocations.evaluate(element => getComputedStyle(element).overflowX)).toBe('auto');
   expect(await allocations.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
   await allocations.focus(); await allocations.press('ArrowRight');
   await expect.poll(() => allocations.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
@@ -55,7 +60,7 @@ test('mobile bid placeholders and scroll hints expose full auction and vault res
   await page.screenshot({ path: 'test-results/targeted-hardening-mobile-results.png', fullPage: true });
 });
 
-test('terminal, protocol manual, wallet, vault and expanded telemetry retain an eleven-pixel text floor', async ({ page }) => {
+test('terminal, protocol manual, wallet, vault and telemetry retain twelve-pixel labels and fourteen-pixel readouts', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [320, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 1000 }); await page.goto('/');

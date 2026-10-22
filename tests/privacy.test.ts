@@ -35,11 +35,11 @@ describe('application privacy regression guard', () => {
     }
     expect(touched).toEqual([]);
   });
-  it('keeps CSS and canvas text at or above eleven pixels', async () => {
+  it('keeps CSS and canvas text at or above twelve pixels', async () => {
     for (const filename of await sources('src')) {
       const source = await readFile(filename, 'utf8');
       const pattern = filename.endsWith('.css') ? /font(?:-size)?\s*:\s*([\d.]+)px/g : /\.font\s*=\s*['"]([\d.]+)px/g;
-      for (const match of source.matchAll(pattern)) expect(Number(match[1]), `${filename}: ${match[0]}`).toBeGreaterThanOrEqual(11);
+      for (const match of source.matchAll(pattern)) expect(Number(match[1]), `${filename}: ${match[0]}`).toBeGreaterThanOrEqual(12);
     }
   });
 });

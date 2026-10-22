@@ -1,4 +1,4 @@
-export type SecurityEvent = 'boot' | 'draft' | 'prepared' | 'committed' | 'seeded' | 'closed' | 'merkle' | 'cleared' | 'proof' | 'reset' | 'wallet' | 'erased' | 'blocked' | 'invalid';
+export type SecurityEvent = 'boot' | 'draft' | 'prepared' | 'committed' | 'seeded' | 'closed' | 'merkle' | 'cleared' | 'proof' | 'reset' | 'wallet' | 'erased' | 'blocked' | 'invalid' | 'revealed' | 'expired';
 export type PayloadSecurityState = 'idle' | 'auction-sealed' | 'vault-verified' | 'invalid';
 export type AuditSource = 'composer' | 'wallet' | 'auction' | 'vault';
 export type MemoAuditState = 'empty' | 'scrambling' | 'ready' | 'invalid';
@@ -54,11 +54,13 @@ const LABELS: Readonly<Record<SecurityEvent, readonly [AuditCategory, string, Au
   boot: ['SYS_INIT', 'Local policy guard initialized', 'info', false],
   draft: ['ZIP-302', 'Private memo draft refreshed', 'info', false],
   prepared: ['AUDIT', 'Private payment request ready for review', 'success', false],
-  committed: ['AUDIT', 'Bid payload encrypted and committed locally', 'success', true],
+  committed: ['AUDIT', 'Commitment hash and posted collateral recorded; no bid preimage', 'success', true],
   seeded: ['AUCTION', 'Three sealed demo notes received', 'info', true],
-  closed: ['AUCTION', 'Commitment set frozen', 'success', true],
-  merkle: ['AUDIT', 'Merkle leaf generated for frozen commitment set; root compiled', 'success', true],
+  closed: ['AUCTION', 'Commitment set frozen; reveal window opened', 'success', true],
+  merkle: ['AUDIT', 'Merkle leaf generated for verified reveal set; root compiled', 'success', true],
   cleared: ['AUCTION', 'Local uniform-price clearing completed', 'success', true],
+  revealed: ['AUCTION', 'Bidder reveal matched a recorded commitment', 'success', true],
+  expired: ['AUCTION', 'Judge clock advanced past the reveal deadline', 'info', true],
   proof: ['AUDIT', 'Local inclusion proof verified', 'success', false],
   reset: ['AUCTION', 'Session buffers discarded', 'info', true],
   wallet: ['ZIP-321', 'Orchard-only wallet request ready for review', 'success', false],

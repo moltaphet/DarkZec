@@ -1,12 +1,11 @@
-import { assertDistinctRefund, validateOrchardAddress } from '../protocol/address';
+import { validateOrchardAddress } from '../protocol/address';
 import type { Network } from '../protocol/address';
-import { formatZec, parseZec } from '../protocol/amount';
 import { commitment, freshSalt, hex, utf8 } from '../protocol/crypto';
-import { encodeMemo, serializeBidMemo } from '../protocol/memo';
+import { DEFAULT_COLLATERAL, encodeMemo, serializeCommitMemo } from '../protocol/memo';
 import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../fixtures';
 import { DEMO_VIEWING_KEY, viewingKeyKind } from './viewing-key-session';
-import { decodeHex, parseVaultMemo, VaultError } from './vault-memo';
-import type { MemoTransport, ParsedVaultMemo, VaultErrorCode } from './vault-memo';
+import { decodeHex, parseVaultCommitMemo, VaultError } from './vault-memo';
+import type { MemoTransport, ParsedCommitMemo, VaultErrorCode } from './vault-memo';
 import { notifyAudit } from './security-events';
 import type { AuditObserver, ScanAuditEvent } from './security-events';
 
@@ -24,7 +23,7 @@ export interface MockNote {
 export interface ScanScope { readonly network: Network; readonly vault: string; readonly auctionId: string }
 export const MOCK_SCAN_SCOPE: ScanScope = Object.freeze({ network: 'testnet', vault: FIXTURE_ADDRESS, auctionId: SIMULATION_CONFIG.auctionId });
 export type ScannedNote =
-  | { readonly status: 'accepted'; readonly id: string; readonly parsed: ParsedVaultMemo; readonly commitment: string; readonly memoHex: string }
+  | { readonly status: 'accepted'; readonly id: string; readonly parsed: ParsedCommitMemo; readonly commitment: string; readonly memoHex: string }
   | { readonly status: 'empty'; readonly id: string }
   | { readonly status: 'rejected'; readonly id: string; readonly code: VaultErrorCode; readonly message: string };
 
@@ -77,15 +76,14 @@ export async function scanMockNotes(notes: readonly MockNote[], key: CryptoKey, 
       if (signal?.aborted) throw new VaultError('cancelled');
       notifyAudit(audit, { type: 'decryption-succeeded' });
       const memoHex = hex(bytes);
-      const parsed = parseVaultMemo(memoHex, note.transport, scope.network, scope.auctionId);
+      const parsed = parseVaultCommitMemo(memoHex, note.transport, scope.auctionId);
       if (!parsed) results.push(Object.freeze({ status: 'empty', id: note.id }));
       else {
-        try { assertDistinctRefund(parsed.bid.refund, scope.vault, scope.network); } catch { throw new VaultError('refund'); }
-        const hash = await commitment(parsed.bid);
+        const hash = parsed.commit.commitment;
         if (signal?.aborted) throw new VaultError('cancelled');
         if (hash !== note.commitment) throw new VaultError('commitment');
         if (hashes.has(hash)) throw new VaultError('duplicate');
-        if (note.amount !== formatZec(parseZec(parsed.bid.price) * BigInt(parsed.bid.quantity))) throw new VaultError('escrow');
+        if (note.amount !== DEFAULT_COLLATERAL) throw new VaultError('escrow');
         hashes.add(hash); results.push(Object.freeze({ status: 'accepted', id: note.id, parsed, commitment: hash, memoHex }));
         notifyAudit(audit, { type: 'scan-memo-validated', bytes: parsed.jsonBytes });
       }
@@ -108,8 +106,8 @@ export async function incomingDemoNote(index: number, key: CryptoKey): Promise<M
   const fixture = DEMO_BIDS[(index - 1) % DEMO_BIDS.length]; if (!fixture) throw new VaultError('format');
   const bid = { ...fixture, auctionId: SIMULATION_CONFIG.auctionId, salt: await freshSalt(SIMULATION_CONFIG.auctionId), refund: FIXTURE_REFUND_ADDRESS };
   const transport: MemoTransport = index % 2 === 0 ? 'base64url' : 'json';
-  const memo = serializeBidMemo(bid, 'testnet'); const field = paddedMockField(transport === 'json' ? memo : encodeMemo(memo));
-  try { return await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: `NOTE-${String(index).padStart(4, '0')}`, commitment: await commitment(bid), amount: formatZec(parseZec(bid.price) * BigInt(bid.quantity)), transport }, field, key); }
+  const hash = await commitment(bid); const memo = serializeCommitMemo(bid.auctionId, hash); const field = paddedMockField(transport === 'json' ? memo : encodeMemo(memo));
+  try { return await encryptMockNote({ ...MOCK_SCAN_SCOPE, id: `NOTE-${String(index).padStart(4, '0')}`, commitment: hash, amount: DEFAULT_COLLATERAL, transport }, field, key); }
   finally { field.fill(0); }
 }
 export async function createDemoNotes(): Promise<readonly MockNote[]> {

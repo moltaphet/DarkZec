@@ -33,11 +33,11 @@ test('saves encrypted credentials, scans notes privately, rescans and locks with
   expect(log).not.toContain(DEMO_VIEWING_KEY); expect(log).not.toContain('0.74');
   await expect(page.locator('#telemetry-leaks')).toHaveText('0');
   await page.locator('#vault-result-rows tr[data-status="accepted"] details summary').first().click();
-  await expect(page.locator('#vault-result-rows')).toContainText('PRIVATE SALT');
+  await expect(page.locator('#vault-result-rows')).toContainText('COMMITMENT');
   await page.screenshot({ path: 'test-results/viewing-vault-desktop.png', fullPage: true });
   await page.locator('#vault-lock').click();
   await expect(page.locator('#vault-result-rows')).toContainText('Vault locked');
-  await expect(page.locator('#vault-result-rows')).not.toContainText('PRIVATE SALT');
+  await expect(page.locator('#vault-result-rows')).not.toContainText('COMMITMENT');
   await expect(page.locator('#vault-accepted dd')).toHaveText('0');
   expect(external).toEqual([]); expect(failures).toEqual([]);
 });

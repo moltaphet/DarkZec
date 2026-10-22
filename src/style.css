@@ -10,6 +10,7 @@
   background: #050806;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-weight: 400;
+  font-size: 14px;
 }
 
 * {
@@ -91,7 +92,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   letter-spacing: 1px;
   border-left: 1px solid var(--line);
   padding-left: 28px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 
@@ -102,7 +103,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .node-label {
   white-space: nowrap;
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .status-dot {
@@ -147,7 +148,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .nav-item span {
   opacity: .65;
   margin-left: 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .nav-item.active {
@@ -159,7 +160,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   color: var(--muted);
   letter-spacing: 1px;
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .intro {
@@ -174,7 +175,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   letter-spacing: 2px;
   color: var(--muted);
   margin-bottom: 15px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 h1 {
@@ -207,7 +208,7 @@ h1 span {
   min-height: 48px;
   margin-bottom: 24px;
   padding: 14px 18px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   display: flex;
 }
@@ -218,7 +219,7 @@ h1 span {
   white-space: nowrap;
   border: 1px solid #2d5b3c;
   padding: 3px 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .error {
@@ -251,7 +252,7 @@ h1 span {
 .micro {
   letter-spacing: 1.1px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   display: block;
 }
@@ -266,14 +267,14 @@ h1 span {
 
 .auction-strip strong {
   margin-top: 9px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   display: block;
 }
 
 .auction-strip small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .phase-cell strong {
@@ -304,14 +305,14 @@ h1 span {
 .panel-heading h2 {
   letter-spacing: -.2px;
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .section-code {
   color: var(--green);
   margin-right: 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .composer .panel-heading {
@@ -320,7 +321,7 @@ h1 span {
 
 .composer .panel-heading > .micro {
   letter-spacing: .6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .composer form, .prepared {
@@ -332,14 +333,14 @@ label {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
 }
 
 label > span {
   color: var(--muted);
   letter-spacing: 1px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 input, textarea, select {
@@ -349,7 +350,7 @@ input, textarea, select {
   border-radius: 0;
   width: 100%;
   padding: 13px 14px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -366,7 +367,7 @@ textarea {
   overflow-wrap: anywhere;
   word-break: break-all;
   min-height: 74px;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 input::placeholder, textarea::placeholder {
@@ -385,13 +386,13 @@ input::placeholder, textarea::placeholder {
 }
 
 .input-unit input::placeholder {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0;
 }
 
 .input-unit > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   position: absolute;
   top: 23px;
   right: 15px;
@@ -401,7 +402,7 @@ input::placeholder, textarea::placeholder {
   color: var(--muted);
   margin-bottom: 23px;
   padding-top: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 
@@ -413,7 +414,7 @@ input::placeholder, textarea::placeholder {
   gap: 18px;
   min-height: 45px;
   padding: 13px 17px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.5;
   text-decoration: none;
   transition: background .15s, border-color .15s;
@@ -449,7 +450,7 @@ input::placeholder, textarea::placeholder {
   color: var(--muted);
   gap: 13px;
   padding: 18px 22px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
   display: flex;
 }
@@ -462,13 +463,13 @@ input::placeholder, textarea::placeholder {
 .book-count {
   letter-spacing: 1px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .book-count > span {
   color: var(--green);
   margin-right: 4px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .book-visual {
@@ -523,7 +524,7 @@ input::placeholder, textarea::placeholder {
 .note-sheet.front > .micro {
   color: #8eaf99;
   letter-spacing: 1px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .note-sheet.front > div {
@@ -545,14 +546,14 @@ input::placeholder, textarea::placeholder {
   text-align: center;
   color: var(--muted);
   padding: 0 16px 27px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.9;
 }
 
 .book-thesis > span {
   letter-spacing: 1.5px;
   color: #d4e8dc;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .book-columns, .commitment-row {
@@ -568,7 +569,7 @@ input::placeholder, textarea::placeholder {
   letter-spacing: 1px;
   color: var(--muted);
   background: #0e1711;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .book-columns > span:last-child {
@@ -584,18 +585,18 @@ input::placeholder, textarea::placeholder {
   text-align: center;
   color: var(--muted);
   padding: 24px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
 }
 
 .commitment-row {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .commitment-row code {
   overflow-wrap: anywhere;
   color: #b6d2bf;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -603,7 +604,7 @@ input::placeholder, textarea::placeholder {
   text-align: right;
   color: var(--green);
   letter-spacing: .6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .entry {
@@ -620,14 +621,14 @@ input::placeholder, textarea::placeholder {
 }
 
 .small {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 
 .book-actions .button {
   min-height: 36px;
   padding: 9px 12px;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .lifecycle {
@@ -640,7 +641,7 @@ input::placeholder, textarea::placeholder {
 
 .lifecycle .eyebrow {
   margin-bottom: 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .lifecycle h2 {
@@ -654,7 +655,7 @@ input::placeholder, textarea::placeholder {
   color: var(--muted);
   max-width: 470px;
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 
@@ -671,7 +672,7 @@ input::placeholder, textarea::placeholder {
   background: none;
   border: 0;
   padding: 5px;
-  font-size: 11px;
+  font-size: 14px;
   text-decoration: underline;
 }
 
@@ -687,7 +688,7 @@ input::placeholder, textarea::placeholder {
 
 .receipt {
   margin: 12px 0 20px;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .receipt > div {
@@ -698,6 +699,7 @@ input::placeholder, textarea::placeholder {
 
 .receipt dt {
   color: var(--muted);
+  font-size: 12px;
 }
 
 .receipt dd {
@@ -709,7 +711,7 @@ input::placeholder, textarea::placeholder {
   color: #c5e1ce;
   user-select: all;
   margin: 8px 0 16px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.8;
   display: block;
 }
@@ -721,7 +723,7 @@ input::placeholder, textarea::placeholder {
 .prepared summary {
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
 }
 
@@ -753,7 +755,7 @@ input::placeholder, textarea::placeholder {
 output {
   color: var(--green);
   margin-top: 12px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.8;
   display: block;
 }
@@ -778,6 +780,9 @@ output {
   padding: 0 26px;
 }
 
+.max-w-full { max-width: 100%; }
+.overflow-x-auto { overflow-x: auto; }
+
 .table-scroll {
   max-width: 100%;
   min-width: 0;
@@ -798,7 +803,7 @@ output {
   padding: 12px 18px;
   border-top: 1px solid #00ff6633;
   color: var(--green);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
   background: #00ff6608;
 }
@@ -811,7 +816,7 @@ table {
   border-collapse: collapse;
   white-space: nowrap;
   width: 100%;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 th, td {
@@ -823,7 +828,7 @@ th, td {
 th {
   letter-spacing: .4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -833,7 +838,7 @@ th:first-child, td:first-child {
 
 td:first-child {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .wallet-panel {
@@ -889,7 +894,7 @@ td:first-child {
 .check-label {
   justify-content: start;
   align-items: start;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 
@@ -921,14 +926,14 @@ a[aria-disabled="true"] {
 }
 
 .privacy-strip strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .privacy-strip > div > span:last-child {
   color: var(--muted);
   grid-column: 2;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 footer {
@@ -937,7 +942,7 @@ footer {
   justify-content: space-between;
   gap: 16px;
   padding: 22px 0 28px;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
 }
 
@@ -965,7 +970,7 @@ footer > span:nth-child(2) {
   }
 
   .auction-strip strong {
-    font-size: 11px;
+    font-size: 14px;
   }
 
   .masthead-sub {
@@ -999,7 +1004,7 @@ footer > span:nth-child(2) {
   }
 
   .network-status {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 
@@ -1018,7 +1023,7 @@ footer > span:nth-child(2) {
   }
 
   .node-label {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .node-label .muted {
@@ -1047,7 +1052,7 @@ footer > span:nth-child(2) {
   .intro-copy {
     margin: 24px 0 0;
     padding-left: 15px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .intro-copy br {
@@ -1058,7 +1063,7 @@ footer > span:nth-child(2) {
     align-items: start;
     gap: 10px;
     padding: 12px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .auction-strip {
@@ -1133,7 +1138,7 @@ footer > span:nth-child(2) {
 
   footer {
     flex-wrap: wrap;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.8;
   }
 
@@ -1177,7 +1182,7 @@ footer > span:nth-child(2) {
   }
 
   .panel-heading h2 {
-    font-size: 11px;
+    font-size: 14px;
   }
 
   .audit-panel .panel-heading {
@@ -1185,11 +1190,11 @@ footer > span:nth-child(2) {
   }
 
   .privacy-strip strong {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .privacy-strip > div > span:last-child {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .book-columns, .commitment-row {
@@ -1199,11 +1204,11 @@ footer > span:nth-child(2) {
   }
 
   .book-count {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .book-actions > .small {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 

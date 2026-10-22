@@ -1,68 +1,115 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Sandbox } from '../src/simulation';
-import { prepareBid } from '../src/protocol/memo';
-import { encodeOrchardAddress } from '../src/protocol/address';
-import { unhex } from '../src/protocol/crypto';
+import { commitSubmission, DEFAULT_COLLATERAL, prepareBid } from '../src/protocol/memo';
+import type { CommitSubmission, PreparedBid } from '../src/protocol/memo';
+import { commitment } from '../src/protocol/crypto';
 import { parseZec } from '../src/protocol/amount';
-import { verifyProof } from '../src/protocol/merkle';
-import { TEST_REFUND } from './fixtures';
+import { merkleRoot, verifyProof } from '../src/protocol/merkle';
+import { TEST_REFUND, TEST_VAULT, WALLET_REFUND } from './fixtures';
 
-const address = encodeOrchardAddress(unhex('953f3c78d103c32b60559299462ebb27348964b892acad10482fe502c99f0d524959ba7be4f188e3a27138'), 'testnet');
-const config = { auctionId: 'NODE07-001', supply: 10, reserve: '0.5', vault: address, network: 'testnet' as const };
-const prepare = (price: string, quantity: number, auctionId = config.auctionId) => prepareBid({ auctionId, price, quantity, vault: address, refund: TEST_REFUND, network: 'testnet' });
+const config = { auctionId: 'NODE07-001', supply: 10, reserve: '0.5', vault: TEST_VAULT, network: 'testnet' as const, collateral: DEFAULT_COLLATERAL, revealWindowMs: 1000 };
+const prepare = (price: string, quantity: number, auctionId = config.auctionId) => prepareBid({ auctionId, price, quantity, vault: TEST_VAULT, refund: TEST_REFUND, network: 'testnet' });
+async function commitAll(sandbox: Sandbox, bids: readonly PreparedBid[]): Promise<void> { for (const bid of bids) await sandbox.submit(commitSubmission(bid)); }
+async function revealAll(sandbox: Sandbox, bids: readonly PreparedBid[]): Promise<void> { for (const bid of bids) await sandbox.reveal(bid.reveal); }
 
-describe('local sealed auction', () => {
-  it('enforces close -> clear, hides bids, freezes the root and conserves every zatoshi', async () => {
-    const sandbox = await Sandbox.create(config);
-    const high = await prepare('0.74', 4); const mid = await prepare('0.72', 4); const low = await prepare('0.68', 6);
-    await sandbox.submit(high); await sandbox.submit(mid); await sandbox.submit(low);
-    const publicState = JSON.stringify(sandbox.publicSnapshot());
-    for (const secret of ['0.74', high.memo, high.uri, address, 'refund', 'salt']) expect(publicState).not.toContain(secret);
-    expect(sandbox.publicSnapshot().commitments).toHaveLength(3);
+describe('strict commit/reveal auction ledger', () => {
+  it('accepts only hashes at commit and clears verified reveals with immutable proofs and exact collateral accounting', async () => {
+    const sandbox = await Sandbox.create(config); const bids = await Promise.all([prepare('0.74', 4), prepare('0.72', 4), prepare('0.68', 6)]);
+    await commitAll(sandbox, bids);
+    const state = JSON.stringify(sandbox.publicSnapshot());
+    for (const bid of bids) for (const secret of [bid.reveal.salt, bid.reveal.refund, bid.reveal.price, 'quantity', 'refund', 'salt', bid.uri]) expect(state).not.toContain(secret);
+    expect(bids.every(bid => bid.amount === DEFAULT_COLLATERAL)).toBe(true);
+    expect(sandbox.publicSnapshot().revealed).toEqual([]);
     await expect(sandbox.clear()).rejects.toThrow('Close');
-    sandbox.close();
-    const audit = await sandbox.audit(1);
-    expect(await verifyProof(mid.commitment, audit.proof, audit.root)).toBe(true);
-    await expect(sandbox.submit(await prepare('1', 1))).rejects.toThrow('closed');
+    await expect(sandbox.reveal(bids[0]!.reveal)).rejects.toThrow('reveal window');
+    sandbox.close(); await expect(sandbox.audit(0)).rejects.toThrow('Finalize');
+    await expect(sandbox.submit(commitSubmission(bids[0]!))).rejects.toThrow('closed');
+    await revealAll(sandbox, bids);
     const result = await sandbox.clear();
-    expect(result.clearingPrice).toBe('0.68');
-    expect(result.filled).toBe(10);
-    expect(result.allocations.find(a => a.commitment === low.commitment)?.filled).toBe(2);
-    expect(result.allocations.reduce((sum, a) => sum + parseZec(a.paid) + parseZec(a.refundAmount), 0n)).toBe(parseZec(high.amount) + parseZec(mid.amount) + parseZec(low.amount));
-    expect((await sandbox.audit(1)).root).toBe(audit.root);
-    await expect(sandbox.clear()).rejects.toThrow('already');
+    expect(result).toMatchObject({ clearingPrice: '0.68', filled: 10, excluded: 0, heldCollateral: '0' });
+    expect(result.allocations.find(row => row.price === '0.68')?.filled).toBe(2);
+    expect(result.allocations.reduce((sum, row) => sum + parseZec(row.paid) + parseZec(row.refundAmount), 0n)).toBe(3n * parseZec(DEFAULT_COLLATERAL));
+    const audit = await sandbox.audit(1); expect(await verifyProof(bids[1]!.commitment, audit.proof, audit.root)).toBe(true);
+    expect(audit.root).toBe(result.root); await expect(sandbox.clear()).rejects.toThrow('already');
+    await expect(sandbox.reveal(bids[0]!.reveal)).rejects.toThrow('reveal window');
   });
-  it('rejects duplicates, tampering, wrong auctions and racing actions atomically', async () => {
-    const sandbox = await Sandbox.create(config); const bid = await prepare('0.7', 4);
-    await expect(sandbox.submit({ ...bid, commitment: 'a'.repeat(64) })).rejects.toThrow('commitment');
-    await expect(sandbox.submit({ ...bid, amount: '0.1' })).rejects.toThrow('escrow');
-    await expect(sandbox.submit({ ...bid, uri: 'zcash:t1bad' })).rejects.toThrow('URI');
-    await expect(sandbox.submit(await prepare('1', 1, 'OTHER'))).rejects.toThrow('auction');
-    expect(sandbox.publicSnapshot().commitments).toHaveLength(0);
-    const first = sandbox.submit(bid);
-    expect(() => sandbox.close()).toThrow('progress');
-    await expect(sandbox.submit(bid)).rejects.toThrow('progress');
-    await first;
-    await expect(sandbox.submit(bid)).rejects.toThrow('Duplicate');
-    expect(sandbox.publicSnapshot().commitments).toHaveLength(1);
+  it('discards price, quantity, salt, refund and auction substitutions without poisoning a later valid reveal', async () => {
+    const sandbox = await Sandbox.create(config); const bid = await prepare('0.7', 4); await commitAll(sandbox, [bid]); sandbox.close();
+    for (const changes of [{ price: '0.8' }, { quantity: 5 }, { salt: 'b'.repeat(64) }, { refund: WALLET_REFUND }, { auctionId: 'OTHER' }, { refund: TEST_VAULT }]) {
+      await expect(sandbox.reveal({ ...bid.reveal, ...changes })).rejects.toThrow();
+      expect(sandbox.publicSnapshot().revealed).toEqual([]);
+    }
+    await sandbox.reveal(bid.reveal); await expect(sandbox.reveal(bid.reveal)).rejects.toThrow('already');
+    expect((await sandbox.clear()).allocations).toHaveLength(1);
   });
-  it('handles no bids, reserve rejection and unsold supply', async () => {
-    const empty = await Sandbox.create(config); empty.close();
-    expect((await empty.clear()).filled).toBe(0);
+  it('excludes an unrevealed highest bid from price discovery and the Merkle tree after the deadline', async () => {
+    let now = 100; const sandbox = await Sandbox.create({ ...config, supply: 1 }, () => now);
+    const missing = await prepare('9', 1); const bids = await Promise.all([prepare('0.8', 1), prepare('0.6', 1)]);
+    await commitAll(sandbox, [missing, ...bids]); sandbox.close(); await revealAll(sandbox, bids);
+    await expect(sandbox.clear()).rejects.toThrow('still open'); now = 1100;
+    await expect(sandbox.reveal(missing.reveal)).rejects.toThrow('expired');
+    const result = await sandbox.clear(); expect(result).toMatchObject({ clearingPrice: '0.6', excluded: 1, heldCollateral: '10' });
+    expect(result.allocations.map(row => row.commitment)).not.toContain(missing.commitment);
+    const audit = await sandbox.audit(0); expect(audit.proof.count).toBe(2);
+    expect(await verifyProof(missing.commitment, audit.proof, audit.root)).toBe(false);
+    expect(result.root).toBe(await merkleRoot(bids.map(bid => bid.commitment)));
+  });
+  it('settles no unrevealed bids and keeps their collateral held rather than inventing refunds', async () => {
+    let now = 0; const sandbox = await Sandbox.create(config, () => now);
+    await commitAll(sandbox, [await prepare('1', 1)]); sandbox.close(); now = 1000;
+    const result = await sandbox.clear(); expect(result).toMatchObject({ filled: 0, allocations: [], excluded: 1, heldCollateral: '10' });
+    expect(result.root).toBe(await merkleRoot([])); await expect(sandbox.audit(0)).rejects.toThrow('No verified');
+    const empty = await Sandbox.create(config); empty.close(); expect((await empty.clear()).filled).toBe(0);
+  });
+  it('rejects rich commit payloads, wrong collateral, wrong auctions, duplicates and malformed hashes', async () => {
+    const sandbox = await Sandbox.create(config); const bid = await prepare('0.7', 4); const packet = commitSubmission(bid);
+    await expect(sandbox.submit(bid as unknown as CommitSubmission)).rejects.toThrow('only');
+    for (const bad of [{ ...packet, collateral: '2.8' }, { ...packet, auctionId: 'OTHER' }, { ...packet, commitment: 'NOT-HEX' }]) await expect(sandbox.submit(bad)).rejects.toThrow();
+    const extra = { ...packet, reveal: bid.reveal }; await expect(sandbox.submit(extra)).rejects.toThrow('only');
+    expect(sandbox.publicSnapshot().commitments).toHaveLength(0); await sandbox.submit(packet);
+    await expect(sandbox.submit(packet)).rejects.toThrow('Duplicate');
+  });
+  it('requires funded reveals even when an attacker records a valid hash with insufficient collateral', async () => {
+    const sandbox = await Sandbox.create(config); const honest = await prepare('1', 1); const bid = { ...honest.reveal, price: '11' };
+    await sandbox.submit({ auctionId: config.auctionId, commitment: await commitment(bid), collateral: '10' }); sandbox.close();
+    await expect(sandbox.reveal(bid)).rejects.toThrow('Insufficient'); expect(sandbox.publicSnapshot().revealed).toEqual([]);
+    await expect(prepare('11', 1)).rejects.toThrow('posted collateral');
+  });
+  it('preserves commit order for ties even when participants reveal in reverse order', async () => {
+    const sandbox = await Sandbox.create({ ...config, supply: 3 }); const bids = [await prepare('1', 2), await prepare('1', 2)];
+    await commitAll(sandbox, bids); sandbox.close(); await revealAll(sandbox, [...bids].reverse());
+    const result = await sandbox.clear(); expect(result.allocations.find(row => row.commitment === bids[0]!.commitment)?.filled).toBe(2);
+    expect((await sandbox.audit(0)).commitment).toBe(bids[0]!.commitment);
+  });
+  it('rejects concurrent commit, close and clear operations and snapshots caller-owned data', async () => {
+    const mutable = { ...config }; const sandbox = await Sandbox.create(mutable); mutable.supply = 99;
+    const bid = await prepare('1', 1); const packet = { ...commitSubmission(bid) }; const pending = sandbox.submit(packet); packet.commitment = 'f'.repeat(64);
+    expect(() => sandbox.close()).toThrow('progress'); await expect(sandbox.submit(commitSubmission(bid))).rejects.toThrow('progress'); await pending;
+    expect(sandbox.publicSnapshot().commitments).toEqual([bid.commitment]); expect(Object.isFrozen(sandbox.publicSnapshot().commitments)).toBe(true);
+    sandbox.close(); const reveal = { ...bid.reveal }; const running = sandbox.reveal(reveal); reveal.price = '2';
+    await expect(sandbox.clear()).rejects.toThrow('progress'); await running;
+    expect((await sandbox.clear()).allocations[0]?.price).toBe('1');
+  });
+  it('rejects a reveal when its deadline passes during asynchronous commitment verification', async () => {
+    let now = 0; const sandbox = await Sandbox.create(config, () => now); const bid = await prepare('1', 1);
+    await commitAll(sandbox, [bid]); sandbox.close(); const pending = sandbox.reveal(bid.reveal); now = 1000;
+    await expect(pending).rejects.toThrow('expired'); expect(sandbox.publicSnapshot().revealed).toEqual([]);
+  });
+  it('keeps finalization atomic when Merkle hashing fails and allows a safe retry', async () => {
+    const sandbox = await Sandbox.create(config); const bid = await prepare('1', 1); await commitAll(sandbox, [bid]); sandbox.close(); await revealAll(sandbox, [bid]);
+    const original = crypto.subtle.digest.bind(crypto.subtle);
+    const mock = vi.spyOn(crypto.subtle, 'digest').mockImplementation((algorithm, bytes) => {
+      if (bytes instanceof Uint8Array && bytes[0] === 0) return Promise.reject(new Error('Merkle unavailable'));
+      return original(algorithm, bytes);
+    });
+    try { await expect(sandbox.clear()).rejects.toThrow('Merkle'); } finally { mock.mockRestore(); }
+    expect(sandbox.publicSnapshot().phase).toBe('reveal'); await expect(sandbox.audit(0)).rejects.toThrow('Finalize');
+    expect((await sandbox.clear()).allocations).toHaveLength(1);
+  });
+  it('bounds ledger size and rejects invalid collateral/window configuration', async () => {
     const sandbox = await Sandbox.create(config);
-    await sandbox.submit(await prepare('0.4', 5)); await sandbox.submit(await prepare('0.9', 2));
-    sandbox.close(); const result = await sandbox.clear();
-    expect(result.filled).toBe(2); expect(result.clearingPrice).toBe('0.5');
-    expect(result.allocations.find(a => a.price === '0.4')?.refundAmount).toBe('2');
-  });
-  it('breaks ties by accepted submission order and protects config/snapshot ownership', async () => {
-    const mutable = { ...config, supply: 3 };
-    const sandbox = await Sandbox.create(mutable); mutable.supply = 99;
-    const a = await prepare('1', 2); const b = await prepare('1', 2);
-    await sandbox.submit(a); await sandbox.submit(b);
-    const snapshot = sandbox.publicSnapshot(); expect(Object.isFrozen(snapshot.commitments)).toBe(true);
-    sandbox.close(); const result = await sandbox.clear();
-    expect(result.filled).toBe(3);
-    expect(result.allocations.find(row => row.commitment === a.commitment)?.filled).toBe(2);
+    for (let i = 0; i < 128; i++) await sandbox.submit({ auctionId: config.auctionId, collateral: '10', commitment: i.toString(16).padStart(64, '0') });
+    await expect(sandbox.submit({ auctionId: config.auctionId, collateral: '10', commitment: 'f'.repeat(64) })).rejects.toThrow('128');
+    for (const changes of [{ collateral: '0' }, { revealWindowMs: 0 }, { revealWindowMs: NaN }, { revealWindowMs: 1.5 }]) await expect(Sandbox.create({ ...config, ...changes })).rejects.toThrow();
   });
 });

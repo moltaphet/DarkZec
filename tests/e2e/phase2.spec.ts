@@ -14,7 +14,7 @@ test('unselected ArrowLeft chooses the final node and wraps in both directions',
 test('closed auction locks inputs and ignores late draft events while preserving independent workspaces', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await page.locator('#seed').click();
   await page.locator('#bid-price').fill('0.81'); await page.locator('#close').click();
-  await expect(page.locator('#phase')).toHaveText('CLOSED / SEALED');
+  await expect(page.locator('#phase')).toHaveText('CLOSED / REVEAL WINDOW');
   await expect(page.locator('#bid-price')).toBeDisabled(); await expect(page.locator('#bid-quantity')).toBeDisabled();
   await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'empty');
   await expect(page.locator('#stream-bytes')).toHaveText('0/512');
@@ -63,7 +63,7 @@ test('shield and Merkle events reflect encryption and close-time compilation rat
   await expect(page.locator('#stream-shield')).toHaveText('IDLE'); await expect(page.locator('#telemetry-shield')).toHaveText('IDLE');
   await page.locator('#prepare').click(); await expect(page.locator('#stream-shield')).toHaveText('IDLE');
   await page.locator('#commit').click(); await expect(page.locator('#stream-shield')).toHaveText('ACTIVE');
-  const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('Bid payload encrypted');
+  const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('Commitment hash and posted collateral');
   await expect(log).not.toContainText('Merkle leaf generated');
   await page.locator('#close').click(); await expect(page.locator('#merkle-root')).toHaveText(/^[a-f0-9]{64}$/);
   await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('Merkle leaf generated');
