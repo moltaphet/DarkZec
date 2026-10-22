@@ -97,7 +97,7 @@
                 <div class="micro green">BID PREPARED / LOCAL ONLY</div>
                 <dl class="receipt"><div><dt>Escrow</dt><dd id="prepared-amount"></dd></div><div><dt>Memo audit</dt><dd id="prepared-bytes"></dd></div></dl>
                 <span class="micro">SHA-256 COMMITMENT</span><code id="prepared-hash" class="hash"></code>
-                <details id="sensitive-details"><summary>Review sensitive demo request</summary><p class="small warning">Base64url is readable encoding. This URI contains your bid and salt. It is not an encrypted memo until a wallet creates a shielded transaction. Demo address: never send funds.</p><textarea id="demo-uri" aria-label="Sensitive demo payment URI" readonly spellcheck="false"></textarea><button id="copy-demo" class="button quiet" type="button">Copy demo URI</button></details>
+                <details id="sensitive-details"><summary>Review sensitive demo request</summary><p class="small warning">Base64url is readable encoding. This URI contains only the auction ID and your commitment hash; the private bid stays in the reveal receipt. It is not an encrypted memo until a wallet creates a shielded transaction. Demo address: never send funds.</p><textarea id="demo-uri" aria-label="Sensitive demo payment URI" readonly spellcheck="false"></textarea><button id="copy-demo" class="button quiet" type="button">Copy demo URI</button></details>
                 <button id="commit" class="button primary" type="button">Commit to local vault <span>→</span></button>
               </div>
               <div class="composer-footer"><svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 10V7a6 6 0 0 1 12 0v3M4 10h16v12H4zM12 14v4" /></svg><span>No wallet connection.<br />No private keys requested.</span></div>
@@ -118,7 +118,7 @@
           </div>
 
           <section class="panel lifecycle">
-            <div class="lifecycle-copy"><div class="eyebrow">CONTROL DESK</div><h2>Close. Unseal. Verify.</h2><p>Closing opens the reveal window. Bidders submit matching receipts before finalization. Only verified reveals clear. Posted collateral is 10 ZEC per commitment, independent of price and quantity.</p></div>
+            <div class="lifecycle-copy"><div class="eyebrow">CONTROL DESK</div><h2>Close. Reveal. Verify.</h2><p>Closing freezes the commitment root and opens the reveal window. Bidders submit matching receipts before finalization. Only verified reveals clear. Posted collateral is 10 ZEC per commitment, independent of price and quantity.</p></div>
             <div class="lifecycle-actions"><button id="close" class="button quiet" type="button">Close auction <span>→</span></button><button id="clear" class="button primary" type="button" disabled>Finalize &amp; clear <span>↗</span></button><button id="reset" class="reset" type="button">Reset local session</button></div>
           </section>
 
@@ -168,7 +168,7 @@
       <div id="telemetry-body" class="telemetry-body">
         <div class="telemetry-node"><span class="status-dot"></span>NODE 07 <span>POLICY MONITOR</span></div>
         <dl class="telemetry-counters"><div><dt>LEAKS BLOCKED</dt><dd id="telemetry-leaks">0</dd></div><div><dt>ORCHARD SHIELD</dt><dd id="telemetry-shield">IDLE</dd></div><div><dt>MEMO BYTES</dt><dd id="telemetry-bytes">0/512</dd></div></dl>
-        <div class="telemetry-policy">No verified encrypted payload.<br />Local mock encryption only; no live chain connection.</div>
+        <div class="telemetry-policy">No verified encrypted payload.<br />Hash-only commit ledger; mock encryption only in the vault scanner. No live chain connection.</div>
         <div class="telemetry-log-heading"><span>EVENT STREAM</span><span>LOCAL / MOCK FEED</span></div>
         <div id="telemetry-log" class="telemetry-log" role="log" aria-label="Local simulation security events" aria-live="off" tabindex="0"></div>
         <div class="telemetry-footer"><span class="status-dot"></span>NO PAYLOADS LOGGED <span>▰▰▰▱</span></div>

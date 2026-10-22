@@ -1,5 +1,7 @@
 # Targeted security and UI hardening
 
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+
 Date: 2026-10-18. Scope: mock-only vault credentials, readable typography, mobile wallet/results UX, MIT licensing and basic build/unit CI.
 
 ## Applied changes

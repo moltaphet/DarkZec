@@ -21,7 +21,7 @@ describe('bounded local security audit', () => {
     expect(Object.isFrozen(state)).toBe(true); expect(Object.isFrozen(state.entries)).toBe(true); expect(Object.isFrozen(state.entries[0])).toBe(true);
   });
   it('bounds history and keeps blocked counters after clear and reset', () => {
-    const audit = new SecurityAudit(); audit.encryption('auction-sealed'); audit.networkGuard(true); audit.log('blocked');
+    const audit = new SecurityAudit(); audit.encryption('vault-verified'); audit.networkGuard(true); audit.log('blocked');
     for (let i = 0; i < 200; i++) audit.log('committed');
     expect(audit.snapshot().entries).toHaveLength(128); expect(audit.snapshot().dropped).toBe(75);
     audit.memo({ bytes: 512, state: 'ready' }, 'wallet');
@@ -90,8 +90,7 @@ describe('bounded local security audit', () => {
     const audit = new SecurityAudit(); expect(audit.snapshot().shield).toBe('IDLE');
     audit.protocol({ type: 'memo-validated', bytes: 200 }, 'composer'); audit.protocol({ type: 'uri-generated' }, 'wallet');
     expect(audit.snapshot().shield).toBe('IDLE');
-    audit.encryption('auction-sealed'); expect(audit.snapshot()).toMatchObject({ shield: 'ACTIVE', payloadState: 'auction-sealed' });
-    expect(audit.snapshot().shieldDetail).toContain('mock AES-GCM');
+    audit.log('committed'); expect(audit.snapshot().shield).toBe('IDLE');
     audit.encryption('idle'); audit.vault({ type: 'decryption-succeeded' }); expect(audit.snapshot().shield).toBe('IDLE');
     audit.vault({ type: 'scan-memo-validated', bytes: 200 }); expect(audit.snapshot()).toMatchObject({ shield: 'ACTIVE', payloadState: 'vault-verified' });
     audit.vault({ type: 'vault-locked' }); expect(audit.snapshot().shield).toBe('IDLE');
@@ -103,7 +102,7 @@ describe('bounded local security audit', () => {
     expect(JSON.stringify(audit.snapshot())).not.toContain('Merkle leaf');
     audit.log('closed'); audit.log('merkle');
     expect(audit.snapshot().entries.map(entry => entry.message)).toEqual([
-      'Commitment hash and posted collateral recorded; no bid preimage', 'Commitment set frozen; reveal window opened', 'Merkle leaf generated for verified reveal set; root compiled',
+      'Commitment hash and posted collateral recorded; no bid preimage', 'Commitment set frozen; reveal window opened', 'Merkle leaf generated for frozen commitment set; root compiled',
     ]);
   });
 });

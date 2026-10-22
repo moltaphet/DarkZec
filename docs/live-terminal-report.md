@@ -1,5 +1,7 @@
 # Live terminal security stream / Step 2
 
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+
 Historical Step 2 report. [Phase 1 security changes](phase1-security-report.md) supersede its commitment/address/clearing policies; [Phase 2 QA changes](phase2-qa-report.md) supersede its startup shield, Merkle-event timing and verification counts. ACTIVE now describes verified local mock payloads, not address-policy readiness.
 
 Implemented a dedicated NODE 07 security stream below the active workspace, available in auction, wallet and vault views. This checkout uses Vite and strict TypeScript with typed DOM components. `LiveTerminalStream.tsx` follows that architecture without adding React, dependencies, network services or persistence.

@@ -53,7 +53,7 @@ describe('exact amounts and commitments', () => {
     for (const bad of ['0', '1.5', '-1', '1000000']) expect(() => parseQuantity(bad)).toThrow();
   });
   it('matches independent SHA-256 and HMAC known answers', async () => {
-    const preimage = `${bid.price}:${bid.quantity}:${bid.salt}:${bid.refund}`;
+    const preimage = JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
     expect(canonicalPreimage(bid)).toBe(preimage);
     expect(await commitment(bid)).toBe(createHash('sha256').update(preimage).digest('hex'));
     const entropy = new Uint8Array(32).fill(42); const nonce = '0'.repeat(32);

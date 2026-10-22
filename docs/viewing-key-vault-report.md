@@ -1,5 +1,7 @@
 # Viewing Key Vault & Memo Devault — Step 1
 
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+
 Historical Step 1 report. [Phase 1 security changes](phase1-security-report.md) add refund-bound commitments, distinct fixtures, Orchard-capable UA input compatibility and self-refund quarantine to this scanner.
 
 The terminal now includes a fully local **Vault scanner** view with viewing-key input, encrypted tab-session persistence, authenticated mock-note scanning, validated bid results, live incoming-note simulation, lock, forget and reload restoration. The requested `src/components/ViewingKeyVault.tsx` integrates with the existing Vite/TypeScript DOM architecture without adding React or other dependencies.

@@ -21,14 +21,13 @@ describe('Phase 1 protocol security boundaries', () => {
       expect(buildPaymentUri({ address: vault, amount: '1', memo: '{}', network: 'testnet' }).startsWith(`zcash:${TEST_VAULT}?`)).toBe(true);
     }
   });
-  it('binds canonical colon-delimited bid fields and refund instructions in the commitment', async () => {
+  it('binds refund instructions, auction domain and unambiguous typed fields in the commitment', async () => {
     const bid = { ...request, salt: 'a'.repeat(64) };
-    const preimage = `${bid.price}:${bid.quantity}:${bid.salt}:${bid.refund}`;
+    const preimage = JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
     expect(canonicalPreimage(bid)).toBe(preimage);
     expect(await commitment(bid)).toBe(createHash('sha256').update(preimage).digest('hex'));
     expect(await commitment({ ...bid, refund: TEST_VAULT })).not.toBe(await commitment(bid));
-    // Hash omits auction scope by specification; the ledger checks the receipt auction.
-    expect(await commitment({ ...bid, auctionId: 'OTHER' })).toBe(await commitment(bid));
+    expect(await commitment({ ...bid, auctionId: 'OTHER' })).not.toBe(await commitment(bid));
     expect(await commitment({ ...bid, price: '1', quantity: 23 })).not.toBe(await commitment({ ...bid, price: '12', quantity: 3 }));
   });
   it('rejects refund-to-vault including equivalent Orchard receivers in different UAs', async () => {
