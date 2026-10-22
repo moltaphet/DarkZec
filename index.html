@@ -125,7 +125,7 @@
           <section id="reveal-workspace"></section>
 
           <section id="audit-panel" class="panel audit-panel" hidden>
-            <div class="panel-heading"><h2><span class="section-code">03 /</span> Inclusion audit</h2><span class="micro green">VERIFIED REVEAL SET</span></div>
+            <div class="panel-heading"><h2><span class="section-code">03 /</span> Inclusion audit</h2><span class="micro green">FROZEN COMMITMENT SET</span></div>
             <div class="audit-content"><div><span class="micro">MERKLE ROOT / SHA-256</span><code id="merkle-root" class="hash"></code><p class="small muted">The root and proof contain no bid price, salt, memo or address. This local root is not externally anchored.</p></div><form id="audit-form"><label for="audit-index">Commitment entry</label><div class="audit-controls"><input id="audit-index" inputmode="numeric" value="1" aria-label="Commitment entry" /><button id="verify-proof" type="submit" class="button quiet">Verify inclusion</button></div><output id="audit-result" aria-live="polite"></output></form></div>
           </section>
 
@@ -133,6 +133,7 @@
             <div class="panel-heading"><h2><span class="section-code">04 /</span> Clearing result</h2><span class="micro warning">REVEALED DEMO DATA</span></div>
             <div class="result-stats"><div><span class="micro">UNIFORM PRICE</span><strong id="clearing-price"></strong></div><div><span class="micro">ALLOCATED</span><strong id="filled-lots"></strong></div></div>
             <p id="excluded-bids" class="small warning result-note"></p>
+            <p id="settlement-balance" class="small result-note settlement-balance" role="status"></p>
             <p class="small muted result-note">Highest prices fill first; accepted submission order breaks ties. Demand at or below supply, or one eligible bid, pays reserve. A sole winner prices against losing competition, excluding its own excess quantity. Multiple winners use the unfilled margin. Refunds are accounting entries only.</p>
             <p id="results-scroll-hint" class="table-scroll-hint"><span aria-hidden="true">↔</span> Scroll horizontally to view all allocations</p>
             <div id="results-table-scroll" class="table-scroll max-w-full overflow-x-auto" role="region" aria-label="Auction clearing allocations" aria-describedby="results-scroll-hint" tabindex="0"><table aria-label="Auction clearing results"><thead><tr><th>Commitment</th><th>Limit / ZEC</th><th>Filled / requested</th><th>Paid / ZEC</th><th>Refund / ZEC</th></tr></thead><tbody id="result-rows"></tbody></table></div>
@@ -151,7 +152,15 @@
             <button id="wallet-prepare" class="button primary" type="submit">Prepare private payment request <span>↗</span></button>
           </form>
           <div id="wallet-output" class="wallet-output" hidden><dl class="receipt"><div><dt>Escrow</dt><dd id="wallet-amount"></dd></div><div><dt>Memo audit</dt><dd id="wallet-bytes"></dd></div></dl><label for="wallet-uri">Sensitive ZIP-321 payment URI</label><textarea id="wallet-uri" readonly spellcheck="false"></textarea>
-            <label for="wallet-reveal">Private reveal receipt / save before paying</label><textarea id="wallet-reveal" readonly spellcheck="false" aria-label="Wallet private reveal receipt"></textarea><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div></div>
+            <label for="wallet-reveal">Private reveal receipt / save before paying</label><textarea id="wallet-reveal" readonly spellcheck="false" aria-label="Wallet private reveal receipt"></textarea><div class="wallet-buttons"><button id="download-wallet-receipt" class="button quiet" type="button">Download receipt (.json)</button></div><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div></div>
+          <form id="memo-verify-form" class="memo-verify" autocomplete="off">
+            <div class="panel-heading"><h2>Verify the memo your wallet received</h2><span class="micro">ZIP-302 / ROUND TRIP</span></div>
+            <p class="small muted">After the vault wallet receives your payment, copy the memo it shows (text, unpadded Base64url or hex) and paste it here. Only a public commit memo is accepted: an auction ID and a commitment hash. If you prepared a request above, the hash is compared with it.</p>
+            <label for="memo-verify-input">Memo received by the vault wallet</label>
+            <textarea id="memo-verify-input" spellcheck="false" maxlength="1100" placeholder='{"v":2,"t":"commit","a":"NODE07-001","c":"…"}'></textarea>
+            <div class="wallet-buttons"><button id="memo-verify" class="button primary" type="submit">Verify received memo</button><button id="memo-verify-clear" class="reset" type="button">Clear</button></div>
+            <output id="memo-verify-result" class="memo-verify-result" aria-live="polite"></output>
+          </form>
         </section>
 
         <section id="viewing-key-view" hidden aria-label="Viewing-key scanner"></section>

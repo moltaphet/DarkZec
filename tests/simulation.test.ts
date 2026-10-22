@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Sandbox } from '../src/simulation';
+import { Sandbox, settlementBalance } from '../src/simulation';
 import { commitSubmission, DEFAULT_COLLATERAL, prepareBid } from '../src/protocol/memo';
 import type { CommitSubmission, PreparedBid } from '../src/protocol/memo';
 import { commitment } from '../src/protocol/crypto';
@@ -32,6 +32,7 @@ describe('strict commit/reveal auction ledger', () => {
     expect(result.allocations.find(row => row.price === '0.68')?.filled).toBe(2);
     expect(result.allocations.reduce((sum, row) => sum + parseZec(row.paid) + parseZec(row.refundAmount), 0n)).toBe(3n * parseZec(DEFAULT_COLLATERAL));
     const audit = await sandbox.audit(1); expect(await verifyProof(bids[1]!.commitment, audit.proof, audit.root)).toBe(true);
+    expect(settlementBalance(result)).toMatchObject({ forfeited: '0', posted: '30', balanced: true });
     expect(audit.root).toBe(frozen.root); expect(result.root).toBe(frozen.root); await expect(sandbox.clear()).rejects.toThrow('already');
     await expect(sandbox.reveal(bids[0]!.reveal)).rejects.toThrow('reveal window');
   });
@@ -62,6 +63,7 @@ describe('strict commit/reveal auction ledger', () => {
     let now = 0; const sandbox = await Sandbox.create(config, () => now);
     const only = await prepare('1', 1); await commitAll(sandbox, [only]); sandbox.close(); now = 1000;
     const result = await sandbox.clear(); expect(result).toMatchObject({ filled: 0, allocations: [], excluded: 1, forfeitedCollateral: '10' });
+    expect(settlementBalance(result)).toEqual({ paid: '0', refunded: '0', forfeited: '10', posted: '10', balanced: true });
     expect(result.root).toBe(await merkleRoot([only.commitment])); await expect(sandbox.audit(1)).rejects.toThrow('No commitment');
     const empty = await Sandbox.create(config); empty.close(); await expect(empty.audit(0)).rejects.toThrow('No commitment');
     const emptyResult = await empty.clear(); expect(emptyResult.filled).toBe(0); expect(emptyResult.root).toBe(await merkleRoot([]));

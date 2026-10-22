@@ -9,3 +9,9 @@
 .reveal-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .reveal-actions .button { font-size: 14px; white-space: normal; }
 #reveal-status { overflow-wrap: anywhere; }
+.memo-verify { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 24px; }
+.memo-verify textarea { font-size: 14px; min-height: 96px; }
+.memo-verify-result { display: block; margin-top: 18px; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.memo-verify-result.is-ok, .settlement-balance.is-ok { color: #00f058; }
+.memo-verify-result.is-bad, .settlement-balance.is-bad { color: #eebc56; }
+.settlement-balance { font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
