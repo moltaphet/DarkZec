@@ -42,9 +42,8 @@ export function canonicalPreimage(bid: BidPreimage): string {
   if (typeof bid.salt !== 'string' || !/^[a-f0-9]{64}$/.test(bid.salt)) throw new Error('A 256-bit salt is required.');
   if (typeof bid.refund !== 'string') throw new Error('An Orchard refund Unified Address is required.');
   validateOrchardAddress(bid.refund, bid.refund.startsWith('utest1') ? 'testnet' : 'mainnet');
-  // Validated decimal, integer, fixed hex and UA alphabets cannot contain colons.
-  // Auction scope is enforced by the commitment ledger; use a fresh salt per auction.
-  return `${bid.price}:${bid.quantity}:${bid.salt}:${bid.refund}`;
+  // Typed tuple prevents field-boundary ambiguity and retains auction replay separation.
+  return JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
 }
 export async function computeBidCommitment(bid: BidPreimage): Promise<string> {
   return sha256(utf8(canonicalPreimage(bid)));

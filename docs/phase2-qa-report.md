@@ -1,5 +1,7 @@
 # Phase 2 — UI, telemetry and documentation audit
 
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+
 Audit finalized: 2026-10-18.
 
 All requested areas were corrected in the existing strict TypeScript terminal. Phase 1 cryptographic, address, registry and clearing changes remain intact. The current full suite is larger than the requested historical 15-unit/9-E2E/29-module baseline: final measurements are **55 tests across 9 unit/privacy/CLI files, 26 E2E tests and 39 bundled modules**.

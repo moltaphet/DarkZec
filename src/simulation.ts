@@ -27,8 +27,6 @@ export class Sandbox {
   #phase: Phase = 'open';
   #busy = false;
   #deadline: number | null = null;
-  #auditHashes: readonly string[] = [];
-  #root = '';
   private constructor(config: AuctionConfig, clock: () => number) { this.#config = config; this.#clock = clock; }
   static async create(input: AuctionConfig, clock: () => number = Date.now): Promise<Sandbox> {
     const config = { ...input };
@@ -103,16 +101,19 @@ export class Sandbox {
         bids.push({ commitment: record.commitment, bid: record.reveal, collateral: record.collateral });
       }
       const result = clearUniformAuction(this.#config, bids);
-      const hashes = Object.freeze(bids.map(bid => bid.commitment)); const root = await merkleRoot(hashes);
+      // The root covers every accepted commitment, so it equals the value a bidder verified after close.
+      const root = await merkleRoot(this.#records.map(record => record.commitment));
       const excluded = this.#records.length - bids.length;
       const held = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
-      this.#root = root; this.#auditHashes = hashes; this.#phase = 'cleared';
+      this.#phase = 'cleared';
       return Object.freeze({ ...result, root, excluded, heldCollateral: formatZec(held) });
     } finally { this.#busy = false; }
   }
+  /** Inclusion proof over the full commitment set, frozen when the commit phase closes. */
   async audit(index: number): Promise<Audit> {
-    if (this.#phase !== 'cleared') throw new Error('Finalize valid reveals before requesting an audit proof.');
-    const hash = this.#auditHashes[index]; if (!hash) throw new Error('No verified reveal at this index.');
-    return Object.freeze({ commitment: hash, root: this.#root, proof: await merkleProof(this.#auditHashes, index) });
+    if (this.#phase === 'open') throw new Error('Close the auction to freeze its audit root.');
+    const hashes = this.#records.map(record => record.commitment);
+    const hash = hashes[index]; if (!hash) throw new Error('No commitment at this index.');
+    return Object.freeze({ commitment: hash, root: await merkleRoot(hashes), proof: await merkleProof(hashes, index) });
   }
 }

@@ -1,14 +1,14 @@
 # DarkZec engineering report — active repository
 
-Updated: 2026-10-18. Scope: the combined sealed-bid module, NODE 07 interface, protocol manual, Viewing Key Vault, live stream, Phase 1/Phase 2 refinements, targeted security/UI hardening and final production polish.
+Updated: 2026-10-22. Scope: the commit/reveal sealed-bid ledger, NODE 07 interface with the WebGL intro, protocol manual, Viewing Key Vault, live stream, earlier hardening stages and the integration of both development lines.
 
 ## Repository and implementation status
 
-The workspace is an active **Git repository on `main`**, with origin configured for [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Verification covers the current working tree, including uncommitted implementation work. No commit, push or deployment was performed during these refinements.
+The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). This report describes the integrated branch that merges the cinematic UI line with the commit/reveal ledger rewrite. Earlier stage reports in this directory are historical and describe the previous encrypted-envelope sandbox where they differ.
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification: **62 unit/privacy/CLI tests across 9 files, 30 E2E tests, and 39 transformed production modules**. This retains the previous 58/27 suite and adds four unit checks and three browser scenarios. The earlier 15-unit/9-E2E/29-module target describes a smaller stage; it is not the current result. The real-viewing-key storage acceptance test now requires rejection under the mock-only policy.
+Current observed verification (Node 26.10.0): **69 unit/privacy/CLI tests across 9 files, 34 E2E tests and 46 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -22,9 +22,9 @@ Node 22.18.0 is the floor for running the erasable TypeScript server without add
 
 | Runtime tested | Full unit/privacy/CLI suite | Strict type check and production bundle |
 | --- | --- | --- |
-| Node 22.18.0 | 62 passed | Passed; 39 modules. |
-| Node 24.0.0 | 62 passed | Passed; 39 modules. |
-| Node 26.10.0 | 62 passed | Passed; 39 modules. |
+| Node 22.18.0 | Run by CI on every push (not re-run locally after the rewrite) | Run by CI on every push. |
+| Node 24.0.0 | Run by CI on every push (not re-run locally after the rewrite) | Run by CI on every push. |
+| Node 26.10.0 | 69 passed | Passed; 46 modules. |
 
 The Node 22/24 matrix used official release archives, verified against their published SHA-256 checksums, outside the repository. E2E verification used Node 26.10.0 and cached Chromium. This does not claim that every future Node/browser release has been tested.
 
@@ -40,7 +40,7 @@ The project `.npmrc` selects official npm. The regenerated lockfile contains **8
 | `src/protocol/address.ts` | Revision 0 UA decoding, Orchard validation/projection and equivalent receiver refund guard. |
 | `src/protocol/amount.ts`, `src/protocol/crypto.ts`, `src/protocol/memo.ts` | Integer amounts, private salts, refund-bound commitments, canonical bid JSON, UTF-8 sizing and ZIP-321. |
 | `src/protocol/merkle.ts` | Domain-separated, size-bound SHA-256 roots and inclusion proofs. |
-| `src/lib/darkpool.ts`, `src/simulation.ts` | Pure uniform-price allocation and authenticated local sandbox lifecycle. |
+| `src/lib/darkpool.ts`, `src/simulation.ts`, `src/components/RevealPanel.ts` | Pure uniform-price allocation, hash-only commit/reveal ledger and the bidder receipt workspace. |
 | `src/fixtures.ts` | Distinct public vault/refund receiving fixtures; no private test-vector keys. |
 | `src/components/NetworkHeader.ts`, `ActionRipples.ts`, `terminal-effects.css` | Local header/glitch effects, click feedback and matte phosphor styling. |
 | `src/components/MemoScramble.ts`, `BlindOrderflow.ts` | Gated private memo preview and commitment-only interactive canvas, including corrected unselected ArrowLeft. |
@@ -60,7 +60,7 @@ Dependencies, `dist/`, browser traces/reports and `test-results/` are ignored ar
 
 **Address policy.** The validator checks lowercase Bech32m, network HRP/padding, inverse F4Jumble, canonical CompactSize, receiver ordering/length and nonidentity Orchard payment-point validity. Standard UAs containing Orchard plus other receivers are accepted as input. Payment URIs and prepared refund instructions use an Orchard-only projection; bare transparent addresses and UAs without Orchard are rejected. Different UA strings carrying the vault's same Orchard receiver cannot bypass the refund guard. Encoding validation does not establish ownership.
 
-**Memo and amount integrity.** The exact `{v,a,p,q,s,r}` schema uses canonical JSON, positive canonical decimal prices, whole quantities, an auction identifier, a 256-bit salt and refund UA. Invalid Unicode and noncanonical schema/values are refused. UTF-8 is validated at **at most 512 bytes before encoding**; ZIP-321 uses unpadded Base64url. Arithmetic uses integer zatoshis and enforces monetary bounds. A URI is readable sensitive data; real wallet transaction machinery performs Orchard encryption.
+**Memo and amount integrity.** Commit memos use the canonical `{v:2,t:"commit",a,c}` schema; reveal receipts use the canonical `{v:1,a,p,q,s,r}` schema with positive canonical decimal prices, whole quantities, an auction identifier, a 256-bit salt and an Orchard refund UA. Invalid Unicode and noncanonical JSON are rejected, and every memo is audited as exact UTF-8 bytes (at most 512) before Base64url encoding.
 
 **Runtime types.** Public commitment preparation rejects non-string auction/price/salt fields and nonnumeric quantities before hashing. The pure clearing engine rejects coerced supply values before allocation. Schema validation and TypeScript checking remain independent layers.
 
@@ -76,20 +76,20 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 
 **Clearing.** Bids sort by price and accepted submission order. Eligible demand at or below supply, or one eligible envelope, pays reserve. When one envelope wins all supply, its own excess demand is excluded and the highest losing eligible envelope sets the price, floored at reserve. With multiple winners, the highest unfilled eligible lot sets the price; a partial marginal bid can set it. The single-lot/unit-demand case produces second-price clearing, without a multi-lot VCG claim. Every allocation preserves exact escrow conservation. The built-in 10-lot walkthrough still clears at `0.68 ZEC` with the default submitted bid and three fixtures.
 
-**Local sealing and viewing vault.** Sandbox bids are retained as AES-256-GCM ciphertext with random IVs and commitment AAD under a nonextractable session key. The separate mock scanner authenticates 528-byte envelopes before recovering exact 512-byte fields. It strips padding after authentication, decodes the declared transport, validates schema/commitment/escrow/refund and isolates rejected notes. Only `mock:node07:` followed by exactly 64 lowercase hex characters is accepted. Real Unified Viewing Keys cannot be saved or unlocked until an audited WASM adapter is ready; the previous storage-only path and its acceptance test have been removed.
+**Commit/reveal ledger and viewing vault.** The sandbox ledger stores only `{commitment, collateral}` per entry; no preimage, ciphertext or decryption key enters it. Reveal receipts live in the bidder-side `RevealPanel` and are verified by recomputing the commitment. The separate mock scanner authenticates 528-byte AES-GCM envelopes bound to note metadata and parses **commit memos only**; it never reads a bid preimage. The scanner and the auction book remain isolated.
 
 **Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes mock-key tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Invalid/non-mock input is rejected before storage access. Stored ciphertext must have the exact mock-key-plus-tag length, and decrypted credentials are validated again, so legacy non-mock records cannot unlock. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
 
-**Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing.
+**Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing. The tree covers every accepted commitment and is frozen when the commit phase closes, so a bidder can verify inclusion before reveals and the clear-time root must equal it.
 
 ## Phase 2 lifecycle and audit corrections
 
 - From no canvas selection, ArrowLeft now chooses the final node; normal wrapping, one-node navigation and Escape remain correct.
 - Closing disables auction input fields and the preview's own enable gate, clears pending timers/private buffers and invalidates late promise callbacks. Synthetic input events cannot restart closed-auction cryptographic work. Independent wallet/scanner controls remain available.
 - Reset restores auction, wallet and audit form defaults; clears review/output/error/result/root state; replaces the sandbox/session key; resets seed progress; and starts one valid `0.72`/`4` preview. Reset does not silently remove the separate encrypted viewing-key record; its owner remains Lock/Forget.
-- Demo seeding tracks accepted fixture progress. Retrying after a later fixture fails encrypting continues at that fixture, rather than duplicating earlier accepted bids.
-- Commit logs successful local encrypted acceptance. The separate **Merkle leaf generated** event appears only after close-time root/proof compilation succeeds for a nonempty set. Empty books and compilation failures produce no success label. A failed compilation leaves the book closed and inputs locked; Reset starts a new session.
-- **ORCHARD SHIELD** is an explicitly local mock payload indicator: **IDLE** at startup/plaintext/reset/lock/unsealed view, **ACTIVE** for sealed auction payloads or authenticated and validated mock bids, and **OFFLINE** after failed local verification. Detail text identifies mock AES-GCM and the absence of real Orchard decryption. Changing workspaces updates the context; merely validating a UA or generating a URI never activates encryption status.
+- Demo seeding tracks accepted fixture progress. Retrying after a later fixture fails during commitment hashing continues at that fixture, rather than duplicating earlier accepted bids.
+- Commit logs hash-only acceptance. The separate **Merkle leaf generated** event appears only after close-time root/proof compilation succeeds for a nonempty set. Empty books and compilation failures produce no such event.
+- **ORCHARD SHIELD** is an explicitly local mock payload indicator: **IDLE** at startup, for hash-only commits, plaintext, reset and lock; **ACTIVE** only after an authenticated and validated mock note scan; **OFFLINE** after a failed local verification. It does not assert real Orchard encryption or chain connectivity.
 - CSP block counts remain passive, observed external enforcement events, deduplicated for the existing HTTP/meta pair. They are not a device-wide traffic audit. Log clear preserves security state; reset clears local payload state and preserves observed block counts.
 
 ## Offline operation, accessibility and performance
@@ -120,14 +120,13 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 62 tests passed across 9 files. |
-| `npm run build` | Strict TypeScript passed; 39 transformed modules. |
-| `npm run test:e2e -- --config /private/tmp/darkzec-playwright.config.ts` | Fresh build followed by 30 passing E2E tests. |
-| Node 22.18.0 / 24.0.0 matrix | Each: 62 tests, strict check and 39-module bundle passed. |
-| Production bundle | JavaScript 87.90 kB / 30.87 kB gzip; CSS 37.79 kB / 8.65 kB gzip. |
+| `npm test` | 69 tests passed across 9 files. |
+| `npm run build` | Strict TypeScript passed; 46 transformed modules. |
+| `npm run test:e2e` | Fresh build followed by 34 passing E2E tests. |
+| Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
+| Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |
 | CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24, `npm ci`, Chromium dependencies and sequential build/unit/E2E steps. |
-| CI-mode browser suite | 30 tests passed with two workers, focused tests forbidden and automatic dedicated preview-server startup/cleanup, using a temporary cached-Chromium config. |
 
 The temporary browser config only selects cached Chromium for this workspace. The maintained configuration is portable. Browser coverage includes existing protocol/wallet/vault/security flows, the five reproduced Phase 2 regressions, failed Merkle compilation and an oversized winning bid priced against competing demand; unit coverage includes missing-build CLI failures. Source privacy, registry origin and strict typing checks remain enabled. Desktop/mobile screenshots are generated under `test-results/` and visually reviewed. No public CI or independent audit result is claimed.
 

@@ -50,7 +50,8 @@ test('reset restores valid defaults, restarts one preview and makes repeated see
   await expect(page.locator('#audit-panel')).toBeHidden(); await expect(page.locator('#results-panel')).toBeHidden(); await expect(page.locator('#error')).toBeHidden();
   await page.locator('#memo-scramble').scrollIntoViewIfNeeded(); await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
   const encoded = await page.locator('#memo-payload').innerText(); const memo: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-  expect(memo).toMatchObject({ p: '0.72', q: 4 });
+  expect(memo).toMatchObject({ v: 2, t: 'commit', a: 'NODE07-001', c: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(JSON.stringify(memo)).not.toContain('0.72');
   await page.locator('#live-terminal-log').scrollIntoViewIfNeeded();
   await expect(page.locator('#live-terminal-log .terminal-event').filter({ hasText: 'Payment URI generated locally' })).toHaveCount(1);
   await page.locator('#seed').click(); await expect(page.locator('#bid-count')).toHaveText('03'); await expect(page.locator('#seed')).toBeDisabled();
@@ -58,17 +59,16 @@ test('reset restores valid defaults, restarts one preview and makes repeated see
   await page.locator('#seed').click(); await expect(page.locator('#bid-count')).toHaveText('03');
 });
 
-test('shield and Merkle events reflect encryption and close-time compilation rather than startup', async ({ page }) => {
+test('shield stays idle for hash-only commits and Merkle events reflect close-time compilation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
   await expect(page.locator('#stream-shield')).toHaveText('IDLE'); await expect(page.locator('#telemetry-shield')).toHaveText('IDLE');
   await page.locator('#prepare').click(); await expect(page.locator('#stream-shield')).toHaveText('IDLE');
-  await page.locator('#commit').click(); await expect(page.locator('#stream-shield')).toHaveText('ACTIVE');
+  await page.locator('#commit').click(); await expect(page.locator('#bid-count')).toHaveText('01'); await expect(page.locator('#stream-shield')).toHaveText('IDLE');
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('Commitment hash and posted collateral');
   await expect(log).not.toContainText('Merkle leaf generated');
   await page.locator('#close').click(); await expect(page.locator('#merkle-root')).toHaveText(/^[a-f0-9]{64}$/);
   await log.scrollIntoViewIfNeeded(); await expect(log).toContainText('Merkle leaf generated');
-  await expect(page.locator('#stream-shield')).toHaveText('ACTIVE');
-  await page.locator('#clear').click(); await expect(page.locator('#stream-shield')).toHaveText('IDLE');
+  await expect(page.locator('#stream-shield')).toHaveText('IDLE');
   await page.locator('#reset').click(); await expect(page.locator('#stream-shield')).toHaveText('IDLE');
   await page.locator('#close').click(); await log.scrollIntoViewIfNeeded(); await expect(log).not.toContainText('Merkle leaf generated');
 });
@@ -88,16 +88,17 @@ test('failed close-time Merkle compilation never logs successful leaf generation
   await page.locator('#live-terminal-log').scrollIntoViewIfNeeded(); await expect(page.locator('#live-terminal-log')).not.toContainText('Merkle leaf generated');
 });
 
-test('a retry after partial fixture encryption failure does not duplicate accepted seed bids', async ({ page }) => {
+test('a retry after partial fixture commitment failure does not duplicate accepted seed bids', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('#seed')).toBeEnabled();
+  await page.locator('#memo-scramble').scrollIntoViewIfNeeded(); await expect(page.locator('#memo-scramble')).toHaveAttribute('data-state', 'ready');
   await page.evaluate(() => {
-    const encrypt = SubtleCrypto.prototype.encrypt; let calls = 0;
-    SubtleCrypto.prototype.encrypt = function(this: SubtleCrypto, ...args: Parameters<SubtleCrypto['encrypt']>): Promise<ArrayBuffer> {
-      if (++calls === 2) return Promise.reject(new DOMException('Simulated local encryption failure', 'OperationError'));
-      return encrypt.apply(this, args);
+    const digest = SubtleCrypto.prototype.digest; let calls = 0;
+    SubtleCrypto.prototype.digest = function(this: SubtleCrypto, ...args: Parameters<SubtleCrypto['digest']>): Promise<ArrayBuffer> {
+      if (++calls === 2) return Promise.reject(new DOMException('Simulated local commitment failure', 'OperationError'));
+      return digest.apply(this, args);
     };
   });
-  await page.locator('#seed').click(); await expect(page.locator('#error')).toContainText('Simulated local encryption failure');
+  await page.locator('#seed').click(); await expect(page.locator('#error')).toContainText('Simulated local commitment failure');
   await expect(page.locator('#bid-count')).toHaveText('01'); await expect(page.locator('#seed')).toBeEnabled();
   await page.locator('#seed').click(); await expect(page.locator('#bid-count')).toHaveText('03'); await expect(page.locator('#seed')).toBeDisabled();
   await page.locator('#reset').click(); await page.locator('#seed').click(); await expect(page.locator('#bid-count')).toHaveText('03');

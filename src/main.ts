@@ -246,15 +246,17 @@ button('close').addEventListener('click', () => {
     vault().close(); clearPrepared(); memoPreview.setEnabled(false);
     clearTimeout(revealDeadlineTimer);
     revealDeadlineTimer = setTimeout(() => { if (sandbox && !working) controls(); }, (SIMULATION_CONFIG.revealWindowMs ?? 60_000) + 10);
-    telemetry.log('closed'); visible('audit-panel', false);
-    status('Commit phase closed. Reveal window is open for 60 seconds. Each bidder must submit a matching receipt; unrevealed bids cannot clear.');
+    const count = vault().publicSnapshot().commitments.length;
+    if (count > 0) text('merkle-root', (await vault().audit(0)).root);
+    else text('merkle-root', 'No commitments. Inclusion proofs require at least one bid.');
+    telemetry.log('closed'); if (count > 0) telemetry.log('merkle'); visible('audit-panel', true);
+    status('Commit phase closed and the commitment root is frozen. Reveal window is open for 60 seconds; unrevealed bids cannot clear.');
   });
 });
 button('clear').addEventListener('click', () => {
   void action(async () => {
     lastResult = await vault().clear();
-    telemetry.log('cleared'); if (vault().publicSnapshot().revealed.length) telemetry.log('merkle');
-    text('merkle-root', lastResult.root); visible('audit-panel', true);
+    telemetry.log('cleared'); text('merkle-root', lastResult.root); visible('audit-panel', true);
     text('clearing-price', `${lastResult.clearingPrice} ZEC`); text('filled-lots', `${lastResult.filled} / ${SIMULATION_CONFIG.supply} LOTS`);
     const rows = el('result-rows'); rows.replaceChildren();
     for (const allocation of lastResult.allocations) {
@@ -266,7 +268,7 @@ button('clear').addEventListener('click', () => {
     }
     visible('results-panel', true);
     text('excluded-bids', `${lastResult.excluded} excluded / ${lastResult.heldCollateral} ZEC collateral held`);
-    status('Only verified reveals entered clearing and the Merkle tree. Missing reveals are excluded; their collateral remains held for a future recovery policy. No settlement transaction was sent.');
+    status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their collateral remains held for a future recovery policy. No settlement transaction was sent.');
   });
 });
 element('audit-form', HTMLFormElement).addEventListener('submit', event => {

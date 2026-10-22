@@ -199,7 +199,7 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .navigation::-webkit-scrollbar { display: none; }
 .nav-item { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 760px) {
-  .nav-item { padding: 0 11px; font-size: 11px; letter-spacing: .03em; }
+  .nav-item { padding: 0 11px; font-size: 12px; letter-spacing: .03em; }
   .network-status { display: none; }
 }
 
@@ -212,7 +212,7 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .hud { display: none; }
 .has-scene .hud { display: block; }
 .hud-distance { position: fixed; right: 28px; bottom: 22px; z-index: 20; text-align: right; pointer-events: none; opacity: clamp(0, calc((1 - var(--journey, 0)) * 14), 1); }
-.hud-distance span { display: block; font: 11px/1 var(--mono); letter-spacing: .14em; color: #a3a3aa; }
+.hud-distance span { display: block; font: 12px/1 var(--mono); letter-spacing: .14em; color: #a3a3aa; }
 .hud-distance strong { display: block; margin: 6px 0 8px; font: 900 46px/1 var(--display); letter-spacing: .02em; color: var(--text); text-shadow: 0 0 22px rgb(0 255 102 / 30%); }
 .hud-bar { display: block; width: 132px; height: 6px; margin-left: auto; background: repeating-linear-gradient(90deg, #2a2a2e 0 6px, transparent 6px 8px); }
 .hud-bar::after { content: ""; display: block; height: 100%; width: calc(var(--journey, 0) * 100%); background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px); }
@@ -226,11 +226,11 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .has-scene .masthead > * { pointer-events: auto; }
 .has-scene .masthead-sub, .has-scene .node-label { display: none; }
 .has-scene .navigation { position: fixed; top: 16px; right: 28px; z-index: 31; width: auto; height: auto; gap: 8px; border: 0; overflow: visible; }
-.has-scene .nav-item { height: auto; padding: 9px 13px; border: 1px solid var(--line); background: rgb(9 9 11 / 70%); font-size: 11px; }
+.has-scene .nav-item { height: auto; padding: 9px 13px; border: 1px solid var(--line); background: rgb(9 9 11 / 70%); font-size: 12px; }
 .has-scene .nav-item:hover { border-color: var(--accent); }
 .has-scene .nav-item.active { border-color: var(--accent); background: rgb(0 255 102 / 9%); color: var(--accent); }
 .has-scene .nav-item span { display: none; }
-.has-scene .network-status { position: fixed; left: 28px; bottom: 22px; z-index: 20; padding: 7px 11px; border: 1px solid rgb(0 255 102 / 35%); background: rgb(4 14 8 / 72%); color: var(--blue); font: 700 11px/1 var(--mono); letter-spacing: .1em; }
+.has-scene .network-status { position: fixed; left: 28px; bottom: 22px; z-index: 20; padding: 7px 11px; border: 1px solid rgb(0 255 102 / 35%); background: rgb(4 14 8 / 72%); color: var(--blue); font: 700 12px/1 var(--mono); letter-spacing: .1em; }
 
 /* Journey: hero headline plus HUD callouts that appear along the scroll. */
 .has-scene .terminal { position: relative; }
@@ -263,13 +263,13 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .callout-stats { display: flex; gap: 26px; margin: 0 0 14px; padding-bottom: 14px; border-bottom: 2px dashed var(--accent); }
 .callout-stats strong { display: block; font: 900 48px/1 var(--display); color: #8d8d94; }
 .callout-stats .acc strong { color: var(--accent); text-shadow: 0 0 20px rgb(0 255 102 / 50%); }
-.callout-stats small { display: block; margin-top: 6px; font: 11px/1.3 var(--mono); letter-spacing: .1em; color: #8d8d94; }
+.callout-stats small { display: block; margin-top: 6px; font: 12px/1.3 var(--mono); letter-spacing: .1em; color: #8d8d94; }
 .callout ul { margin: 0; padding: 0; list-style: none; }
-.callout li { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font: 11px/1.5 var(--mono); letter-spacing: .06em; color: #e8ece9; text-transform: uppercase; }
+.callout li { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font: 12px/1.5 var(--mono); letter-spacing: .06em; color: #e8ece9; text-transform: uppercase; }
 .callout li::before { content: "\203a"; margin-right: 8px; color: var(--accent); }
 .callout li span { flex: 1; }
 .callout li b { color: var(--blue); font-weight: 400; text-align: right; }
-.callout-note { margin: 12px 0 0; font: 11px/1.5 var(--mono); letter-spacing: .08em; color: #8d8d94; text-transform: uppercase; }
+.callout-note { margin: 12px 0 0; font: 12px/1.5 var(--mono); letter-spacing: .08em; color: #8d8d94; text-transform: uppercase; }
 
 /* The application sits in a bracketed frame once the journey ends. */
 .deal-title { display: none; }

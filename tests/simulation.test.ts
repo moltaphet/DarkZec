@@ -22,7 +22,9 @@ describe('strict commit/reveal auction ledger', () => {
     expect(sandbox.publicSnapshot().revealed).toEqual([]);
     await expect(sandbox.clear()).rejects.toThrow('Close');
     await expect(sandbox.reveal(bids[0]!.reveal)).rejects.toThrow('reveal window');
-    sandbox.close(); await expect(sandbox.audit(0)).rejects.toThrow('Finalize');
+    await expect(sandbox.audit(0)).rejects.toThrow('Close');
+    sandbox.close(); const frozen = await sandbox.audit(0);
+    expect(frozen.root).toBe(await merkleRoot(bids.map(bid => bid.commitment)));
     await expect(sandbox.submit(commitSubmission(bids[0]!))).rejects.toThrow('closed');
     await revealAll(sandbox, bids);
     const result = await sandbox.clear();
@@ -30,7 +32,7 @@ describe('strict commit/reveal auction ledger', () => {
     expect(result.allocations.find(row => row.price === '0.68')?.filled).toBe(2);
     expect(result.allocations.reduce((sum, row) => sum + parseZec(row.paid) + parseZec(row.refundAmount), 0n)).toBe(3n * parseZec(DEFAULT_COLLATERAL));
     const audit = await sandbox.audit(1); expect(await verifyProof(bids[1]!.commitment, audit.proof, audit.root)).toBe(true);
-    expect(audit.root).toBe(result.root); await expect(sandbox.clear()).rejects.toThrow('already');
+    expect(audit.root).toBe(frozen.root); expect(result.root).toBe(frozen.root); await expect(sandbox.clear()).rejects.toThrow('already');
     await expect(sandbox.reveal(bids[0]!.reveal)).rejects.toThrow('reveal window');
   });
   it('discards price, quantity, salt, refund and auction substitutions without poisoning a later valid reveal', async () => {
@@ -42,7 +44,7 @@ describe('strict commit/reveal auction ledger', () => {
     await sandbox.reveal(bid.reveal); await expect(sandbox.reveal(bid.reveal)).rejects.toThrow('already');
     expect((await sandbox.clear()).allocations).toHaveLength(1);
   });
-  it('excludes an unrevealed highest bid from price discovery and the Merkle tree after the deadline', async () => {
+  it('excludes an unrevealed highest bid from price discovery but keeps it in the frozen commitment root', async () => {
     let now = 100; const sandbox = await Sandbox.create({ ...config, supply: 1 }, () => now);
     const missing = await prepare('9', 1); const bids = await Promise.all([prepare('0.8', 1), prepare('0.6', 1)]);
     await commitAll(sandbox, [missing, ...bids]); sandbox.close(); await revealAll(sandbox, bids);
@@ -50,16 +52,17 @@ describe('strict commit/reveal auction ledger', () => {
     await expect(sandbox.reveal(missing.reveal)).rejects.toThrow('expired');
     const result = await sandbox.clear(); expect(result).toMatchObject({ clearingPrice: '0.6', excluded: 1, heldCollateral: '10' });
     expect(result.allocations.map(row => row.commitment)).not.toContain(missing.commitment);
-    const audit = await sandbox.audit(0); expect(audit.proof.count).toBe(2);
-    expect(await verifyProof(missing.commitment, audit.proof, audit.root)).toBe(false);
-    expect(result.root).toBe(await merkleRoot(bids.map(bid => bid.commitment)));
+    const audit = await sandbox.audit(0); expect(audit.proof.count).toBe(3);
+    expect(await verifyProof(missing.commitment, audit.proof, audit.root)).toBe(true);
+    expect(result.root).toBe(await merkleRoot([missing, ...bids].map(bid => bid.commitment)));
   });
   it('settles no unrevealed bids and keeps their collateral held rather than inventing refunds', async () => {
     let now = 0; const sandbox = await Sandbox.create(config, () => now);
-    await commitAll(sandbox, [await prepare('1', 1)]); sandbox.close(); now = 1000;
+    const only = await prepare('1', 1); await commitAll(sandbox, [only]); sandbox.close(); now = 1000;
     const result = await sandbox.clear(); expect(result).toMatchObject({ filled: 0, allocations: [], excluded: 1, heldCollateral: '10' });
-    expect(result.root).toBe(await merkleRoot([])); await expect(sandbox.audit(0)).rejects.toThrow('No verified');
-    const empty = await Sandbox.create(config); empty.close(); expect((await empty.clear()).filled).toBe(0);
+    expect(result.root).toBe(await merkleRoot([only.commitment])); await expect(sandbox.audit(1)).rejects.toThrow('No commitment');
+    const empty = await Sandbox.create(config); empty.close(); await expect(empty.audit(0)).rejects.toThrow('No commitment');
+    const emptyResult = await empty.clear(); expect(emptyResult.filled).toBe(0); expect(emptyResult.root).toBe(await merkleRoot([]));
   });
   it('rejects rich commit payloads, wrong collateral, wrong auctions, duplicates and malformed hashes', async () => {
     const sandbox = await Sandbox.create(config); const bid = await prepare('0.7', 4); const packet = commitSubmission(bid);
@@ -103,7 +106,7 @@ describe('strict commit/reveal auction ledger', () => {
       return original(algorithm, bytes);
     });
     try { await expect(sandbox.clear()).rejects.toThrow('Merkle'); } finally { mock.mockRestore(); }
-    expect(sandbox.publicSnapshot().phase).toBe('reveal'); await expect(sandbox.audit(0)).rejects.toThrow('Finalize');
+    expect(sandbox.publicSnapshot().phase).toBe('reveal');
     expect((await sandbox.clear()).allocations).toHaveLength(1);
   });
   it('bounds ledger size and rejects invalid collateral/window configuration', async () => {

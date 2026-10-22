@@ -33,9 +33,11 @@ test('complete local auction stays offline, reveals deliberately, audits and res
   await expect(page.locator('#phase')).toHaveText('CLOSED / REVEAL WINDOW');
   await expect(page.locator('#prepare')).toBeDisabled();
   await expect(page.locator('#results-panel')).toBeHidden();
-  await expect(page.locator('#audit-panel')).toBeHidden();
+  await expect(page.locator('#audit-panel')).toBeVisible(); await expect(page.locator('#merkle-root')).toHaveText(/^[a-f0-9]{64}$/);
+  const frozenRoot = await page.locator('#merkle-root').innerText();
   await expect(page.locator('#clear')).toBeDisabled();
   await revealLocalReceipts(page); await page.locator('#clear').click();
+  await expect(page.locator('#merkle-root')).toHaveText(frozenRoot);
   await page.locator('#audit-index').fill('4');
   await page.getByRole('button', { name: 'Verify inclusion' }).click();
   await expect(page.locator('#audit-result')).toContainText('VERIFIED / Entry 4');

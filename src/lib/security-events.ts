@@ -1,5 +1,5 @@
 export type SecurityEvent = 'boot' | 'draft' | 'prepared' | 'committed' | 'seeded' | 'closed' | 'merkle' | 'cleared' | 'proof' | 'reset' | 'wallet' | 'erased' | 'blocked' | 'invalid' | 'revealed' | 'expired';
-export type PayloadSecurityState = 'idle' | 'auction-sealed' | 'vault-verified' | 'invalid';
+export type PayloadSecurityState = 'idle' | 'vault-verified' | 'invalid';
 export type AuditSource = 'composer' | 'wallet' | 'auction' | 'vault';
 export type MemoAuditState = 'empty' | 'scrambling' | 'ready' | 'invalid';
 export type AuditCategory = 'SYS_INIT' | 'ZIP-302' | 'ZIP-321' | 'AUDIT' | 'AUCTION' | 'VAULT' | 'NETWORK';
@@ -57,7 +57,7 @@ const LABELS: Readonly<Record<SecurityEvent, readonly [AuditCategory, string, Au
   committed: ['AUDIT', 'Commitment hash and posted collateral recorded; no bid preimage', 'success', true],
   seeded: ['AUCTION', 'Three sealed demo notes received', 'info', true],
   closed: ['AUCTION', 'Commitment set frozen; reveal window opened', 'success', true],
-  merkle: ['AUDIT', 'Merkle leaf generated for verified reveal set; root compiled', 'success', true],
+  merkle: ['AUDIT', 'Merkle leaf generated for frozen commitment set; root compiled', 'success', true],
   cleared: ['AUCTION', 'Local uniform-price clearing completed', 'success', true],
   revealed: ['AUCTION', 'Bidder reveal matched a recorded commitment', 'success', true],
   expired: ['AUCTION', 'Judge clock advanced past the reveal deadline', 'info', true],
@@ -72,8 +72,7 @@ const OPERATIONS: Readonly<Record<VaultOperation, string>> = { save: 'encrypted 
 const isBytes = (value: number): boolean => Number.isInteger(value) && value >= 0 && value <= 512;
 const isCount = (value: number): boolean => Number.isInteger(value) && value >= 0 && value <= 128;
 const PAYLOAD_STATES: Readonly<Record<PayloadSecurityState, readonly [SecuritySnapshot['shield'], string]>> = {
-  idle: ['IDLE', 'No verified encrypted bid payload in this view; wallet URIs are readable.'],
-  'auction-sealed': ['ACTIVE', 'Sealed local auction payloads use mock AES-GCM; no live Orchard connection.'],
+  idle: ['IDLE', 'No authenticated mock note in this view. The commit/reveal sandbox stores hashes only; wallet URIs are readable.'],
   'vault-verified': ['ACTIVE', 'Mock note authentication and bid validation verified locally; no real Orchard decryption.'],
   invalid: ['OFFLINE', 'Local payload verification failed; no verified payload is active in this view.'],
 };
@@ -125,7 +124,7 @@ export class SecurityAudit {
   encryption(state: PayloadSecurityState): void {
     if (!Object.hasOwn(PAYLOAD_STATES, state) || state === this.#payloadState || this.#disposed) return;
     this.#payloadState = state;
-    this.#record('AUDIT', PAYLOAD_STATES[state][1], state === 'invalid' ? 'warning' : 'info', state === 'auction-sealed' || state === 'vault-verified');
+    this.#record('AUDIT', PAYLOAD_STATES[state][1], state === 'invalid' ? 'warning' : 'info', state === 'vault-verified');
   }
   networkGuard(active: boolean): void {
     this.#guard = active;
