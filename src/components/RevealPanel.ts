@@ -25,7 +25,7 @@ export class RevealPanel implements Disposable {
     host.setAttribute('aria-label', 'Bidder reveal workspace');
     const heading = node('div'); heading.className = 'panel-heading'; heading.append(node('h2', '03 / Commit → Reveal'), node('span', 'BIDDER WORKSPACE'));
     const content = node('div'); content.className = 'reveal-content';
-    const help = node('p', 'Keep this receipt private until the reveal window. Commit payments contain only an auction ID and hash. The operator cannot recover missing receipts. This browser hosts both roles for the demo; it does not isolate them from a compromised device.');
+    const help = node('p', 'Keep this receipt private until the reveal window. Commit payments contain only an auction ID and hash. The operator cannot recover missing receipts, and a commitment that is not revealed before the deadline forfeits its full collateral. This browser hosts both roles for the demo; it does not isolate them from a compromised device.');
     const label = node('label', 'Your locally held reveal receipts'); label.htmlFor = 'reveal-select'; this.#select.id = 'reveal-select';
     this.#details.append(node('summary', 'Inspect / copy or paste a private reveal receipt'));
     this.#receipt.id = 'reveal-receipt'; this.#receipt.spellcheck = false; this.#receipt.maxLength = 512;
@@ -67,7 +67,7 @@ export class RevealPanel implements Disposable {
     this.#all.disabled = busy || !open || ![...this.#receipts.keys()].some(hash => !this.#verified.has(hash));
     this.#expire.disabled = busy || snapshot.phase !== 'reveal' || snapshot.canClear;
     this.#select.disabled = busy || !this.#receipts.size; this.#receipt.disabled = busy || snapshot.phase === 'cleared';
-    this.#status.textContent = `${snapshot.revealed.length}/${snapshot.commitments.length} valid reveals. ${snapshot.phase === 'open' ? 'Commit phase: reveal submission is locked.' : snapshot.phase === 'cleared' ? 'Finalized: only verified reveals entered clearing and the audit tree.' : snapshot.canClear ? 'Ready to finalize. Missing reveals are excluded; their collateral remains held.' : 'Reveal window open. Clearing stays locked until all reveals verify or the deadline expires.'}`;
+    this.#status.textContent = `${snapshot.revealed.length}/${snapshot.commitments.length} valid reveals. ${snapshot.phase === 'open' ? 'Commit phase: reveal submission is locked.' : snapshot.phase === 'cleared' ? 'Finalized: only verified reveals entered clearing; unrevealed collateral was forfeited.' : snapshot.canClear ? 'Ready to finalize. Missing reveals are excluded and their collateral is forfeited.' : 'Reveal window open. Clearing stays locked until all reveals verify or the deadline expires.'}`;
   }
   reset(): void { this.#receipts.clear(); this.#verified.clear(); this.#select.replaceChildren(); this.#receipt.value = ''; this.#details.open = false; }
   destroy(): void { this.reset(); this.#life.destroy(); this.#host.replaceChildren(); }

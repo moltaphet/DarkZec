@@ -16,7 +16,7 @@ export interface PublicSnapshot {
   readonly revealOpen: boolean;
 }
 export interface Audit { readonly commitment: string; readonly root: string; readonly proof: InclusionProof }
-export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly heldCollateral: string }
+export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly forfeitedCollateral: string }
 interface RecordEntry { readonly commitment: string; readonly collateral: string; reveal?: BidMemo }
 
 /** Hash-only local ledger. No preimage, ciphertext or bidder decryption key enters commit storage. */
@@ -104,9 +104,10 @@ export class Sandbox {
       // The root covers every accepted commitment, so it equals the value a bidder verified after close.
       const root = await merkleRoot(this.#records.map(record => record.commitment));
       const excluded = this.#records.length - bids.length;
-      const held = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
+      // Non-reveal penalty: the full collateral of every unrevealed commitment is forfeited to the vault.
+      const forfeited = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
       this.#phase = 'cleared';
-      return Object.freeze({ ...result, root, excluded, heldCollateral: formatZec(held) });
+      return Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited) });
     } finally { this.#busy = false; }
   }
   /** Inclusion proof over the full commitment set, frozen when the commit phase closes. */

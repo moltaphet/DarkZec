@@ -28,7 +28,7 @@ describe('strict commit/reveal auction ledger', () => {
     await expect(sandbox.submit(commitSubmission(bids[0]!))).rejects.toThrow('closed');
     await revealAll(sandbox, bids);
     const result = await sandbox.clear();
-    expect(result).toMatchObject({ clearingPrice: '0.68', filled: 10, excluded: 0, heldCollateral: '0' });
+    expect(result).toMatchObject({ clearingPrice: '0.68', filled: 10, excluded: 0, forfeitedCollateral: '0' });
     expect(result.allocations.find(row => row.price === '0.68')?.filled).toBe(2);
     expect(result.allocations.reduce((sum, row) => sum + parseZec(row.paid) + parseZec(row.refundAmount), 0n)).toBe(3n * parseZec(DEFAULT_COLLATERAL));
     const audit = await sandbox.audit(1); expect(await verifyProof(bids[1]!.commitment, audit.proof, audit.root)).toBe(true);
@@ -50,16 +50,18 @@ describe('strict commit/reveal auction ledger', () => {
     await commitAll(sandbox, [missing, ...bids]); sandbox.close(); await revealAll(sandbox, bids);
     await expect(sandbox.clear()).rejects.toThrow('still open'); now = 1100;
     await expect(sandbox.reveal(missing.reveal)).rejects.toThrow('expired');
-    const result = await sandbox.clear(); expect(result).toMatchObject({ clearingPrice: '0.6', excluded: 1, heldCollateral: '10' });
+    const result = await sandbox.clear(); expect(result).toMatchObject({ clearingPrice: '0.6', excluded: 1, forfeitedCollateral: '10' });
+    // Conservation: payments + refunds + forfeited collateral equal every posted collateral, revealed or not.
+    expect(result.allocations.reduce((sum, row) => sum + parseZec(row.paid) + parseZec(row.refundAmount), 0n) + parseZec(result.forfeitedCollateral)).toBe(3n * parseZec(DEFAULT_COLLATERAL));
     expect(result.allocations.map(row => row.commitment)).not.toContain(missing.commitment);
     const audit = await sandbox.audit(0); expect(audit.proof.count).toBe(3);
     expect(await verifyProof(missing.commitment, audit.proof, audit.root)).toBe(true);
     expect(result.root).toBe(await merkleRoot([missing, ...bids].map(bid => bid.commitment)));
   });
-  it('settles no unrevealed bids and keeps their collateral held rather than inventing refunds', async () => {
+  it('settles no unrevealed bids and forfeits their collateral rather than inventing refunds', async () => {
     let now = 0; const sandbox = await Sandbox.create(config, () => now);
     const only = await prepare('1', 1); await commitAll(sandbox, [only]); sandbox.close(); now = 1000;
-    const result = await sandbox.clear(); expect(result).toMatchObject({ filled: 0, allocations: [], excluded: 1, heldCollateral: '10' });
+    const result = await sandbox.clear(); expect(result).toMatchObject({ filled: 0, allocations: [], excluded: 1, forfeitedCollateral: '10' });
     expect(result.root).toBe(await merkleRoot([only.commitment])); await expect(sandbox.audit(1)).rejects.toThrow('No commitment');
     const empty = await Sandbox.create(config); empty.close(); await expect(empty.audit(0)).rejects.toThrow('No commitment');
     const emptyResult = await empty.clear(); expect(emptyResult.filled).toBe(0); expect(emptyResult.root).toBe(await merkleRoot([]));

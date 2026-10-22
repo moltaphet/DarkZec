@@ -76,10 +76,10 @@ The local auction follows `open -> reveal -> cleared`:
 1. **Commit:** accept only `{auctionId, commitment, collateral}`; collateral is fixed (10 ZEC per commitment), duplicates are refused, and the sandbox holds up to 128 commitments. No preimage enters the ledger.
 2. **Close:** stop commits, freeze the ordered commitment set and publish the Merkle root over **all** commitments. A 60-second reveal window starts.
 3. **Reveal:** the bidder submits the receipt; the ledger rebuilds the memo, rejects refund-to-vault, recomputes the commitment, matches it to a recorded one and checks `price x quantity <= collateral`.
-4. **Clear:** after all reveals verify or the deadline passes, only verified reveals are allocated. Unrevealed bids get no allocation; their collateral stays held (no forfeiture or recovery policy is defined in this prototype).
+4. **Clear:** after all reveals verify or the deadline passes, only verified reveals are allocated. Unrevealed bids get no allocation and **forfeit their full collateral to the vault** (non-reveal penalty). Without it a bidder could commit for free, then withhold the reveal to grief the auction or to keep a free option on the outcome. Forfeited commitments remain in the frozen Merkle root, so they stay provable.
 5. **Allocate:** descending price, ties broken by accepted commit order (never by hash). The marginal bid can be partially filled.
 6. **Price:** eligible demand at or below supply, or a single eligible bid, pays reserve. If one winning envelope captures all supply, price against the highest losing eligible envelope; with several winners, all filled lots pay the highest unfilled eligible price, floored at reserve. For a single lot with unit-demand bidders this equals second-price (Vickrey) clearing; multi-lot bidding is **not** claimed to be VCG or strategyproof.
-7. **Account:** integer zatoshi arithmetic with `payment + refund = collateral` for every revealed bid.
+7. **Account:** integer zatoshi arithmetic with `payment + refund = collateral` for every revealed bid, and `sum(payments + refunds) + forfeited = all posted collateral` for the auction.
 
 The default market has 10 lots and a `0.50 ZEC` reserve. The three demo bids plus the default `0.72 x 4` user bid clear at `0.68 ZEC` with `10 / 10` lots filled.
 
@@ -128,7 +128,7 @@ Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)**. The stack is Vite + str
 1. Open **Auction sandbox** and choose **+ Load 3 demo bids**. The book shows three commitments; prices stay out of it.
 2. Keep the default `0.72` / `4`, choose **Prepare sealed bid**, inspect the commit-memo byte audit, then **Commit to local vault**. The book has four commitments.
 3. Choose **Close auction**. The Merkle root is frozen. In **Inclusion audit** select entry `4` and **Verify inclusion**.
-4. In **Commit → Reveal**, choose **Reveal all local receipts / demo** (or reveal one receipt). To see non-revealers excluded, skip a reveal and use **Advance reveal deadline / judge only**.
+4. In **Commit → Reveal**, choose **Reveal all local receipts / demo** (or reveal one receipt). To see the non-reveal penalty, reveal only one receipt with **Reveal selected receipt**, then use **Advance reveal deadline / judge only**: finalizing shows `2 unrevealed / 20 ZEC collateral forfeited to the vault`.
 5. Choose **Finalize & clear**. Expect `0.68 ZEC`, `10 / 10` lots and payment + refund equal to collateral for each reveal.
 6. **Reset local session** restarts the demo. Reload also discards the in-memory auction; receipts are not exported.
 
@@ -157,7 +157,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **69 unit/privacy tests (9 files), 34 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **69 unit/privacy tests (9 files), 35 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 
@@ -165,7 +165,7 @@ npm run test:e2e
 - **Private data stays out of logs:** the audit API accepts fixed event types and validated numeric metadata.
 - **Controlled persistence:** bids, receipts and logs are never persisted. Only the passphrase-encrypted mock-key record lives in tab session storage.
 - **Local trust:** the browser, same-origin scripts, extensions and device are inside the trust boundary. JavaScript strings, GC-managed keys and clipboard contents cannot be reliably zeroized. The sandbox hosts the bidder and operator roles in one browser and does not isolate them from a compromised device.
-- **Known prototype limits:** no penalty or recovery policy for non-revealers, no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, and no real Orchard scanning or settlement. These are production work.
+- **Known prototype limits:** the forfeiture goes to the vault operator (a production design may redistribute it or burn a fraction), no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, and no real Orchard scanning or settlement. These are production work.
 
 ## Repository map
 
