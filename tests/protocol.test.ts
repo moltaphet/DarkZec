@@ -39,6 +39,8 @@ describe('ZIP-316 validation', () => {
     expect(() => validateOrchardAddress(wrap([3, 43, ...new Uint8Array(43)]), 'testnet')).toThrow('payment point');
     expect(() => decodeUnifiedAddress(wrap([3, 43, ...r, 3, 43, ...r]), 'testnet')).toThrow('ordering');
     expect(() => decodeUnifiedAddress(wrap([253, 3, 0, 43, ...r]), 'testnet')).toThrow('CompactSize');
+    expect(() => decodeUnifiedAddress(wrap([3, 43, ...r, 192, 1, 0]), 'testnet')).toThrow('Metadata items');
+    expect(decodeUnifiedAddress(wrap([3, 43, ...r, 4, 1, 0]), 'testnet').map(receiver => receiver.type)).toEqual([3]);
     expect(validateOrchardAddress(wrap([0, 20, ...new Uint8Array(20), 3, 43, ...r]), 'testnet')).toMatch(/^utest1/);
     expect(() => validateOrchardAddress(wrap([2, 43, ...r]), 'testnet')).toThrow('Orchard receiver');
   });

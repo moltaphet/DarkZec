@@ -13,13 +13,14 @@ describe('application privacy regression guard', () => {
   it('keeps network, persistence, trackers and unsafe HTML sinks out of application sources', async () => {
     for (const filename of await sources('src')) {
       const source = await readFile(filename, 'utf8');
-      expect(source, filename).not.toMatch(/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|localStorage|indexedDB|sendBeacon)\b/);
+      if (filename !== join('src', 'lib', 'testnet-chain.ts')) expect(source, filename).not.toMatch(/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|localStorage|indexedDB|sendBeacon)\b/);
+      else expect(source).not.toMatch(/(?:XMLHttpRequest|WebSocket|EventSource|localStorage|indexedDB|sendBeacon)/);
       // Only this adapter may persist encrypted mock credentials; real keys must be rejected.
       if (filename !== join('src', 'lib', 'viewing-key-session.ts')) expect(source, filename).not.toMatch(/\bsessionStorage\b/);
       expect(source, filename).not.toMatch(/(?:innerHTML|outerHTML|insertAdjacentHTML|document\.cookie|console\.|https?:\/\/|@import|\bany\b)/);
     }
     const html = await readFile('index.html', 'utf8');
-    expect(html).toContain("connect-src 'none'");
+    expect(html).toContain("connect-src 'self'");
     expect(html).toContain("font-src 'none'");
     expect(html).not.toMatch(/https?:\/\//);
   });

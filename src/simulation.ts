@@ -115,9 +115,12 @@ export class Sandbox {
       const excluded = this.#records.length - bids.length;
       // Non-reveal penalty: the full collateral of every unrevealed commitment is forfeited to the vault.
       const forfeited = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
-      this.#phase = 'cleared';
       const posted = this.#records.reduce((total, record) => total + parseZec(record.collateral), 0n);
-      return Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited), postedCollateral: formatZec(posted) });
+      const settlement = Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited), postedCollateral: formatZec(posted) });
+      // Build every bounded monetary result before committing the state transition.
+      // If aggregate formatting fails, callers can correct the configuration and retry.
+      this.#phase = 'cleared';
+      return settlement;
     } finally { this.#busy = false; }
   }
   /** Inclusion proof over the full commitment set, frozen when the commit phase closes. */

@@ -128,7 +128,7 @@ export class SecurityAudit {
   }
   networkGuard(active: boolean): void {
     this.#guard = active;
-    this.#record('NETWORK', active ? 'Outbound connection guard enabled: CSP connect-src none' : 'Outbound connection guard is not confirmed', active ? 'success' : 'warning');
+    this.#record('NETWORK', active ? 'Same-origin connection policy enabled by CSP' : 'Same-origin connection policy is not confirmed', active ? 'success' : 'warning');
   }
   memo(audit: { readonly bytes: number; readonly state: MemoAuditState }, source: AuditSource = 'composer'): void {
     if (this.#disposed || !isBytes(audit.bytes) || !['empty', 'scrambling', 'ready', 'invalid'].includes(audit.state) || !['composer', 'wallet', 'auction', 'vault'].includes(source)) return;

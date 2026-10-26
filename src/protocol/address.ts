@@ -69,11 +69,15 @@ export function decodeUnifiedAddress(address: string, network: Network): readonl
     const type = readCompact(payload, cursor);
     const length = readCompact(payload, cursor);
     if (type <= previous || length === 0 || cursor.offset + length > payload.length) throw new Error('Invalid Unified Address receiver ordering or length.');
+    // Revision 0 forbids metadata items. Unknown receiver types remain
+    // forward-compatible and are ignored below, as ZIP-316 requires.
+    if (type >= 0xc0 && type <= 0xfc) throw new Error('Metadata items are not valid in a Revision 0 Unified Address.');
     const bytes = payload.slice(cursor.offset, cursor.offset + length);
     cursor.offset += length;
     const expected = type <= 1 ? 20 : type <= 3 ? 43 : undefined;
     if (expected !== undefined && length !== expected) throw new Error('Invalid receiver length.');
-    receivers.push({ type, bytes }); previous = type;
+    if (expected !== undefined) receivers.push({ type, bytes });
+    previous = type;
   }
   if (!receivers.some(({ type }) => type === 2 || type === 3)) throw new Error('A shielded receiver is required.');
   if (receivers.some(({ type }) => type === 0) && receivers.some(({ type }) => type === 1)) throw new Error('Conflicting transparent receivers.');
