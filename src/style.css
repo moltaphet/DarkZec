@@ -163,6 +163,19 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   font-size: 12px;
 }
 
+.testnet-check {
+  border: 1px solid var(--line);
+  padding: 18px;
+  margin-top: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.testnet-check .panel-heading { margin: 0; }
+.testnet-check h3 { margin: 0; font-size: 16px; }
+.testnet-check p { margin: 0; }
+.testnet-check output { overflow-wrap: anywhere; }
+
 .intro {
   justify-content: space-between;
   align-items: center;

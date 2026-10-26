@@ -16,9 +16,10 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 | ZIP-302 memo sizing (exact UTF-8 ≤ 512 bytes) and ZIP-321 `zcash:` URI generation (unpadded Base64url) | **Real**. |
 | Salted, domain-separated bid commitments and SHA-256 Merkle inclusion proofs | **Real**, computed locally with Web Crypto. |
 | Memo round trip: verify a commit memo copied from a real wallet against your prepared request; reveal receipt download/import | **Real**, local checks (see [testnet round trip](docs/testnet-interop.md)). |
+| Local Zcash testnet payment check | **Real read-only wallet RPC check** for a confirmed Orchard note with the exact 10 ZEC collateral and commit memo; user-triggered, local node only. Does not register the commitment or settle the auction. |
 | Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; refunds are accounting results, not transactions. |
 | Viewing Key Vault and note scanner | **Mock**: `mock:node07:` keys only, authenticated AES-GCM mock notes. Real viewing keys are rejected. |
-| Orchard IVK scanning, transaction submission, escrow, NEAR Intents settlement | **Not implemented** (integration work). No RPC, relayer or solver runs. |
+| Automatic Orchard IVK scanning, transaction submission, on-chain escrow, NEAR Intents settlement | **Not implemented** (integration work). No relayer or solver runs. |
 | Zodl Wallet handoff | Standard `zcash:` request; installed-wallet compatibility needs device testing. |
 | QR rendering | Not included in this build. |
 
@@ -137,7 +138,7 @@ npm ci
 npm run dev
 ```
 
-Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)**. The stack is Vite + strict TypeScript + typed DOM components with locally bundled CSS, a WebGL intro scene and system monospace fonts. It needs no wallet, RPC URL, API key or secret. `npm run dev` builds the production bundle and serves it through the loopback-only static server (no HMR); `npm run preview` serves an existing `dist/`. The project `.npmrc` selects the official npm registry and a registry-origin test rejects mirror URLs in the lockfile.
+Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)**. The stack is Vite + strict TypeScript + typed DOM components with locally bundled CSS, a WebGL intro scene and system monospace fonts. The sandbox needs no wallet or secret. The optional testnet payment checker needs local `zcashd` testnet RPC credentials; configure them only if using that feature. `npm run dev` builds the production bundle and serves it through the loopback-only server (no HMR); `npm run preview` serves an existing `dist/`.
 
 ## Judge walkthrough
 
@@ -179,11 +180,13 @@ npm run test:e2e
 
 ## Security & privacy boundaries
 
-- **No external runtime requests:** local scripts/styles, inline icons, system fonts; no RPC, analytics, trackers or polling. CSP uses `connect-src 'none'` and `font-src 'none'`; the server binds to loopback and does not log requests.
+- **Local Zcash testnet check:** the wallet view can check for exactly one confirmed Orchard note containing the prepared commit memo and 10 ZEC collateral. It reads through the local `zcashd` wallet RPC at `127.0.0.1:18232`, only when the user presses Verify. Start a testnet node with the vault's incoming viewing authority already loaded and start DarkZec with `DARKZEC_ZCASH_RPC_USER` and `DARKZEC_ZCASH_RPC_PASSWORD` set in the environment. The RPC credentials and viewing key never enter the browser. The endpoint is fixed, read-only and allow-lists `getblockchaininfo` and `z_listreceivedbyaddress`; the local server binds to loopback, checks same-origin requests and does not log request bodies. Never expose node RPC to the network.
+- **This is not on-chain auction settlement:** payment verification confirms a matching testnet payment only. It does not add the payment to the local sandbox, anchor its commitment root, distribute refunds, or settle the clearing result. Auction commit/reveal/clearing remains a local simulation. Mainnet requests are not eligible for the checker.
+- **Runtime requests:** browser scripts/styles remain same-origin and there are no analytics, trackers or background polling. The optional user-triggered check calls DarkZec's same-origin local API; that server talks only to the fixed loopback wallet RPC. CSP uses `connect-src 'self'` and `font-src 'none'`.
 - **Private data stays out of logs:** the audit API accepts fixed event types and validated numeric metadata.
 - **Controlled persistence:** bids, receipts and logs are never persisted. Only the passphrase-encrypted mock-key record lives in tab session storage.
 - **Local trust:** the browser, same-origin scripts, extensions and device are inside the trust boundary. JavaScript strings, GC-managed keys and clipboard contents cannot be reliably zeroized. The sandbox hosts the bidder and operator roles in one browser and does not isolate them from a compromised device.
-- **Known prototype limits:** the forfeiture goes to the vault operator (a production design may redistribute it or burn a fraction), the operator reads revealed bids and is trusted to clear honestly (see the threat model), no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, and no real Orchard scanning or settlement. These are production work.
+- **Known prototype limits:** the forfeiture goes to the vault operator (a production design may redistribute it or burn a fraction), the operator reads revealed bids and is trusted to clear honestly (see the threat model), no Sybil resistance or decentralized sequencing, no authenticated bidder identity, no externally anchored root, no automatic payment-to-commit registration, and no settlement. The local testnet checker confirms one matching Orchard payment but is not a production auction contract.
 
 ## Repository map
 

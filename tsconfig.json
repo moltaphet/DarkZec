@@ -15,7 +15,8 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src", "tests", "scripts", "vite.config.ts", "playwright.config.ts"]
 }

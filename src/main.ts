@@ -32,6 +32,7 @@ import { Sandbox, settlementBalance } from './simulation';
 import type { SettlementResult } from './simulation';
 import { compareWithRequest, memoFingerprint, parseReceivedCommitMemo } from './lib/memo-import';
 import { downloadText, receiptFilename } from './lib/receipt-file';
+import { localTestnetStatus, verifyTestnetCommit } from './lib/testnet-chain';
 
 const el = (id: string): HTMLElement => element(id, HTMLElement);
 const input = (id: string): HTMLInputElement => element(id, HTMLInputElement);
@@ -123,6 +124,8 @@ function eraseWallet(): void {
   input('wallet-reviewed').checked = false;
   for (const id of ['wallet-amount', 'wallet-bytes']) text(id, '');
   visible('wallet-output', false); updateWalletLink();
+  const paymentResult = el('testnet-payment-result'); paymentResult.textContent = ''; paymentResult.classList.remove('is-ok', 'is-bad');
+  button('testnet-check').disabled = true;
   if (walletView) telemetry.memo({ bytes: 0, state: 'empty' }, 'wallet');
 }
 function updateWalletLink(): void {
@@ -131,6 +134,17 @@ function updateWalletLink(): void {
   link.setAttribute('aria-disabled', String(!enabled));
   if (enabled && walletPrepared) { link.href = walletPrepared.uri; link.tabIndex = 0; }
   else { link.removeAttribute('href'); link.tabIndex = -1; }
+}
+function renderNodeStatus(label: string): void { text('network-status', `● ${label}`); }
+async function refreshNodeStatus(): Promise<void> {
+  try {
+    const node = await localTestnetStatus();
+    renderNodeStatus(node.connected ? node.network === 'testnet' ? node.synced ? 'TESTNET / SYNCED' : 'TESTNET / SYNCING' : `${node.network.toUpperCase()} / WRONG NETWORK` : 'NO LOCAL NODE');
+    text('testnet-status', node.connected ? node.network !== 'testnet' ? 'The local wallet RPC is connected to the wrong network. Switch it to Zcash testnet.' : node.synced ? 'Local Zcash testnet wallet connected and synchronized.' : `Testnet node is syncing (${node.blocks ?? 0} / ${node.headers ?? 0} blocks).` : node.reason === 'wallet-not-configured' ? 'No local node wallet is configured. Start zcashd in testnet mode and provide its RPC credentials to the local server.' : 'Could not reach the local testnet wallet RPC.');
+  } catch {
+    renderNodeStatus('CHECKER UNAVAILABLE');
+    text('testnet-status', 'The local testnet checker is unavailable. Start DarkZec with its local server to use payment verification.');
+  }
 }
 function controls(): void {
   const phase = sandbox?.publicSnapshot().phase;
@@ -143,6 +157,7 @@ function controls(): void {
   button('commit').disabled ||= !prepared;
   button('close').disabled = working || phase !== 'open';
   button('clear').disabled = working || !sandbox?.publicSnapshot().canClear;
+  button('testnet-check').disabled = working || !walletPrepared || element('wallet-network', HTMLSelectElement).value !== 'testnet';
   for (const id of ['bid-price', 'bid-quantity']) input(id).disabled = working || phase !== 'open';
   updateWalletLink();
   if (sandbox) revealPanel.update(sandbox.publicSnapshot(), working);
@@ -193,7 +208,7 @@ function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
   memoPreview.clear();
   memoPreview.setEnabled(view === 'sandbox' && vault().publicSnapshot().phase === 'open');
   if (view === 'sandbox' && vault().publicSnapshot().phase === 'open') memoPreview.update();
-  status(scannerView ? 'Private mock-note scanner. Only mock keys can be saved as passphrase-encrypted tab ciphertext. Real viewing keys are disabled. No RPC.' : walletView ? 'Requests are built on this device. Wallet handoff is explicit; no RPC or payment tracking.' : 'Session-only simulation. No funds move. Reloading erases all bids.');
+  status(scannerView ? 'Private mock-note scanner. Only mock keys can be saved as passphrase-encrypted tab ciphertext. Real viewing keys stay in your local Zcash wallet.' : walletView ? 'Payment requests are built on this device. Optional confirmation reads your local testnet wallet; no keys leave it.' : 'Session-only auction simulation. The local testnet checker can verify a payment, but this sandbox does not settle funds.');
   controls();
 }
 
@@ -323,6 +338,8 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
     area('wallet-reveal').value = serializeBidMemo(walletPrepared.reveal, network);
     text('wallet-amount', `${walletPrepared.amount} ZEC`); text('wallet-bytes', `${walletPrepared.byteLength} / 512 BYTES`);
     visible('wallet-output', true);
+    button('testnet-check').disabled = network !== 'testnet';
+    text('testnet-status', network === 'testnet' ? 'Ready to check the local testnet wallet for this payment.' : 'Chain verification is available for testnet requests only.');
     status('Payment request prepared on this device. Verify the full vault address and amount before opening your wallet.');
   });
 });
@@ -354,6 +371,20 @@ element('memo-verify-form', HTMLFormElement).addEventListener('submit', event =>
   });
 });
 button('memo-verify-clear').addEventListener('click', clearMemoVerification);
+button('testnet-check').addEventListener('click', () => { void action(async () => {
+  if (!walletPrepared || element('wallet-network', HTMLSelectElement).value !== 'testnet') throw new Error('Prepare a testnet request first.');
+  const address = /^zcash:([^?]+)/.exec(walletPrepared.uri)?.[1];
+  if (!address) throw new Error('The payment request has no valid testnet destination.');
+  const result = await verifyTestnetCommit(address, walletPrepared.reveal.auctionId, walletPrepared.commitment);
+  const output = el('testnet-payment-result'); output.classList.remove('is-ok', 'is-bad');
+  if (result.status === 'confirmed') {
+    output.textContent = `CONFIRMED / ${result.confirmations} confirmation${result.confirmations === 1 ? '' : 's'} / 10 ZEC / tx ${result.txid}`;
+    output.classList.add('is-ok'); telemetry.log('wallet');
+  } else {
+    const messages = { 'not-found': 'No matching confirmed Orchard payment was found. Check that the local wallet can view the vault address and that the memo and collateral are exact.', 'wrong-network': 'The local wallet is not connected to Zcash testnet.', syncing: 'Wait for the local testnet node to finish syncing, then check again.', 'wallet-not-configured': 'Configure the local zcashd RPC credentials, then restart DarkZec.', 'node-unavailable': 'The local testnet wallet RPC could not complete the check.' } as const;
+    output.textContent = `NOT CONFIRMED / ${messages[result.status]}`; output.classList.add('is-bad'); telemetry.log('invalid');
+  }
+}); });
 button('copy-wallet').addEventListener('click', () => { void action(() => copy(walletPrepared?.uri ?? '')); });
 button('erase-wallet').addEventListener('click', () => { eraseWallet(); telemetry.log('erased'); controls(); status('Sensitive payment request erased from the interface.'); });
 element('open-wallet', HTMLAnchorElement).addEventListener('click', event => {
@@ -371,3 +402,4 @@ void action(async () => {
   sandbox = await Sandbox.create(SIMULATION_CONFIG, judgeClock);
   memoPreview.setEnabled(true); memoPreview.update();
 });
+void refreshNodeStatus();
