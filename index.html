@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'" />
     <title>DarkZec — NODE 07 Private Markets</title>
     <link rel="icon" href="data:," />
   </head>
@@ -25,7 +25,7 @@
         <button id="sandbox-tab" class="nav-item active" aria-pressed="true">Auction sandbox <span>01</span></button>
         <button id="wallet-tab" class="nav-item" aria-pressed="false">Wallet request <span>02</span></button>
         <button id="vault-tab" class="nav-item" aria-pressed="false">Vault scanner <span>03</span></button>
-        <span class="network-status">● NO RPC CONNECTION</span>
+        <span id="network-status" class="network-status">● CHECKING LOCAL NODE</span>
       </nav>
 
       <main>
@@ -55,7 +55,7 @@
             <aside class="callout c4 left" aria-label="Who sees what">
               <h2>Who sees what</h2>
               <ul><li><span>Public</span><b>Commitments</b></li><li><span>Wallet</span><b>Full request</b></li><li><span>Operator</span><b>Every bid (IVK)</b></li><li><span>You</span><b>Your own bid</b></li></ul>
-              <p class="callout-note">No RPC &middot; no payment tracking</p>
+              <p class="callout-note">Local simulation &middot; optional testnet check</p>
             </aside>
           </div>
         </section>
@@ -152,7 +152,9 @@
             <button id="wallet-prepare" class="button primary" type="submit">Prepare private payment request <span>↗</span></button>
           </form>
           <div id="wallet-output" class="wallet-output" hidden><dl class="receipt"><div><dt>Escrow</dt><dd id="wallet-amount"></dd></div><div><dt>Memo audit</dt><dd id="wallet-bytes"></dd></div></dl><label for="wallet-uri">Sensitive ZIP-321 payment URI</label><textarea id="wallet-uri" readonly spellcheck="false"></textarea>
-            <label for="wallet-reveal">Private reveal receipt / save before paying</label><textarea id="wallet-reveal" readonly spellcheck="false" aria-label="Wallet private reveal receipt"></textarea><div class="wallet-buttons"><button id="download-wallet-receipt" class="button quiet" type="button">Download receipt (.json)</button></div><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div></div>
+            <label for="wallet-reveal">Private reveal receipt / save before paying</label><textarea id="wallet-reveal" readonly spellcheck="false" aria-label="Wallet private reveal receipt"></textarea><div class="wallet-buttons"><button id="download-wallet-receipt" class="button quiet" type="button">Download receipt (.json)</button></div><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div>
+            <section class="testnet-check" aria-labelledby="testnet-check-title"><div class="panel-heading"><h3 id="testnet-check-title">Check a real testnet payment</h3><span class="micro">LOCAL ZCASH WALLET</span></div><p class="small muted">Checks for one confirmed 10 ZEC Orchard payment with this exact commit memo. Your local wallet must already be able to view the vault address. Viewing keys and RPC credentials stay in the local wallet and server. This check does not submit the bid to the sandbox or settle funds.</p><p id="testnet-status" class="small" role="status">Checking local node…</p><button id="testnet-check" class="button quiet" type="button" disabled>Verify payment on testnet</button><output id="testnet-payment-result" class="memo-verify-result" aria-live="polite"></output></section>
+          </div>
           <form id="memo-verify-form" class="memo-verify" autocomplete="off">
             <div class="panel-heading"><h2>Verify the memo your wallet received</h2><span class="micro">ZIP-302 / ROUND TRIP</span></div>
             <p class="small muted">After the vault wallet receives your payment, copy the memo it shows (text, unpadded Base64url or hex) and paste it here. Only a public commit memo is accepted: an auction ID and a commitment hash. If you prepared a request above, the hash is compared with it.</p>
@@ -177,7 +179,7 @@
       <div id="telemetry-body" class="telemetry-body">
         <div class="telemetry-node"><span class="status-dot"></span>NODE 07 <span>POLICY MONITOR</span></div>
         <dl class="telemetry-counters"><div><dt>LEAKS BLOCKED</dt><dd id="telemetry-leaks">0</dd></div><div><dt>ORCHARD SHIELD</dt><dd id="telemetry-shield">IDLE</dd></div><div><dt>MEMO BYTES</dt><dd id="telemetry-bytes">0/512</dd></div></dl>
-        <div class="telemetry-policy">No verified encrypted payload.<br />Hash-only commit ledger; mock encryption only in the vault scanner. No live chain connection.</div>
+        <div class="telemetry-policy">No verified encrypted payload.<br />Hash-only local auction ledger. Optional testnet checks use the local wallet; no settlement transaction is sent.</div>
         <div class="telemetry-log-heading"><span>EVENT STREAM</span><span>LOCAL / MOCK FEED</span></div>
         <div id="telemetry-log" class="telemetry-log" role="log" aria-label="Local simulation security events" aria-live="off" tabindex="0"></div>
         <div class="telemetry-footer"><span class="status-dot"></span>NO PAYLOADS LOGGED <span>▰▰▰▱</span></div>

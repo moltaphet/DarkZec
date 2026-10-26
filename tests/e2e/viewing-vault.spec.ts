@@ -11,9 +11,9 @@ async function unlockDemo(page: import('@playwright/test').Page): Promise<void> 
 
 test('saves encrypted credentials, scans notes privately, rescans and locks without outbound requests', async ({ page, context }) => {
   const external: string[] = []; const failures: string[] = [];
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+  page.on('request', request => { if (!request.url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`)) external.push(request.url()); });
   page.on('pageerror', error => failures.push(error.message));
-  await context.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4173/') ? route.continue() : route.abort());
+  await context.route('**/*', route => route.request().url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`) ? route.continue() : route.abort());
   await page.setViewportSize({ width: 1440, height: 1100 }); await openVault(page);
   await expect(page.locator('#vault-load-notes')).toBeDisabled();
   await unlockDemo(page);

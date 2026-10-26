@@ -5,7 +5,7 @@ import { WALLET_REFUND, WALLET_REFUND_RECEIVER, WALLET_VAULT, WALLET_VAULT_RECEI
 for (const quantity of [10, 11]) {
   test(`single bid with demand ${quantity} clears at reserve rather than its maximum`, async ({ page }) => {
     const external: string[] = []; const sockets: string[] = [];
-    page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+    page.on('request', request => { if (!request.url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`)) external.push(request.url()); });
     page.on('websocket', socket => sockets.push(socket.url()));
     await page.goto('/'); await page.locator('#bid-price').fill('0.9'); await page.locator('#bid-quantity').fill(String(quantity));
     await page.locator('#prepare').click(); await expect(page.locator('#prepared-panel')).toBeVisible();
@@ -17,7 +17,7 @@ for (const quantity of [10, 11]) {
 }
 
 test('a winning bid larger than the whole supply pays the competing margin rather than its own limit', async ({ page }) => {
-  const external: string[] = []; page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+  const external: string[] = []; page.on('request', request => { if (!request.url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`)) external.push(request.url()); });
   await page.goto('/'); await page.locator('#seed').click();
   await page.locator('#bid-price').fill('0.9'); await page.locator('#bid-quantity').fill('11');
   await page.locator('#prepare').click(); await page.locator('#commit').click();

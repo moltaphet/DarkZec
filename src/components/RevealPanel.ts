@@ -25,6 +25,7 @@ export class RevealPanel implements Disposable {
   readonly #import = node('button', 'Import receipt file');
   readonly #file = node('input');
   readonly #status = node('p');
+  #importedReceipt: BidMemo | undefined;
   constructor(host: HTMLElement, run: (operation: () => Promise<void>) => void,
     reveal: (bid: BidMemo) => Promise<void>, expire: () => void) {
     this.#host = host; host.className = 'panel reveal-panel'; host.setAttribute('data-independent-controls', '');
@@ -45,16 +46,19 @@ export class RevealPanel implements Disposable {
     }
     this.#reveal.classList.add('primary'); this.#status.id = 'reveal-status'; this.#status.setAttribute('role', 'status');
     content.append(help, label, this.#select, this.#details, actions, this.#file, this.#status); host.append(heading, content);
-    const fill = (): void => { this.#receipt.value = this.#details.open ? this.#serialized() : ''; };
+    const fill = (): void => {
+      if (!this.#details.open) { this.#receipt.value = ''; return; }
+      this.#receipt.value = this.#importedReceipt ? serializeBidMemo(this.#importedReceipt, 'testnet') : this.#serialized();
+    };
     this.#details.addEventListener('toggle', fill, { signal: this.#life.signal });
-    this.#select.addEventListener('change', fill, { signal: this.#life.signal });
+    this.#select.addEventListener('change', () => { this.#importedReceipt = undefined; fill(); }, { signal: this.#life.signal });
     this.#reveal.addEventListener('click', () => run(async () => {
-      const text = this.#receipt.value || this.#serialized();
-      await reveal(parseBidMemo(text, 'testnet')); this.#details.open = false; this.#receipt.value = '';
+      const text = this.#receipt.value || (this.#importedReceipt ? serializeBidMemo(this.#importedReceipt, 'testnet') : this.#serialized());
+      await reveal(parseBidMemo(text, 'testnet')); this.#importedReceipt = undefined; this.#details.open = false; this.#receipt.value = '';
     }), { signal: this.#life.signal });
     this.#all.addEventListener('click', () => run(async () => {
       for (const [hash, bid] of this.#receipts) if (!this.#verified.has(hash)) await reveal(bid);
-      this.#details.open = false; this.#receipt.value = '';
+      this.#importedReceipt = undefined; this.#details.open = false; this.#receipt.value = '';
     }), { signal: this.#life.signal });
     this.#expire.addEventListener('click', () => run(async () => { expire(); }), { signal: this.#life.signal });
     this.#download.addEventListener('click', () => run(async () => {
@@ -67,12 +71,13 @@ export class RevealPanel implements Disposable {
       const file = this.#file.files?.[0]; this.#file.value = ''; if (!file) return;
       run(async () => {
         const bid = await readReceiptFile(file, 'testnet');
+        this.#importedReceipt = Object.freeze({ ...bid });
         this.#receipt.value = serializeBidMemo(bid, 'testnet'); this.#details.open = true;
         this.#note = 'Receipt file loaded and validated. Choose Reveal selected receipt to submit it.';
         this.#refresh();
       });
     }, { signal: this.#life.signal });
-    this.#receipt.addEventListener('input', () => { this.#note = ''; }, { signal: this.#life.signal });
+    this.#receipt.addEventListener('input', () => { this.#note = ''; this.#importedReceipt = undefined; }, { signal: this.#life.signal });
     this.reset();
   }
   #verified = new Set<string>();
@@ -103,6 +108,6 @@ export class RevealPanel implements Disposable {
     const warning = unsaved > 0 && snapshot.phase !== 'cleared' ? ` ${unsaved} receipt${unsaved === 1 ? '' : 's'} not downloaded yet: save ${unsaved === 1 ? 'it' : 'them'} before closing, because a lost receipt cannot be revealed and forfeits its collateral.` : '';
     this.#status.textContent = `${snapshot.revealed.length}/${snapshot.commitments.length} valid reveals. ${snapshot.phase === 'open' ? 'Commit phase: reveal submission is locked.' : snapshot.phase === 'cleared' ? 'Finalized: only verified reveals entered clearing; unrevealed collateral was forfeited.' : snapshot.canClear ? 'Ready to finalize. Missing reveals are excluded and their collateral is forfeited.' : 'Reveal window open. Clearing stays locked until all reveals verify or the deadline expires.'}${warning}${this.#note ? ` ${this.#note}` : ''}`;
   }
-  reset(): void { this.#receipts.clear(); this.#saved.clear(); this.#note = ''; this.#verified.clear(); this.#select.replaceChildren(); this.#receipt.value = ''; this.#details.open = false; }
+  reset(): void { this.#receipts.clear(); this.#saved.clear(); this.#importedReceipt = undefined; this.#note = ''; this.#verified.clear(); this.#select.replaceChildren(); this.#receipt.value = ''; this.#details.open = false; }
   destroy(): void { this.reset(); this.#life.destroy(); this.#host.replaceChildren(); }
 }

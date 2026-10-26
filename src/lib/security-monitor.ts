@@ -6,7 +6,7 @@ import type { SecurityAudit } from './security-events';
 export function monitorSecurityPolicy(audit: SecurityAudit): Disposable {
   const lifetime = new Lifetime();
   const meta = document.querySelector<HTMLMetaElement>('meta[http-equiv="Content-Security-Policy"]');
-  audit.networkGuard((meta?.content ?? '').split(';').some(directive => directive.trim() === "connect-src 'none'"));
+  audit.networkGuard((meta?.content ?? '').split(';').some(directive => directive.trim() === "connect-src 'self'"));
   document.addEventListener('securitypolicyviolation', event => {
     if (event.disposition !== 'enforce') return;
     // The HTTP and fallback meta policies both report this application's same restriction.

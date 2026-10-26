@@ -3,14 +3,14 @@ import { test, expect } from '@playwright/test';
 import { FIXTURE_ADDRESS } from '../../src/fixtures';
 import { WALLET_REFUND, WALLET_VAULT } from '../fixtures';
 
-test('complete local auction stays offline, reveals deliberately, audits and resets', async ({ page, context }) => {
+test('complete local auction stays same-origin, reveals deliberately, audits and resets', async ({ page, context }) => {
   const external: string[] = []; const failures: string[] = []; const sockets: string[] = [];
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+  page.on('request', request => { if (!request.url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`)) external.push(request.url()); });
   page.on('pageerror', error => failures.push(error.message));
   page.on('websocket', socket => sockets.push(socket.url()));
-  await context.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4173/') ? route.continue() : route.abort());
+  await context.route('**/*', route => route.request().url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`) ? route.continue() : route.abort());
   const response = await page.goto('/');
-  expect(response?.headers()['content-security-policy']).toContain("connect-src 'none'");
+  expect(response?.headers()['content-security-policy']).toContain("connect-src 'self'");
   expect(response?.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page.locator('#prepare')).toBeEnabled();
   await page.getByRole('button', { name: '+ Load 3 demo bids' }).click();

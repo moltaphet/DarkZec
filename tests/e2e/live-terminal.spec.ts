@@ -5,7 +5,7 @@ import { DEMO_UNLOCK_PASSPHRASE, DEMO_VIEWING_KEY } from '../../src/lib/viewing-
 test('stream observes URI/memo/auction operations, pauses, clears and shares counters', async ({ page }) => {
   const errors: string[] = []; const external: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+  page.on('request', request => { if (!request.url().startsWith(`http://127.0.0.1:${process.env.PORT ?? 4173}/`)) external.push(request.url()); });
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded();
   await expect(log).toContainText('[SYS_INIT]:'); await expect(log).toContainText('[ZIP-302]: UTF-8 memo validated:');
