@@ -85,7 +85,12 @@ const scene = mountScene(element('scene-3d', HTMLCanvasElement), () => { root.cl
 });
 if (scene) {
   root.classList.add('has-scene');
-  const reveal = new IntersectionObserver(entries => entries.forEach(entry => entry.target.classList.toggle('in', entry.isIntersecting)), { threshold: 0.12 });
+  // The observed area starts below the fixed logo and view buttons, and a callout fades out once its top slides under them.
+  const header = matchMedia('(max-width: 760px)').matches ? 112 : 96;
+  const reveal = new IntersectionObserver(entries => entries.forEach(entry => {
+    const top = entry.rootBounds?.top ?? header;
+    entry.target.classList.toggle('in', entry.intersectionRatio >= 0.12 && entry.boundingClientRect.top >= top - 24);
+  }), { rootMargin: `-${header}px 0px 0px 0px`, threshold: Array.from({ length: 21 }, (_, step) => step / 20) });
   document.querySelectorAll('.callout').forEach(node => reveal.observe(node));
   effects.own(() => { root.classList.remove('has-scene'); delete root.dataset.phase; reveal.disconnect(); scene.destroy(); });
 }

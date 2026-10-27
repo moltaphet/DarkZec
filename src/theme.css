@@ -293,7 +293,7 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 [data-phase="journey"] .telemetry-rail { opacity: 0; visibility: hidden; pointer-events: none; }
 
 @media (max-width: 760px) {
-  .has-scene .masthead { padding: 14px 16px; }
+  .has-scene .masthead { padding: 6px 16px 14px; }
   .has-scene .navigation { top: 62px; right: 16px; left: 16px; overflow-x: auto; }
   .has-scene .nav-item { padding: 8px 10px; }
   .has-scene .intro { top: max(18vh, 140px); padding: 0 16px; }
