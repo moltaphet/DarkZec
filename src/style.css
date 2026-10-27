@@ -77,12 +77,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   text-decoration: none;
 }
 
-.brand-mark {
-  color: var(--green);
-  letter-spacing: -3px;
-  margin-right: 12px;
-}
-
 .brand-slash {
   color: var(--green);
   margin-left: 10px;

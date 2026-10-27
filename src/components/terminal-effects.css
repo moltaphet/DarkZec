@@ -38,7 +38,6 @@ body::before {
 
 .brand-word { display: inline-block; position: relative; }
 .brand:hover, .brand:focus-visible { color: #ffce73; text-shadow: 0 0 22px #ffce7344; }
-.brand:hover .brand-mark, .brand:focus-visible .brand-mark { color: #b6f9cf; }
 
 .brand-word::before, .brand-word::after {
   content: attr(data-text);

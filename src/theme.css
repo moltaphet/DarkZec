@@ -30,27 +30,17 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 
 /* Monospace is reserved for data and micro-labels. */
 code, pre, textarea, .hash, table, .commitment-row, [role="log"], .memo-console, .protocol-formula,
-.micro, .eyebrow, .notice-tag, .section-code, .brand-mark, .masthead-sub, .node-label, .network-status,
+.micro, .eyebrow, .notice-tag, .section-code, .masthead-sub, .node-label, .network-status,
 .nav-item span, .book-columns, th, .button, label > span, .status-dot + span {
   font-family: var(--mono);
 }
 
-/* Header: boxed brand mark, hairline rules. */
+/* Header: brand emblem, hairline rules. */
+.brand-emblem { display: block; width: 44px; height: 44px; flex: none; filter: drop-shadow(0 0 10px rgb(0 255 102 / 22%)); transition: filter .2s; }
+.brand:hover .brand-emblem, .brand:focus-visible .brand-emblem { filter: drop-shadow(0 0 14px rgb(0 255 102 / 45%)); }
+@media (max-width: 760px) { .brand-emblem { width: 36px; height: 36px; } }
 .masthead { height: 96px; gap: 24px; background: var(--bg); }
 .brand { display: flex; align-items: center; gap: 14px; font-size: 17px; letter-spacing: 0; font-weight: 700; }
-.brand-mark {
-  display: inline-grid;
-  place-items: center;
-  height: 40px;
-  min-width: 40px;
-  margin: 0;
-  padding: 0 9px;
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .08em;
-}
 .brand-word { letter-spacing: -.01em; }
 .brand-slash { display: none; }
 .masthead-sub { border-left: 1px solid var(--line); padding-left: 22px; letter-spacing: .1em; text-transform: uppercase; }

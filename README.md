@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/darkzec-logo.png" width="360" alt="DarkZec logo: a vault-locked order book with a Z and a green gem" /></p>
+
 # DarkZec // Sealed-Bid Auctions & OTC Dark Pools on Zcash
 
 ![ZECATHON · Track: Private Markets · NODE 07 · Local prototype](docs/assets/darkzec-badges.svg)
