@@ -174,7 +174,14 @@ function updateRevealLink(): void {
   if (enabled) { link.href = walletRevealUri; link.tabIndex = 0; } else { link.removeAttribute('href'); link.tabIndex = -1; }
 }
 function renderNodeStatus(label: string): void { text('network-status', `● ${label}`); }
+/** The testnet checker only answers same-origin loopback requests, so a public deployment never probes it. */
+const loopbackHost = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 async function refreshNodeStatus(): Promise<void> {
+  if (!loopbackHost) {
+    renderNodeStatus('PUBLIC DEMO / NO NODE');
+    text('testnet-status', 'Testnet payment checks and live auctions read a local Zcash wallet, so they run only on a local DarkZec server (npm run dev). Everything else works here.');
+    return;
+  }
   try {
     const node = await localTestnetStatus();
     renderNodeStatus(node.connected ? node.network === 'testnet' ? node.synced ? 'TESTNET / SYNCED' : 'TESTNET / SYNCING' : `${node.network.toUpperCase()} / WRONG NETWORK` : 'NO LOCAL NODE');

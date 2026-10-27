@@ -161,6 +161,8 @@ a.button.primary:not([aria-disabled='true']):hover { background: #2c2a2e; }
   mask-image: linear-gradient(#000, #0005);
 }
 .memo-console[data-state='scrambling'] .memo-hex-stream { animation: hex-stream .48s linear infinite; }
+/* Once settled, the pipeline summary may wrap; the fixed height only frames the scrolling hex animation. */
+.memo-console[data-state='ready'] .memo-hex-stream { height: auto; mask-image: none; }
 @keyframes hex-stream { from { transform: translateY(2px); } to { transform: translateY(-2px); } }
 #memo-draft-state { color: #908b95; font-size: 12px; letter-spacing: .8px; }
 .memo-payload {
@@ -193,7 +195,8 @@ a.button.primary:not([aria-disabled='true']):hover { background: #2c2a2e; }
 .book-thesis { padding: 7px 12px 25px; font-size: 12px; }
 .book-thesis > span { font-size: 12px; }
 .book-columns { font-size: 12px; }
-.book-columns, .commitment-row { padding-inline: 20px; grid-template-columns: 32px minmax(0, 1fr) 50px; gap: 9px; }
+/* The entry column must fit the letter-spaced ENTRY label, or it runs into the commitment heading. */
+.book-columns, .commitment-row { padding-inline: 20px; grid-template-columns: 52px minmax(0, 1fr) 56px; gap: 9px; }
 .commitment-row code { font-size: 14px; }
 .book-actions { padding: 18px 20px; }
 .lifecycle { background: linear-gradient(110deg, #141415bb, #070707cc); padding: 25px; gap: 28px; }

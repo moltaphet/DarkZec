@@ -125,6 +125,10 @@ h1 span { color: var(--accent); }
 .notice { background: var(--surface); border: 1px solid var(--line); color: #bdbdc2; }
 .notice-tag { color: var(--accent); border: 1px solid var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .error { background: #130c0e; border: 1px solid #61303a; color: #a4e5bc; }
+/* Errors are raised from forms far below the banner, so it stays pinned in view while the terminal scrolls. */
+#error { position: sticky; top: 12px; z-index: 25; box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+.has-scene #error { top: 84px; }
+@media (max-width: 760px) { .has-scene #error { top: 116px; } }
 
 /* Panels: flat surfaces with a section-row style heading. */
 .panel, .auction-strip, .lifecycle, .privacy-strip { background: var(--surface); border: 1px solid var(--line); border-radius: 0; }
@@ -224,6 +228,10 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 /* Top bar: brand left, compact outlined view buttons right, status pill bottom-left. */
 .has-scene .masthead { position: fixed; inset: 0 0 auto; z-index: 30; height: auto; padding: 18px 28px; gap: 14px; border: 0; background: none; pointer-events: none; }
 .has-scene .masthead > * { pointer-events: auto; }
+/* Inside the terminal the transparent fixed bar would overlap scrolling text, so it gains a backdrop there only. */
+.has-scene[data-phase="app"] .masthead::before { content: ""; position: fixed; inset: 0 0 auto; height: 72px; z-index: -1; pointer-events: none;
+  background: rgb(6 7 7 / 94%); border-bottom: 1px solid var(--line); }
+@media (max-width: 760px) { .has-scene[data-phase="app"] .masthead::before { height: 112px; } }
 .has-scene .masthead-sub, .has-scene .node-label { display: none; }
 .has-scene .navigation { position: fixed; top: 16px; right: 28px; z-index: 31; width: auto; height: auto; gap: 8px; border: 0; overflow: visible; }
 .has-scene .nav-item { height: auto; padding: 9px 13px; border: 1px solid var(--line); background: rgb(9 9 11 / 70%); font-size: 12px; }

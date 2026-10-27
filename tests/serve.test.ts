@@ -19,3 +19,19 @@ describe('preview server build preflight', () => {
     });
   }
 });
+
+describe('hosted deployment headers', () => {
+  it('serve the same security headers on Vercel as the local server', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const serve = await readFile('scripts/serve.ts', 'utf8');
+    const local = new Map([...serve.matchAll(/response\.setHeader\('([A-Za-z-]+)', ('[^']*'|csp)\)/g)].map(([, key, value]) =>
+      [key, value === 'csp' ? /const csp = "([^"]+)"/.exec(serve)?.[1] : value?.slice(1, -1)]));
+    // Caching and content type differ by file and host; only the security headers must match.
+    local.delete('Cache-Control'); local.delete('Content-Type');
+    const vercel = JSON.parse(await readFile('vercel.json', 'utf8')) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
+    const hosted = new Map(vercel.headers.find(rule => rule.source === '/(.*)')?.headers.map(({ key, value }) => [key, value]));
+    expect(local.size).toBeGreaterThanOrEqual(6);
+    expect(hosted).toEqual(local);
+    expect(hosted.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+  });
+});

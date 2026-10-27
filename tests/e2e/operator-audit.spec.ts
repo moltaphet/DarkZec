@@ -107,6 +107,8 @@ test('the wallet builds tiered commit requests and an on-chain reveal request fr
   await page.locator('#wallet-collateral').selectOption('1');
   await page.locator('#wallet-price').fill('0.72'); await page.locator('#wallet-quantity').fill('4'); await page.locator('#wallet-prepare').click();
   await expect(page.locator('#error')).toContainText('exceeds the posted collateral');
+  // The form sits far below the banner; the error must still be on screen where the user is working.
+  await expect(page.locator('#error')).toBeInViewport();
   await page.locator('#wallet-price').fill('0.2'); await page.locator('#wallet-prepare').click();
   await expect(page.locator('#wallet-uri')).toHaveValue(/amount=1&memo=/);
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#download-wallet-receipt').click()]);

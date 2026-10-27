@@ -23,7 +23,10 @@ test('memo copied from the receiving wallet round-trips against the prepared req
     await expect(verify).toContainText('VALID COMMIT MEMO'); await expect(verify).toContainText('MATCH / the memo your wallet received');
     await expect(verify).toHaveClass(/is-ok/);
   }
-  await page.locator('#memo-verify-input').fill(memo.replace(/"c":"./, '"c":"0')); await page.locator('#memo-verify').click();
+  // Change the first hash digit to a different digit; overwriting it with a fixed value is a no-op 1 time in 16.
+  const altered = memo.replace(/"c":"(.)/, (_match, digit: string) => `"c":"${digit === '0' ? '1' : '0'}`);
+  expect(altered).not.toBe(memo);
+  await page.locator('#memo-verify-input').fill(altered); await page.locator('#memo-verify').click();
   await expect(verify).toHaveClass(/is-bad/);
   await page.locator('#memo-verify-input').fill(memo.replace('NODE07-001', 'OTHER-001')); await page.locator('#memo-verify').click();
   await expect(verify).toContainText('another auction'); await expect(verify).toHaveClass(/is-bad/);
