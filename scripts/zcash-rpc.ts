@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { devtoolReceivedNotes, devtoolStatus, devtoolWalletDir } from './devtool-wallet.ts';
 
 type JsonRecord = Record<string, unknown>;
 interface RpcEnvelope { readonly result?: unknown; readonly error?: { readonly message?: unknown } | null; readonly id?: unknown }
@@ -19,9 +20,11 @@ export type CommitPaymentResult =
   | { readonly status: 'node-unavailable' };
 
 const RPC_ENDPOINT = 'http://127.0.0.1:18232/';
-/** Collateral tiers (1, 10 or 100 ZEC). Every bid in one auction posts the same tier, so the amount reveals nothing. */
-export const COLLATERAL_TIERS_ZAT: readonly number[] = Object.freeze([100_000_000, 1_000_000_000, 10_000_000_000]);
+/** Collateral tiers (0.1, 1, 10 or 100 ZEC). Every bid in one auction posts the same tier, so the amount reveals nothing. */
+export const COLLATERAL_TIERS_ZAT: readonly number[] = Object.freeze([10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000]);
 const DEFAULT_COLLATERAL_ZAT = 1_000_000_000;
+/** Payments to an Orchard receiver settle in the Ironwood pool since NU6.3; older Orchard-pool notes still count. */
+const isShieldedPool = (pool: unknown): boolean => pool === 'orchard' || pool === 'ironwood';
 const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 function configuredCredentials(): { readonly user: string; readonly password: string } | undefined {
@@ -73,7 +76,17 @@ function matchesCommitMemo(value: unknown, auctionId: string, commitment: string
   return memo === JSON.stringify({ v: 2, t: 'commit', a: auctionId, c: commitment });
 }
 
+/** A zcash-devtool vault wallet takes precedence when configured; otherwise the zcashd wallet RPC is used. */
 export async function localChainStatus(): Promise<LocalChainStatus> {
+  const devtool = devtoolWalletDir();
+  if (devtool) {
+    try {
+      const { network, tip } = await devtoolStatus(devtool);
+      if (network !== 'testnet') return { connected: true, network, synced: false, reason: 'wrong-network' };
+      if (tip === undefined) return { connected: true, network, synced: false, reason: 'syncing' };
+      return { connected: true, network, synced: true, blocks: tip, headers: tip };
+    } catch { return { connected: false, network: 'unknown', synced: false, reason: 'node-unavailable' }; }
+  }
   if (!configuredCredentials()) return { connected: false, network: 'unknown', synced: false, reason: 'wallet-not-configured' };
   try {
     const info = chainInfo(await rpc('getblockchaininfo'));
@@ -88,6 +101,12 @@ export async function localChainStatus(): Promise<LocalChainStatus> {
   }
 }
 
+/** Notes received at the vault in z_listreceivedbyaddress shape, from whichever local wallet is configured. */
+async function receivedNotes(address: string): Promise<unknown> {
+  const devtool = devtoolWalletDir();
+  return devtool ? devtoolReceivedNotes(devtool, address) : rpc('z_listreceivedbyaddress', [address, 1]);
+}
+
 export async function verifyLocalCommitPayment(address: string, auctionId: string, commitment: string, collateralZat = DEFAULT_COLLATERAL_ZAT): Promise<CommitPaymentResult> {
   if (!/^utest1[023456789acdefghjklmnpqrstuvwxyz]{40,250}$/.test(address) ||
     !/^[A-Za-z0-9_-]{1,48}$/.test(auctionId) || !/^[a-f0-9]{64}$/.test(commitment) || !COLLATERAL_TIERS_ZAT.includes(collateralZat)) {
@@ -100,11 +119,11 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
   if (!status.synced) return { status: 'syncing' };
 
   try {
-    // z_listreceivedbyaddress scans with viewing authority already held by the local wallet.
+    // The local wallet scans with viewing authority it already holds.
     // No viewing key, wallet credentials, or RPC URL enters the browser request.
-    const notes: unknown = await rpc('z_listreceivedbyaddress', [address, 1]);
+    const notes: unknown = await receivedNotes(address);
     if (!Array.isArray(notes)) throw new Error('node-unavailable');
-    const matches = notes.filter((note: unknown) => isRecord(note) && note.pool === 'orchard' &&
+    const matches = notes.filter((note: unknown) => isRecord(note) && isShieldedPool(note.pool) &&
       note.txid && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
       Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 &&
       Number.isSafeInteger(note.amountZat) && Number(note.amountZat) === collateralZat &&
@@ -144,9 +163,9 @@ export async function listVaultMemos(address: string, auctionId: string, collate
   if (status.network !== 'testnet') return { status: 'wrong-network' };
   if (!status.synced) return { status: 'syncing' };
   let notes: unknown;
-  try { notes = await rpc('z_listreceivedbyaddress', [address, 1]); } catch { return { status: 'node-unavailable' }; }
+  try { notes = await receivedNotes(address); } catch { return { status: 'node-unavailable' }; }
   if (!Array.isArray(notes)) return { status: 'node-unavailable' };
-  const confirmed = notes.filter((note: unknown): note is JsonRecord => isRecord(note) && note.pool === 'orchard' && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
+  const confirmed = notes.filter((note: unknown): note is JsonRecord => isRecord(note) && isShieldedPool(note.pool) && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
     Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 && Number.isSafeInteger(note.amountZat) && Number(note.amountZat) > 0)
     .sort((a, b) => Number(b.confirmations) - Number(a.confirmations) || String(a.txid).localeCompare(String(b.txid)));
   const commits: VaultCommitNote[] = []; const reveals: VaultRevealNote[] = []; const seen = new Set<string>();

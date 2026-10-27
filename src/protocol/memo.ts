@@ -9,7 +9,7 @@ import type { AuditObserver, ProtocolAuditEvent } from '../lib/security-events';
 export const MEMO_LIMIT = 512;
 export const DEFAULT_COLLATERAL = '10';
 /** Collateral is one tier per auction, so within an auction every commit pays the same amount and leaks nothing. */
-export const COLLATERAL_TIERS: readonly string[] = Object.freeze(['1', '10', '100']);
+export const COLLATERAL_TIERS: readonly string[] = Object.freeze(['0.1', '1', '10', '100']);
 /** A reveal is a second shielded payment to the vault; its value only carries the receipt memo. */
 export const REVEAL_AMOUNT = '0.0001';
 export function memoBytes(text: string): Uint8Array<ArrayBuffer> {

@@ -384,7 +384,7 @@ function refuseFixtureVault(address: string): void {
   }
 }
 async function startLiveAuction(settings: LiveAuctionSettings): Promise<void> {
-  if (!COLLATERAL_TIERS.includes(settings.collateral)) throw new Error('Choose a 1, 10 or 100 ZEC collateral tier.');
+  if (!COLLATERAL_TIERS.includes(settings.collateral)) throw new Error('Choose a 0.1, 1, 10 or 100 ZEC collateral tier.');
   const vaultAddress = orchardPaymentAddress(settings.vault, 'testnet'); refuseFixtureVault(vaultAddress);
   await resetSession({ auctionId: settings.auctionId, supply: settings.mode === 'vickrey' ? 1 : 10, reserve: settings.reserve, vault: vaultAddress, network: 'testnet',
     collateral: settings.collateral, revealWindowMs: settings.revealMinutes * 60_000, unitDemand: settings.mode !== 'uniform' }, true);
@@ -442,7 +442,7 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
       if (receivers.some(receiver => receiver.type === 3 && [FIXTURE_RECEIVER, FIXTURE_REFUND_RECEIVER].includes(hex(receiver.bytes)))) throw new Error('Public demo fixtures cannot be used for wallet requests. Use verified addresses you control or trust.');
     }
     const collateral = element('wallet-collateral', HTMLSelectElement).value;
-    if (!COLLATERAL_TIERS.includes(collateral)) throw new Error('Choose a 1, 10 or 100 ZEC collateral tier.');
+    if (!COLLATERAL_TIERS.includes(collateral)) throw new Error('Choose a 0.1, 1, 10 or 100 ZEC collateral tier.');
     walletPrepared = await prepareBid({ auctionId: input('wallet-auction').value, price: input('wallet-price').value,
       quantity: parseQuantity(input('wallet-quantity').value), vault: vaultAddress, refund, network, collateral }, event => securityAudit.protocol(event, 'wallet'));
     telemetry.memo({ bytes: walletPrepared.byteLength, state: 'ready' }, 'wallet'); telemetry.log('wallet');

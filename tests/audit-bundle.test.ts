@@ -82,6 +82,15 @@ describe('audit bundle verification', () => {
   });
 });
 
+describe('recorded Zcash testnet auction', () => {
+  it('keeps verifying the DZ-TESTNET-1 bundle built from real commit and reveal memos', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const report = await verifyAuditBundle(await readFile('docs/testnet-run/DZ-TESTNET-1-audit-bundle.json', 'utf8'));
+    expect(report.checks.filter(check => !check.ok)).toEqual([]);
+    expect(report).toMatchObject({ ok: true, auctionId: 'DZ-TESTNET-1' });
+  });
+});
+
 describe('unit-demand mode', () => {
   it('clears a single lot at the second price (Vickrey) and refuses multi-lot reveals', async () => {
     const { result, bundle } = await runAuction([['0.9', 1], ['0.8', 1], ['0.6', 1]], () => true, { supply: 1, unitDemand: true });

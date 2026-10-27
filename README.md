@@ -6,6 +6,8 @@
 
 **Live demo: [darkzec.xyz](https://darkzec.xyz)** — the static build of `main`. The auction, operator view, audit mode, wallet requests and mock vault all run there; testnet payment checks and live testnet auctions read a local Zcash wallet, so they need the local server below.
 
+**Proven on testnet: [DZ-TESTNET-1](docs/testnet-run/README.md)** — a complete auction on the public Zcash testnet: two commits paid as shielded memos, two reveals sent as shielded memos, imported from the chain, cleared at the Vickrey second price and audited 8/8. Txids, the audit bundle and the lessons learned (Ironwood routing, memo enhancement) are in that report.
+
 DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** settled through Zcash's Orchard shielded pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
 
 [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
@@ -21,7 +23,7 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 | Local Zcash testnet payment check | **Real read-only wallet RPC check** for a confirmed Orchard note with the exact collateral tier and commit memo; user-triggered, local node only. |
 | Live testnet auction | **Real** commit and reveal ingestion from confirmed Orchard memos at a vault the local wallet views (read-only RPC). Commits enter the ledger oldest first; reveals arrive as a second shielded memo. No funds are settled. |
 | Operator signatures and audit mode | **Real**: ECDSA P-256 signatures over the frozen root at close, every accepted reveal and the result; an exportable audit bundle that any browser re-verifies in eight checks. The signing key is per session and not bound to an identity. |
-| Collateral tiers and unit-demand mode | **Real**: 1, 10 or 100 ZEC per auction; unit-demand auctions clear at the truthful (k+1)-th price (Vickrey for one lot). |
+| Collateral tiers and unit-demand mode | **Real**: 0.1, 1, 10 or 100 ZEC per auction; unit-demand auctions clear at the truthful (k+1)-th price (Vickrey for one lot). |
 | Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; refunds are accounting results, not transactions. |
 | Viewing Key Vault and note scanner | **Mock**: `mock:node07:` keys only, authenticated AES-GCM mock notes. Real viewing keys are rejected. |
 | In-browser Orchard IVK scanning, transaction submission, on-chain escrow and burn, external root anchoring, OTC/RFQ matching, NEAR Intents settlement | **Not implemented** (integration work). No relayer or solver runs. |
@@ -56,6 +58,8 @@ The sandbox auction and the vault scanner are isolated: scanned mock notes never
 ### ZIP-316: Orchard-only payment instructions
 
 A `u1…` prefix alone does not establish Orchard support. DarkZec accepts standard wallet UAs containing a valid Orchard receiver (Sapling and transparent companions allowed) and rebuilds an Orchard-only UA for the payment URI and refund destination, so no transparent fallback is generated. Bare transparent addresses and UAs without Orchard are refused. Supported encodings are Revision 0 `u1…` (mainnet) and `utest1…` (testnet). The validator checks Bech32m, inverse F4Jumble, HRP padding, canonical CompactSize, receiver ordering/length and a valid nonidentity Orchard payment point. Refund and vault must resolve to different Orchard receivers even when their UA strings differ. See [ZIP-316](https://zips.z.cash/zip-0316).
+
+**Ironwood routing (NU6.3).** Since NU6.3, ordinary payments inside the old Orchard pool are disabled and a payment to an Orchard receiver in a Unified Address settles in the new Ironwood pool ([ZIP 318](https://zips.z.cash/zip-0318)). The receiver and its encoding are unchanged, so DarkZec's Orchard-only requests stay valid; they simply land in Ironwood. The payment checker and the live auction therefore accept vault notes from the Ironwood pool as well as legacy Orchard-pool notes, and still refuse Sapling and transparent ones.
 
 ### ZIP-302: memos within 512 bytes
 
@@ -135,7 +139,7 @@ A bundle contains revealed bids, including refund addresses, so it is published 
 
 ### Mechanism options
 
-- **Collateral tiers:** an auction uses 1, 10 or 100 ZEC per commitment. Every bid in one auction posts the same amount, so the amount still reveals nothing, while the tier raises or lowers the maximum bid.
+- **Collateral tiers:** an auction uses 0.1, 1, 10 or 100 ZEC per commitment. Every bid in one auction posts the same amount, so the amount still reveals nothing, while the tier raises or lowers the maximum bid.
 - **Unit-demand mode:** every bid is for exactly one lot. Uniform clearing then charges every winner the (k+1)-th highest bid, which is truthful; with one lot it is a Vickrey auction. This removes the quantity-padding manipulation of the multi-lot rule described above.
 
 ### Viewing-key unsealing and disclosure authority
@@ -168,7 +172,7 @@ The sandbox can run against a real Zcash testnet vault. Open **Live testnet auct
 3. After **Close auction**, bidders send their receipt as a second shielded memo with **Reveal on chain** (Wallet request tab). **Sync from vault** now reads reveal memos, verifies each against its commitment, and signs an acknowledgement for every accepted one.
 4. **Finalize & clear**, then export and verify the audit bundle.
 
-Sync uses only the same read-only `getblockchaininfo` and `z_listreceivedbyaddress` calls as the payment check, through the loopback server; viewing keys and RPC credentials never reach the browser. The reveal deadline is judged by the operator's clock at import time, not by block time. The RPC is zcashd's; zcashd reached end of support in 2026, so a Zallet or Zebra-based adapter is the next integration step.
+The server reads the vault in one of two ways, both read-only and loopback-only. With `DARKZEC_DEVTOOL_WALLET=<wallet dir>` it reads a [zcash-devtool](https://github.com/zcash/zcash-devtool) light wallet's SQLite data; keep that wallet current with `zcash-devtool wallet -w <dir> sync` and then `enhance` (light-client sync stores notes without memos until `enhance` fetches the full transactions). Otherwise it uses zcashd's `getblockchaininfo` and `z_listreceivedbyaddress`. Viewing keys and RPC credentials never reach the browser. The reveal deadline is judged by the operator's clock at import time, not by block time. The RPC is zcashd's; zcashd reached end of support in 2026, so a Zallet or Zebra-based adapter is the next integration step.
 
 ## Ecosystem synergy
 
@@ -226,7 +230,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **88 unit/privacy tests (12 files), 45 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **92 unit/privacy tests (13 files), 45 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 
@@ -259,6 +263,7 @@ docs/           Engineering reports and local badge asset
 | [DARKZEC-STANDARD](DARKZEC-STANDARD.md) | Governing protocol and privacy invariants. |
 | [Threat model](docs/threat-model.md) | Roles, who sees what, attacks, trust assumptions and roadmap. |
 | [Testnet round trip](docs/testnet-interop.md) | Verify a memo from a real wallet against your prepared request. |
+| [DZ-TESTNET-1 run](docs/testnet-run/README.md) | A complete auction executed on the public Zcash testnet, with txids and its audit bundle. |
 | [Engineering report](docs/engineering-report.md) | Current repository state, design and verification matrix. |
 | Stage reports in [docs/archive/](docs/archive/) | Historical per-stage notes (UI polish, vault, live stream, Phase 1/2, hardening, production polish). Their test counts, commitment wording and sandbox-encryption descriptions predate the commit/reveal ledger; this README and the standard describe the current build. |
 

@@ -1,0 +1,70 @@
+{
+  "v": 1,
+  "kind": "darkzec-audit-bundle",
+  "auction": {
+    "auctionId": "DZ-TESTNET-1",
+    "network": "testnet",
+    "vault": "utest1ysqmec2u7n23ep887tsz2l3vetc0c8dhx2wvkjash26mcrlxsfrdgdh59rkyjtx6wkjrz3rutvk70gdrpds25nd9hcm3hrlef5vle6dc",
+    "supply": 1,
+    "reserve": "0.01",
+    "collateral": "0.1",
+    "unitDemand": true
+  },
+  "commitments": [
+    "0e99e19b04da04f899581b513abcdcffb8797d4a82b711d959224329b52bf26d",
+    "c95e32c889ded05c652a4ce0b2e76a55c7f25303920bdf3fc56244edc57fdcec"
+  ],
+  "root": "705c36cf0708d4b309a16fc3b0e8c2cf19dd2ec37696c680234bb17be32f8844",
+  "reveals": [
+    "{\"v\":1,\"a\":\"DZ-TESTNET-1\",\"p\":\"0.08\",\"q\":1,\"s\":\"5be5651fb0edd8ff51cda8ba4f9846ebc038e4279d35c36aafa83bea5e160826\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}",
+    "{\"v\":1,\"a\":\"DZ-TESTNET-1\",\"p\":\"0.05\",\"q\":1,\"s\":\"378c03e7f4d15dde9c41fe5f096082c7f85be46f5f68e8770ca5d2da8a6c2a53\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}"
+  ],
+  "result": {
+    "clearingPrice": "0.05",
+    "filled": 1,
+    "excluded": 0,
+    "forfeitedCollateral": "0",
+    "postedCollateral": "0.2",
+    "allocations": [
+      {
+        "commitment": "0e99e19b04da04f899581b513abcdcffb8797d4a82b711d959224329b52bf26d",
+        "price": "0.08",
+        "requested": 1,
+        "filled": 1,
+        "paid": "0.05",
+        "refundAmount": "0.05",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      },
+      {
+        "commitment": "c95e32c889ded05c652a4ce0b2e76a55c7f25303920bdf3fc56244edc57fdcec",
+        "price": "0.05",
+        "requested": 1,
+        "filled": 0,
+        "paid": "0",
+        "refundAmount": "0.1",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      }
+    ]
+  },
+  "operator": {
+    "publicKey": "04ceadad2a726bda2ccae1484d14162cbddd4ebbd633abe8ad21a19b6a85e93fc0d0edcbcf7cf3b9bd2d28bb5e23ea795e3499cf00448e8fd7481c324d64c34340",
+    "statements": [
+      {
+        "statement": "[\"DARKZEC/close/v1\",\"DZ-TESTNET-1\",\"705c36cf0708d4b309a16fc3b0e8c2cf19dd2ec37696c680234bb17be32f8844\",2,1793128424293,1793132024293]",
+        "signature": "ccdd26b33ba911c3bcd06e3b1c256fd1f93d00e7b2c682af22ada441559fd4770ef5d1ecc7988e546053e591802a7af69864fad1459098721edbcb7d7f18b7cc"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-1\",\"705c36cf0708d4b309a16fc3b0e8c2cf19dd2ec37696c680234bb17be32f8844\",\"0e99e19b04da04f899581b513abcdcffb8797d4a82b711d959224329b52bf26d\",0,1793128426844]",
+        "signature": "885d618ad92a9ec820a39d9667d4f8971ade46f775ef3efc48440ec90542ce7e1ad89f8e528a0cf073937d740516b39befddc44c06e33d7aa1e1db2c760a17bf"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-1\",\"705c36cf0708d4b309a16fc3b0e8c2cf19dd2ec37696c680234bb17be32f8844\",\"c95e32c889ded05c652a4ce0b2e76a55c7f25303920bdf3fc56244edc57fdcec\",1,1793128426848]",
+        "signature": "472dffffeec974538206bf291790e7b28b3aae0d1ba4b813e449344382d76d4bb473a52227fe890498199632379a8990a97f1845f87d0c72fc6bd166de39bf58"
+      },
+      {
+        "statement": "[\"DARKZEC/result/v1\",\"DZ-TESTNET-1\",\"705c36cf0708d4b309a16fc3b0e8c2cf19dd2ec37696c680234bb17be32f8844\",\"6a1656b51f0dbd0fe8332212cf622efa9754e2857e2e2d4d3548b353cabf633b\"]",
+        "signature": "032eeeef766c75df1a4bdf8f7b761177622509189d5f0e34e8344de2fac2aea791562f08ec8884fd123e3d5f4dcc2e66b3df90dac8395b1dd3e6036dba8f1bf0"
+      }
+    ]
+  }
+}

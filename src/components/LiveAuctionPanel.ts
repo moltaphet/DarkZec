@@ -34,7 +34,7 @@ export class LiveAuctionPanel implements Disposable {
   readonly #auction = node('input');
   readonly #reserve = node('input');
   readonly #minutes = node('input');
-  readonly #collateral = select([['1', '1 ZEC'], ['10', '10 ZEC'], ['100', '100 ZEC']], '10');
+  readonly #collateral = select([['0.1', '0.1 ZEC'], ['1', '1 ZEC'], ['10', '10 ZEC'], ['100', '100 ZEC']], '10');
   readonly #mode = select([['uniform', 'Uniform price / 10 lots'], ['unit', 'Unit demand / 10 lots, truthful'], ['vickrey', 'Vickrey / 1 lot, second price']], 'uniform');
   readonly #start = node('button', 'Start live testnet auction', 'button primary');
   readonly #sync = node('button', 'Sync from vault', 'button quiet');
