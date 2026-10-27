@@ -81,6 +81,9 @@ test('canvas node hover and keyboard inspection reveal commitment identifiers on
 test('telemetry is a collapsible mobile dock with private event text and reset cleanup', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  // The dock stays hidden through the intro and appears once the terminal opens.
+  await expect(page.locator('.telemetry-rail')).toBeHidden();
+  await page.locator('.skip-intro').click();
   await expect(page.locator('#telemetry-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#telemetry-body')).toBeHidden();
   await page.getByRole('button', { name: 'Expand telemetry' }).click();
