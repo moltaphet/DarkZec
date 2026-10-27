@@ -1,0 +1,28 @@
+/* Live testnet auction, operator view and audit mode share the reveal panel's spacing and type scale. */
+.live-auction, .operator-view, .audit-view { margin-top: 22px; }
+.live-auction .panel-heading, .operator-view .panel-heading, .audit-view .panel-heading { flex-wrap: wrap; gap: 10px; }
+.live-auction .panel-heading > span, .operator-view .panel-heading > span, .audit-view .panel-heading > span { font-size: 12px; color: #00ff66; }
+.tool-content { padding: 22px; min-width: 0; }
+.tool-content p { color: #8caa98; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.tool-content summary { color: #00ff66; font-size: 14px; cursor: pointer; padding: 4px 0 14px; }
+.tool-content textarea, .tool-content input, .tool-content select { font-size: 14px; margin-bottom: 14px; }
+.tool-content textarea { min-height: 96px; }
+.tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 18px; }
+.tool-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+.tool-actions .button { font-size: 14px; white-space: normal; }
+.tool-status { margin-top: 16px; }
+.tool-status.is-ok, .audit-verdict.is-ok { color: #00f058; }
+.tool-status.is-bad, .audit-verdict.is-bad { color: #eebc56; }
+.operator-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 0 0 18px; }
+.operator-metrics div { border: 1px solid var(--line); padding: 12px 14px; min-width: 0; }
+.operator-metrics dt { font-size: 12px; letter-spacing: .1em; color: #8d8d94; text-transform: uppercase; }
+.operator-metrics dd { margin: 6px 0 0; font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.operator-view table, .audit-view table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.operator-view th, .audit-view th { font-size: 12px; text-align: left; color: #8d8d94; letter-spacing: .08em; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.operator-view td, .audit-view td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; text-align: left; white-space: normal; }
+.audit-checks td.state { white-space: nowrap; font-weight: 700; }
+.audit-checks tr.is-ok td.state { color: #00f058; }
+.audit-checks tr.is-bad td.state { color: #eebc56; }
+.audit-verdict { font-size: 14px; font-weight: 700; margin: 18px 0 10px; }
+.reveal-chain { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 24px; }
+.reveal-chain textarea { font-size: 14px; min-height: 96px; }

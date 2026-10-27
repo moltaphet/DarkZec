@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkSameLocalOrigin, localChainStatus, verifyLocalCommitPayment } from '../scripts/zcash-rpc';
+import { checkSameLocalOrigin, listVaultMemos, localChainStatus, verifyLocalCommitPayment } from '../scripts/zcash-rpc';
 
 const address = `utest1${'a'.repeat(40)}`;
 const auctionId = 'NODE07-001';
@@ -60,6 +60,31 @@ describe('local Zcash testnet RPC', () => {
       receivedNote({ confirmations: 0 }),
     ]);
     await expect(verifyLocalCommitPayment(address, auctionId, commitment)).resolves.toEqual({ status: 'not-found' });
+  });
+
+  it('lists commit and reveal memos oldest first and ignores other auctions, tiers, pools and unconfirmed notes', async () => {
+    process.env.DARKZEC_ZCASH_RPC_USER = 'local-user';
+    process.env.DARKZEC_ZCASH_RPC_PASSWORD = 'local-password';
+    const padded = (text: string) => Buffer.concat([Buffer.from(text), Buffer.alloc(512 - Buffer.byteLength(text))]).toString('hex');
+    const commitOf = (hash: string, auction = auctionId) => padded(JSON.stringify({ v: 2, t: 'commit', a: auction, c: hash }));
+    const reveal = JSON.stringify({ v: 1, a: auctionId, p: '0.72', q: 4, s: 'c'.repeat(64), r: address });
+    mockRpc([
+      receivedNote({ txid: '1'.repeat(64), confirmations: 3, memo: commitOf('d'.repeat(64)) }),
+      receivedNote({ txid: '2'.repeat(64), confirmations: 9, memo: commitOf('e'.repeat(64)) }),
+      receivedNote({ txid: '3'.repeat(64), confirmations: 1, amountZat: 10_000, memo: padded(reveal) }),
+      receivedNote({ txid: '4'.repeat(64), memo: commitOf('f'.repeat(64), 'OTHER-001') }),
+      receivedNote({ txid: '5'.repeat(64), amountZat: 100_000_000, memo: commitOf('9'.repeat(64)) }),
+      receivedNote({ txid: '6'.repeat(64), pool: 'sapling', memo: commitOf('8'.repeat(64)) }),
+      receivedNote({ txid: '7'.repeat(64), confirmations: 0, memo: commitOf('7'.repeat(64)) }),
+      receivedNote({ txid: '8'.repeat(64), memo: padded(JSON.stringify({ v: 2, t: 'commit', c: 'a'.repeat(64), a: auctionId })) }),
+    ]);
+    await expect(listVaultMemos(address, auctionId, 1_000_000_000)).resolves.toEqual({
+      status: 'ok',
+      commits: [{ txid: '2'.repeat(64), commitment: 'e'.repeat(64), confirmations: 9 }, { txid: '1'.repeat(64), commitment: 'd'.repeat(64), confirmations: 3 }],
+      reveals: [{ txid: '3'.repeat(64), memo: reveal, confirmations: 1 }],
+    });
+    await expect(listVaultMemos(address, auctionId, 5)).rejects.toThrow('Invalid vault memo request.');
+    await expect(verifyLocalCommitPayment(address, auctionId, commitment, 7)).rejects.toThrow('Invalid testnet commit verification request.');
   });
 
   it('rejects malformed requests and cross-origin browser calls', async () => {

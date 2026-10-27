@@ -45,14 +45,14 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 | Attacker copies a victim's commitment hash | Prevented | Duplicate commitments are refused and the copier cannot produce the preimage. |
 | Reveal on another auction | Prevented | The commitment is `["DARKZEC/bid/v2", auction_id, ...]`, so it is auction-bound. |
 | Free option / griefing by never revealing | **Mitigated by forfeiture** | Unrevealed commitments forfeit the whole collateral, which is burned; they still appear in the frozen root. Not enforced on-chain in the prototype. |
-| Operator ignores honest reveals to keep their collateral | **Incentive removed** | Forfeited collateral is burned, never credited to the operator, so rejecting a valid reveal earns the operator nothing. Censorship itself is still possible without signed reveal acknowledgements (see roadmap). |
+| Operator ignores honest reveals to keep their collateral | **Incentive removed, censorship provable** | Forfeited collateral is burned, never credited to the operator, so rejecting a valid reveal earns it nothing. Every accepted reveal gets a signed acknowledgement; a published result that omits an acknowledged bid fails the audit-mode acknowledgement check. A reveal the operator never acknowledges is still deniable unless it was sent as an on-chain reveal memo the bidder can point to. |
 | Operator places shill bids and withholds their reveal after seeing others | **Made costly** | A withheld shill reveal burns the operator's own collateral instead of returning it to the operator's vault. The operator still sees revealed bids before clearing. |
-| Bidder inflates the price with lots it cannot win | Not solved (rule property) | A partially filled marginal bid sets the uniform price, so extra requested quantity can raise what every winner pays (`0.8 x 1` vs `0.8 x 2` in the README example). This is a known property of multi-unit uniform-price auctions and is pinned by a regression test. |
+| Bidder inflates the price with lots it cannot win | Not solved in multi-lot mode; **prevented in unit-demand mode** | A partially filled marginal bid sets the uniform price, so extra requested quantity can raise what every winner pays (`0.8 x 1` vs `0.8 x 2` in the README example). Unit-demand auctions accept one lot per bid and charge the truthful (k+1)-th price (Vickrey for one lot). |
 | Refund redirected to the vault | Prevented | Refund and vault must resolve to different Orchard receivers, even across different UA strings. |
 | Transparent fallback leaks the payer | Mitigated | Every instruction is projected to an Orchard-only UA; bare transparent addresses are refused. |
-| Operator drops a commitment | **Partly mitigated** | A bidder can prove inclusion only if the root covers their commitment. A dropped commitment cannot be proven after the fact without an external timestamp. |
-| Operator clears incorrectly | **Not solved** | Clearing is deterministic and re-runnable by anyone who gets all revealed bids, but the prototype publishes no reveal set and no zero-knowledge proof of execution. |
-| Salt grinding or ordering games | Limited | Ties follow accepted commit order, never the hash. Order depends on the operator, so this is not Sybil resistance. |
+| Operator drops a commitment | **Partly mitigated** | The operator signs the frozen root and commitment count at close, and a bidder can prove inclusion against it. In a live auction a dropped commitment is also an on-chain commit payment the bidder can point to. Without an external timestamp the close statement itself is not anchored. |
+| Operator clears incorrectly | **Detectable** | The audit bundle publishes the reveal set; audit mode re-runs the deterministic clearing and checks the signed result digest, so an incorrect or edited result fails. There is still no zero-knowledge proof, and publishing reveals discloses bids. |
+| Salt grinding or ordering games | Limited | Ties follow accepted commit order, never the hash. In a live auction commits are imported oldest first by confirmations, so order follows the chain; within one block it falls back to transaction ID. This is not Sybil resistance. |
 | Wallet or browser compromise | Out of scope | A compromised device can read receipts. Secrets cannot be reliably zeroized in JavaScript. |
 | Viewing-key leak | Out of scope | A viewing key shows incoming notes, so a leak exposes commit memos and, after reveal, revealed bids. It does not grant spending. |
 | Timing, amount and network metadata | Not solved | Shielding does not hide submission timing or network-level correlation. |
@@ -62,14 +62,15 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 
 The vault operator is trusted to: not leak revealed bids, run the announced clearing rule, publish the true root, return refunds, accept every valid reveal and burn forfeited collateral honestly. The sandbox hosts bidder and operator in one browser, so it demonstrates the rules and data flow, not the separation.
 
-## Roadmap to reduce operator trust (not implemented)
+## Roadmap to reduce operator trust
 
-1. Deliver reveals as a second shielded memo to the vault, so the whole flow is on Orchard.
+1. ~~Deliver reveals as a second shielded memo to the vault~~ **Done:** the Wallet request tab builds a reveal payment and the live auction imports reveal memos.
 2. Encrypt reveals to a **threshold key**, or run the operator in a **TEE** with attestation, so no single party reads bids before clearing.
 3. **Anchor the root** at close in an external timestamped record, so omission becomes provable.
-4. Publish the full reveal set after clearing so anyone can re-run the deterministic clearing, or prove clearing in zero knowledge.
+4. ~~Publish the full reveal set after clearing so anyone can re-run the clearing~~ **Done** as the audit bundle and audit mode. Proving clearing in zero knowledge without publishing bids remains open.
 5. Real Orchard scanning through an audited adapter in place of the mock vault, and on-chain handling of refunds and the forfeiture burn.
-6. **Signed reveal acknowledgements**: the operator signs each received reveal inside the window, so a bidder can prove an ignored reveal.
+6. ~~Signed reveal acknowledgements~~ **Done:** close, every accepted reveal and the result are signed. Next: publish the operator key before the auction opens and anchor the close statement externally.
+7. Replace the zcashd RPC adapter with Zallet or Zebra-based scanning, since zcashd reached end of support.
 
 ## What the prototype demonstrates
 

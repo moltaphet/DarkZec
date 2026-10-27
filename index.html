@@ -25,6 +25,7 @@
         <button id="sandbox-tab" class="nav-item active" aria-pressed="true">Auction sandbox <span>01</span></button>
         <button id="wallet-tab" class="nav-item" aria-pressed="false">Wallet request <span>02</span></button>
         <button id="vault-tab" class="nav-item" aria-pressed="false">Vault scanner <span>03</span></button>
+        <button id="audit-tab" class="nav-item" aria-pressed="false">Audit mode <span>04</span></button>
         <span id="network-status" class="network-status">● CHECKING LOCAL NODE</span>
       </nav>
 
@@ -69,12 +70,14 @@
 
         <div id="sandbox-view">
           <section class="auction-strip" aria-label="Auction configuration">
-            <div><span class="micro">AUCTION ID</span><strong>NODE07-001</strong></div>
-            <div><span class="micro">INVENTORY</span><strong>10 <small>DEMO LOTS</small></strong></div>
-            <div><span class="micro">RESERVE / LOT</span><strong>0.50 <small>ZEC</small></strong></div>
-            <div><span class="micro">CLEARING RULE</span><strong>UNIFORM PRICE</strong></div>
+            <div><span class="micro">AUCTION ID</span><strong id="strip-auction">NODE07-001</strong></div>
+            <div><span class="micro">INVENTORY</span><strong><span id="strip-supply">10</span> <small id="strip-supply-label">DEMO LOTS</small></strong></div>
+            <div><span class="micro">RESERVE / LOT</span><strong><span id="strip-reserve">0.5</span> <small>ZEC</small></strong></div>
+            <div><span class="micro">CLEARING RULE</span><strong id="strip-rule">UNIFORM PRICE</strong></div>
             <div class="phase-cell"><span class="micro">VAULT STATE</span><strong id="phase">ACCEPTING BIDS</strong></div>
           </section>
+
+          <section id="live-auction"></section>
 
           <div class="workspace">
             <section class="panel composer">
@@ -119,11 +122,13 @@
           </div>
 
           <section class="panel lifecycle">
-            <div class="lifecycle-copy"><div class="eyebrow">CONTROL DESK</div><h2>Close. Reveal. Verify.</h2><p>Closing freezes the commitment root and opens the reveal window. Bidders submit matching receipts before finalization. Only verified reveals clear; unrevealed commitments forfeit their collateral, which is burned. Posted collateral is 10 ZEC per commitment, independent of price and quantity.</p></div>
+            <div class="lifecycle-copy"><div class="eyebrow">CONTROL DESK</div><h2>Close. Reveal. Verify.</h2><p>Closing freezes the commitment root and opens the reveal window. Bidders submit matching receipts before finalization. Only verified reveals clear; unrevealed commitments forfeit their collateral, which is burned. Posted collateral is one fixed tier per auction (10 ZEC in the demo), independent of price and quantity.</p></div>
             <div class="lifecycle-actions"><button id="close" class="button quiet" type="button">Close auction <span>→</span></button><button id="clear" class="button primary" type="button" disabled>Finalize &amp; clear <span>↗</span></button><button id="reset" class="reset" type="button">Reset local session</button></div>
           </section>
 
           <section id="reveal-workspace"></section>
+
+          <section id="operator-view"></section>
 
           <section id="audit-panel" class="panel audit-panel" hidden>
             <div class="panel-heading"><h2><span class="section-code">03 /</span> Inclusion audit</h2><span class="micro green">FROZEN COMMITMENT SET</span></div>
@@ -145,7 +150,7 @@
           <div class="panel-heading"><h2>Prepare a wallet request</h2><span class="micro">ZIP-321 / ZODL HANDOFF</span></div>
           <p class="wallet-description">Build a request for an independently verified vault. Wallet UAs with Orchard are accepted; requests use Orchard-only versions of the supplied addresses to prevent fallback. Refund and vault must differ. Review the resulting Orchard destination, amount and memo in your wallet before paying.</p>
           <form id="wallet-form" autocomplete="off">
-            <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet" disabled>Mainnet (disabled in prototype)</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div></div>
+            <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet" disabled>Mainnet (disabled in prototype)</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div><div><label for="wallet-collateral">Collateral tier</label><select id="wallet-collateral"><option value="1">1 ZEC</option><option value="10" selected>10 ZEC</option><option value="100">100 ZEC</option></select></div></div>
             <label for="wallet-vault">Verified vault address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-vault" required spellcheck="false" placeholder="Paste the vault's u1… or utest1… address"></textarea>
             <label for="wallet-refund">Your refund / settlement address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-refund" required spellcheck="false" placeholder="Paste your shielded receiving address"></textarea>
             <div class="wallet-grid"><div><label for="wallet-price">Limit price / ZEC</label><input id="wallet-price" placeholder="0.00 ZEC" inputmode="decimal" required maxlength="17" /></div><div><label for="wallet-quantity">Quantity / lots</label><input id="wallet-quantity" placeholder="0 Qty" inputmode="numeric" required maxlength="6" /></div></div>
@@ -154,8 +159,15 @@
           </form>
           <div id="wallet-output" class="wallet-output" hidden><dl class="receipt"><div><dt>Escrow</dt><dd id="wallet-amount"></dd></div><div><dt>Memo audit</dt><dd id="wallet-bytes"></dd></div></dl><label for="wallet-uri">Sensitive ZIP-321 payment URI</label><textarea id="wallet-uri" readonly spellcheck="false"></textarea>
             <label for="wallet-reveal">Private reveal receipt / save before paying</label><textarea id="wallet-reveal" readonly spellcheck="false" aria-label="Wallet private reveal receipt"></textarea><div class="wallet-buttons"><button id="download-wallet-receipt" class="button quiet" type="button">Download receipt (.json)</button></div><p class="small warning">Copy and Open wallet stay locked until this receipt is downloaded: a paid commitment without its receipt can never be revealed and forfeits its collateral.</p><p class="small">Use Zodl or another Orchard-capable wallet. URI-handler support depends on the installed wallet and device.</p><label class="check-label"><input id="wallet-reviewed" type="checkbox" />I verified the full vault address, network and escrow amount.</label><div class="wallet-buttons"><button id="copy-wallet" class="button quiet" type="button">Copy sensitive URI</button><a id="open-wallet" class="button primary" aria-disabled="true" rel="noreferrer">Open wallet ↗</a><button id="erase-wallet" class="reset" type="button">Erase request</button></div>
-            <section class="testnet-check" aria-labelledby="testnet-check-title"><div class="panel-heading"><h3 id="testnet-check-title">Check a real testnet payment</h3><span class="micro">LOCAL ZCASH WALLET</span></div><p class="small muted">Checks for one confirmed 10 ZEC Orchard payment with this exact commit memo. Your local wallet must already be able to view the vault address. Viewing keys and RPC credentials stay in the local wallet and server. This check does not submit the bid to the sandbox or settle funds.</p><p id="testnet-status" class="small" role="status">Checking local node…</p><button id="testnet-check" class="button quiet" type="button" disabled>Verify payment on testnet</button><output id="testnet-payment-result" class="memo-verify-result" aria-live="polite"></output></section>
+            <section class="testnet-check" aria-labelledby="testnet-check-title"><div class="panel-heading"><h3 id="testnet-check-title">Check a real testnet payment</h3><span class="micro">LOCAL ZCASH WALLET</span></div><p class="small muted">Checks for one confirmed Orchard payment of exactly the chosen collateral tier with this exact commit memo. Your local wallet must already be able to view the vault address. Viewing keys and RPC credentials stay in the local wallet and server. This check alone does not enter the bid into an auction; a live testnet auction in the sandbox imports confirmed commits itself. No funds are settled.</p><p id="testnet-status" class="small" role="status">Checking local node…</p><button id="testnet-check" class="button quiet" type="button" disabled>Verify payment on testnet</button><output id="testnet-payment-result" class="memo-verify-result" aria-live="polite"></output></section>
           </div>
+          <form id="wallet-reveal-form" class="reveal-chain" autocomplete="off">
+            <div class="panel-heading"><h2>Reveal on chain</h2><span class="micro">SECOND SHIELDED MEMO</span></div>
+            <p class="small muted">After the auction closes, reveal by sending a tiny shielded payment to the same vault whose memo is your receipt. The memo is encrypted to the vault, so only the operator reads it, and the whole commit/reveal flow stays on Orchard. Load the receipt file you saved before paying; the vault address above is used as the destination.</p>
+            <input id="wallet-reveal-file" type="file" accept="application/json,.json" hidden aria-label="Receipt file for on-chain reveal" />
+            <div class="wallet-buttons"><button id="wallet-reveal-build" class="button quiet" type="button">Load receipt and build reveal request</button></div>
+            <div id="wallet-reveal-output" hidden><label for="wallet-reveal-uri">Sensitive reveal payment URI / contains your private bid</label><textarea id="wallet-reveal-uri" readonly spellcheck="false"></textarea><div class="wallet-buttons"><button id="wallet-reveal-copy" class="button quiet" type="button">Copy reveal URI</button><a id="wallet-reveal-open" class="button primary" aria-disabled="true" rel="noreferrer">Open reveal in wallet ↗</a></div></div>
+          </form>
           <form id="memo-verify-form" class="memo-verify" autocomplete="off">
             <div class="panel-heading"><h2>Verify the memo your wallet received</h2><span class="micro">ZIP-302 / ROUND TRIP</span></div>
             <p class="small muted">After the vault wallet receives your payment, copy the memo it shows (text, unpadded Base64url or hex) and paste it here. Only a public commit memo is accepted: an auction ID and a commitment hash. If you prepared a request above, the hash is compared with it.</p>
@@ -167,6 +179,8 @@
         </section>
 
         <section id="viewing-key-view" hidden aria-label="Viewing-key scanner"></section>
+
+        <section id="audit-view" hidden aria-label="Audit mode"></section>
 
         <div id="live-terminal-stream"></div>
         </div>

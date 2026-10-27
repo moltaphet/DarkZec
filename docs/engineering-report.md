@@ -8,7 +8,7 @@ The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Thi
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification (Node 26.10.0): **78 unit/privacy/CLI tests across 11 files, 41 E2E tests and 49 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
+Current observed verification (Node 26.10.0): **87 unit/privacy/CLI tests across 12 files, 45 E2E tests and 56 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -82,6 +82,10 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 
 **Non-reveal penalty.** A commitment not revealed (and verified) before the reveal deadline forfeits its full collateral, which is burned rather than credited to the operator (otherwise the operator, who judges reveal validity, would profit from ignoring reveals): `SettlementResult.forfeitedCollateral` is the sum of those collaterals and `payments + refunds + forfeited` equals every posted collateral. Unrevealed commitments stay in the frozen Merkle tree. Actual settlement of the forfeiture is outside the sandbox.
 
+**Operator accountability.** `src/lib/operator-journal.ts` signs canonical close, reveal-acknowledgement and result statements with a per-session, non-extractable ECDSA P-256 key. `src/lib/auction-session.ts` pairs the hash-only `Sandbox` with that journal so every close, accepted reveal and result produces a statement, and exports the audit bundle. `src/lib/audit-bundle.ts` parses bundles strictly (256 KB cap) and runs eight independent checks; `tests/audit-bundle.test.ts` covers honest runs, a censored reveal, edited results, commitments, statements and keys, and malformed input.
+
+**Live testnet auction and on-chain reveals.** `scripts/zcash-rpc.ts` `listVaultMemos` classifies confirmed Orchard notes at the vault into exact commit memos of the auction's collateral tier and reveal-receipt memos, oldest first; `/api/chain/vault-memos` exposes it to the same-origin page. The Wallet request tab builds a `0.0001` ZEC reveal payment whose memo is the receipt. `Sandbox` gained `unitDemand` (truthful (k+1)-th price; Vickrey for one lot), an operator view and reveal acceptance metadata.
+
 **Receipts and wallet memo round trip.** `src/lib/receipt-file.ts` downloads and imports the canonical reveal JSON (size-capped, strictly parsed, never auto-persisted). `src/lib/memo-import.ts` parses a memo copied from a wallet (text, unpadded Base64url or zero-padded hex), accepts only the public commit shape and compares it with the prepared request. `settlementBalance()` independently checks `payments + refunds + forfeited = posted collateral`, and the UI shows the result. See [threat-model.md](threat-model.md) and [testnet-interop.md](testnet-interop.md).
 
 **Merkle audit.** Leaves hash `0x00 || commitment`, parents hash `0x01 || left || right`, and nonempty roots bind `0x02 || uint64be(count) || treeRoot`. Odd nodes duplicate; empty trees have a separate domain. Verification checks index, count, depth, sides and siblings. The inclusion root is local, not externally anchored, and proves membership rather than payment, completeness or correct clearing. The tree covers every accepted commitment and is frozen when the commit phase closes, so a bidder can verify inclusion before reveals and the clear-time root must equal it.
@@ -124,9 +128,9 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 78 tests passed across 11 files. |
-| `npm run build` | Strict TypeScript passed; 49 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 41 passing E2E tests. |
+| `npm test` | 87 tests passed across 12 files. |
+| `npm run build` | Strict TypeScript passed; 56 transformed modules. |
+| `npm run test:e2e` | Fresh build followed by 45 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |

@@ -34,3 +34,14 @@ A `MISMATCH` means the memo that arrived differs from the request (another aucti
 - Show the prepared request, the wallet confirmation screen with the memo, the incoming memo in the vault wallet, and the green `MATCH` line.
 - A transaction identifier is not secret on its own, but do not show addresses, receipts or memo text you do not want public. Blur the refund address and never show the receipt file.
 - Say plainly what is real (ZIP-316/302/321 data crossing a real shielded transaction) and what is still a sandbox (the clearing vault and mock viewing key).
+
+## Run a full live auction on testnet
+
+1. In **Auction sandbox**, open **Live testnet auction**, paste the vault address your local wallet views, choose the auction ID, collateral tier and clearing mode, then **Start live testnet auction**.
+2. Each bidder prepares a request in **Wallet request** with the same auction ID and tier, downloads the receipt and pays it.
+3. When the commits are confirmed, choose **Sync from vault**. Only confirmed Orchard notes with the exact tier and an exact commit memo enter the book, oldest first.
+4. **Close auction**. Each bidder loads their receipt under **Reveal on chain** and pays the `0.0001` ZEC reveal request before the deadline.
+5. **Sync from vault** again: each valid reveal is accepted and acknowledged with an operator signature. Then **Finalize & clear**.
+6. In **Operator view**, download the audit bundle and verify it in **Audit mode**.
+
+The adapter uses zcashd's `z_listreceivedbyaddress`. zcashd reached end of support in 2026; check the Zallet/Zebra RPC compatibility table before relying on this path.

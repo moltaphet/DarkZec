@@ -71,6 +71,7 @@ test('terminal, protocol manual, wallet, vault and telemetry retain twelve-pixel
     await assertReadable(page);
     await page.locator('#wallet-tab').click(); await assertReadable(page);
     await page.locator('#vault-tab').click(); await assertReadable(page);
+    await page.locator('#audit-tab').click(); await assertReadable(page);
     if (await page.locator('#telemetry-toggle').getAttribute('aria-expanded') === 'false') await page.locator('#telemetry-toggle').click();
     await assertReadable(page);
     if (width === 1440) await page.screenshot({ path: 'test-results/targeted-hardening-desktop.png', fullPage: true });

@@ -19,7 +19,9 @@ export type CommitPaymentResult =
   | { readonly status: 'node-unavailable' };
 
 const RPC_ENDPOINT = 'http://127.0.0.1:18232/';
-const MINIMUM_COLLATERAL_ZAT = 1_000_000_000;
+/** Collateral tiers (1, 10 or 100 ZEC). Every bid in one auction posts the same tier, so the amount reveals nothing. */
+export const COLLATERAL_TIERS_ZAT: readonly number[] = Object.freeze([100_000_000, 1_000_000_000, 10_000_000_000]);
+const DEFAULT_COLLATERAL_ZAT = 1_000_000_000;
 const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 function configuredCredentials(): { readonly user: string; readonly password: string } | undefined {
@@ -86,9 +88,9 @@ export async function localChainStatus(): Promise<LocalChainStatus> {
   }
 }
 
-export async function verifyLocalCommitPayment(address: string, auctionId: string, commitment: string): Promise<CommitPaymentResult> {
+export async function verifyLocalCommitPayment(address: string, auctionId: string, commitment: string, collateralZat = DEFAULT_COLLATERAL_ZAT): Promise<CommitPaymentResult> {
   if (!/^utest1[023456789acdefghjklmnpqrstuvwxyz]{40,250}$/.test(address) ||
-    !/^[A-Za-z0-9_-]{1,48}$/.test(auctionId) || !/^[a-f0-9]{64}$/.test(commitment)) {
+    !/^[A-Za-z0-9_-]{1,48}$/.test(auctionId) || !/^[a-f0-9]{64}$/.test(commitment) || !COLLATERAL_TIERS_ZAT.includes(collateralZat)) {
     throw new Error('Invalid testnet commit verification request.');
   }
   const status = await localChainStatus();
@@ -105,7 +107,7 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
     const matches = notes.filter((note: unknown) => isRecord(note) && note.pool === 'orchard' &&
       note.txid && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
       Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 &&
-      Number.isSafeInteger(note.amountZat) && Number(note.amountZat) === MINIMUM_COLLATERAL_ZAT &&
+      Number.isSafeInteger(note.amountZat) && Number(note.amountZat) === collateralZat &&
       matchesCommitMemo(note, auctionId, commitment));
     if (matches.length === 0) return { status: 'not-found' };
     if (matches.length !== 1) return { status: 'not-found' };
@@ -113,11 +115,56 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
     if (!isRecord(match)) return { status: 'not-found' };
     return {
       status: 'confirmed', txid: String(match.txid),
-      confirmations: Number(match.confirmations), amountZat: MINIMUM_COLLATERAL_ZAT,
+      confirmations: Number(match.confirmations), amountZat: collateralZat,
     };
   } catch {
     return { status: 'node-unavailable' };
   }
+}
+
+export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number }
+export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number }
+export type VaultMemoResult =
+  | { readonly status: 'ok'; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
+  | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' };
+
+/**
+ * Reads every confirmed Orchard note the local wallet can view at the vault and classifies its memo:
+ * exact commit memos carrying the auction's collateral tier, and reveal receipts for the same auction.
+ * Notes are returned oldest first, so the ledger's tie priority follows chain order rather than operator choice.
+ * Reveal receipts are only shape-checked here; the browser ledger validates them completely.
+ */
+export async function listVaultMemos(address: string, auctionId: string, collateralZat: number): Promise<VaultMemoResult> {
+  if (!/^utest1[023456789acdefghjklmnpqrstuvwxyz]{40,250}$/.test(address) || !/^[A-Za-z0-9_-]{1,48}$/.test(auctionId) || !COLLATERAL_TIERS_ZAT.includes(collateralZat)) {
+    throw new Error('Invalid vault memo request.');
+  }
+  const status = await localChainStatus();
+  if (status.reason === 'wallet-not-configured') return { status: 'wallet-not-configured' };
+  if (status.reason === 'node-unavailable') return { status: 'node-unavailable' };
+  if (status.network !== 'testnet') return { status: 'wrong-network' };
+  if (!status.synced) return { status: 'syncing' };
+  let notes: unknown;
+  try { notes = await rpc('z_listreceivedbyaddress', [address, 1]); } catch { return { status: 'node-unavailable' }; }
+  if (!Array.isArray(notes)) return { status: 'node-unavailable' };
+  const confirmed = notes.filter((note: unknown): note is JsonRecord => isRecord(note) && note.pool === 'orchard' && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
+    Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 && Number.isSafeInteger(note.amountZat) && Number(note.amountZat) > 0)
+    .sort((a, b) => Number(b.confirmations) - Number(a.confirmations) || String(a.txid).localeCompare(String(b.txid)));
+  const commits: VaultCommitNote[] = []; const reveals: VaultRevealNote[] = []; const seen = new Set<string>();
+  for (const note of confirmed.slice(0, 512)) {
+    const memo = decodeMemoHex(note.memo); if (!memo || seen.has(memo)) continue;
+    let value: unknown;
+    try { value = JSON.parse(memo); } catch { continue; }
+    if (!isRecord(value) || value.a !== auctionId) continue;
+    const txid = String(note.txid); const confirmations = Number(note.confirmations);
+    if (value.v === 2 && value.t === 'commit' && typeof value.c === 'string' && /^[a-f0-9]{64}$/.test(value.c) && matchesCommitMemo(note, auctionId, value.c)) {
+      if (Number(note.amountZat) !== collateralZat) continue;
+      seen.add(memo); commits.push({ txid, commitment: value.c, confirmations });
+    } else if (value.v === 1 && Buffer.byteLength(memo) <= 512) {
+      seen.add(memo); reveals.push({ txid, memo, confirmations });
+    }
+    if (commits.length >= 128 && reveals.length >= 128) break;
+  }
+  return { status: 'ok', commits: commits.slice(0, 128), reveals: reveals.slice(0, 128) };
 }
 
 export function checkSameLocalOrigin(request: import('node:http').IncomingMessage, port: number): boolean {

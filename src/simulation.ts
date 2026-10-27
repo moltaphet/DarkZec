@@ -15,6 +15,12 @@ export interface PublicSnapshot {
   readonly revealDeadline: number | null; readonly canClear: boolean;
   readonly revealOpen: boolean;
 }
+/** Everything the vault operator holds: hashes before close, and only verified reveals after it. */
+export interface OperatorView {
+  readonly phase: Phase; readonly commitments: readonly string[]; readonly closedAt: number | null; readonly revealDeadline: number | null;
+  readonly reveals: readonly { readonly index: number; readonly commitment: string; readonly bid: BidMemo }[];
+}
+export interface AcceptedReveal { readonly commitment: string; readonly index: number; readonly acceptedAt: number }
 export interface Audit { readonly commitment: string; readonly root: string; readonly proof: InclusionProof }
 export interface SettlementResult extends ClearingResult { readonly root: string; readonly excluded: number; readonly forfeitedCollateral: string; readonly postedCollateral: string }
 export interface SettlementBalance { readonly paid: string; readonly refunded: string; readonly forfeited: string; readonly posted: string; readonly balanced: boolean }
@@ -36,6 +42,7 @@ export class Sandbox {
   #phase: Phase = 'open';
   #busy = false;
   #deadline: number | null = null;
+  #closedAt: number | null = null;
   private constructor(config: AuctionConfig, clock: () => number) { this.#config = config; this.#clock = clock; }
   static async create(input: AuctionConfig, clock: () => number = Date.now): Promise<Sandbox> {
     const config = { ...input };
@@ -46,10 +53,17 @@ export class Sandbox {
     if (parseZec(collateral) === 0n) throw new Error('Posted collateral must be positive.');
     const revealWindowMs = config.revealWindowMs ?? 60_000;
     if (!Number.isSafeInteger(revealWindowMs) || revealWindowMs < 1 || revealWindowMs > 86_400_000) throw new Error('Invalid reveal window.');
-    return new Sandbox(Object.freeze({ ...config, collateral, revealWindowMs, vault: orchardPaymentAddress(config.vault, config.network) }), clock);
+    if (config.unitDemand !== undefined && typeof config.unitDemand !== 'boolean') throw new Error('Unit demand must be true or false.');
+    return new Sandbox(Object.freeze({ ...config, collateral, revealWindowMs, unitDemand: config.unitDemand === true, vault: orchardPaymentAddress(config.vault, config.network) }), clock);
   }
+  /** The validated, normalized configuration (Orchard-only vault, canonical collateral). */
+  get config(): AuctionConfig { return this.#config; }
   #now(): number { const now = this.#clock(); if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid auction clock.'); return now; }
   #canClear(): boolean { return this.#phase === 'reveal' && (this.#records.every(record => record.reveal !== undefined) || this.#now() >= (this.#deadline ?? Infinity)); }
+  operatorView(): OperatorView {
+    return Object.freeze({ phase: this.#phase, commitments: Object.freeze(this.#records.map(item => item.commitment)), closedAt: this.#closedAt, revealDeadline: this.#deadline,
+      reveals: Object.freeze(this.#records.flatMap((item, index) => item.reveal ? [Object.freeze({ index, commitment: item.commitment, bid: item.reveal })] : [])) });
+  }
   publicSnapshot(): PublicSnapshot {
     return Object.freeze({ phase: this.#phase, commitments: Object.freeze(this.#records.map(item => item.commitment)),
       revealed: Object.freeze(this.#records.filter(item => item.reveal).map(item => item.commitment)), revealDeadline: this.#deadline, canClear: this.#canClear(),
@@ -76,9 +90,10 @@ export class Sandbox {
   close(): void {
     if (this.#busy) throw new Error('A vault operation is in progress.');
     if (this.#phase !== 'open') throw new Error('Auction is already closed.');
-    this.#deadline = this.#now() + (this.#config.revealWindowMs ?? 60_000); this.#phase = 'reveal';
+    const now = this.#now();
+    this.#closedAt = now; this.#deadline = now + (this.#config.revealWindowMs ?? 60_000); this.#phase = 'reveal';
   }
-  async reveal(input: BidMemo): Promise<void> {
+  async reveal(input: BidMemo): Promise<AcceptedReveal> {
     if (this.#busy) throw new Error('A vault operation is in progress.');
     if (this.#phase !== 'reveal') throw new Error('Reveal is allowed only in the closed reveal window.');
     if (this.#now() >= (this.#deadline ?? 0)) throw new Error('Reveal window has expired.');
@@ -87,14 +102,17 @@ export class Sandbox {
       if (Object.keys(input).sort().join(',') !== 'auctionId,price,quantity,refund,salt') throw new Error('Invalid reveal schema.');
       const bid = Object.freeze(parseBidMemo(serializeBidMemo({ ...input }, this.#config.network), this.#config.network));
       if (bid.auctionId !== this.#config.auctionId) throw new Error('Wrong auction ID.');
+      if (this.#config.unitDemand && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
       assertDistinctRefund(bid.refund, this.#config.vault, this.#config.network);
       const hash = await commitment(bid);
-      if (this.#now() >= (this.#deadline ?? 0)) throw new Error('Reveal window has expired.');
-      const record = this.#records.find(item => item.commitment === hash);
+      const acceptedAt = this.#now();
+      if (acceptedAt >= (this.#deadline ?? 0)) throw new Error('Reveal window has expired.');
+      const index = this.#records.findIndex(item => item.commitment === hash); const record = this.#records[index];
       if (!record) throw new Error('Reveal does not match a recorded commitment.');
       if (record.reveal) throw new Error('Commitment has already been revealed.');
       if (parseZec(bid.price) * BigInt(bid.quantity) > parseZec(record.collateral)) throw new Error('Insufficient collateral for reveal.');
       record.reveal = bid;
+      return Object.freeze({ commitment: hash, index, acceptedAt });
     } finally { this.#busy = false; }
   }
   async clear(): Promise<SettlementResult> {

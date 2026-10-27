@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { access, readFile, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import { checkSameLocalOrigin, localChainStatus, readJsonBody, verifyLocalCommitPayment } from './zcash-rpc.ts';
+import { checkSameLocalOrigin, listVaultMemos, localChainStatus, readJsonBody, verifyLocalCommitPayment } from './zcash-rpc.ts';
 
 const root = resolve('dist');
 try {
@@ -30,7 +30,7 @@ const server = createServer(async (request, response) => {
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
   // Only same-origin, read-only testnet wallet checks are exposed. No raw RPC proxy or request logging.
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
-  if (pathname === '/api/chain/status' || pathname === '/api/chain/verify') {
+  if (pathname === '/api/chain/status' || pathname === '/api/chain/verify' || pathname === '/api/chain/vault-memos') {
     if (request.method !== 'POST') { json(response, 405, { error: 'method-not-allowed' }); return; }
     if (!checkSameLocalOrigin(request, port)) { json(response, 403, { error: 'same-origin-required' }); return; }
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json')) { json(response, 415, { error: 'json-required' }); return; }
@@ -39,11 +39,11 @@ const server = createServer(async (request, response) => {
       if (pathname === '/api/chain/status') { json(response, 200, await localChainStatus()); return; }
       if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('invalid-body');
       const record = body as Record<string, unknown>;
-      const result = await verifyLocalCommitPayment(
-        typeof record.address === 'string' ? record.address : '',
-        typeof record.auctionId === 'string' ? record.auctionId : '',
-        typeof record.commitment === 'string' ? record.commitment : '',
-      );
+      const address = typeof record.address === 'string' ? record.address : '';
+      const auctionId = typeof record.auctionId === 'string' ? record.auctionId : '';
+      const collateralZat = record.collateralZat === undefined ? 1_000_000_000 : typeof record.collateralZat === 'number' ? record.collateralZat : Number.NaN;
+      if (pathname === '/api/chain/vault-memos') { json(response, 200, await listVaultMemos(address, auctionId, collateralZat)); return; }
+      const result = await verifyLocalCommitPayment(address, auctionId, typeof record.commitment === 'string' ? record.commitment : '', collateralZat);
       json(response, 200, result); return;
     } catch (error: unknown) {
       const status = error instanceof Error && error.message === 'node-unavailable' ? 503 : 400;

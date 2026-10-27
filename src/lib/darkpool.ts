@@ -12,6 +12,8 @@ export interface AuctionConfig {
   readonly network: Network;
   readonly collateral?: string;
   readonly revealWindowMs?: number;
+  /** Every bid is for exactly one lot. Uniform (k+1)-th price clearing is then truthful; with one lot it is Vickrey. */
+  readonly unitDemand?: boolean;
 }
 export interface Allocation {
   readonly commitment: string;
@@ -38,6 +40,7 @@ export function clearUniformAuction(config: AuctionConfig, bids: readonly Verifi
   const ordered = bids.map(({ bid, commitment, collateral }, sequence) => {
     bid = Object.freeze({ ...bid }); canonicalPreimage(bid);
     if (bid.auctionId !== config.auctionId) throw new Error('Wrong auction ID.');
+    if (config.unitDemand && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
     if (!/^[a-f0-9]{64}$/.test(commitment) || seen.has(commitment)) throw new Error('Invalid or duplicate commitment.');
     seen.add(commitment);
     assertDistinctRefund(bid.refund, config.vault, config.network);
