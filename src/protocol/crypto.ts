@@ -1,5 +1,5 @@
 import { formatZec, parseQuantity, parseZec, validateAuctionId } from './amount';
-import { validateOrchardAddress } from './address';
+import { unifiedAddressNetwork, validateOrchardAddress } from './address';
 
 export interface BidPreimage {
   readonly auctionId: string;
@@ -41,11 +41,11 @@ export function canonicalPreimage(bid: BidPreimage): string {
   if (parseZec(bid.price) === 0n || formatZec(parseZec(bid.price)) !== bid.price) throw new Error('Bid price must be positive and canonical.');
   if (typeof bid.salt !== 'string' || !/^[a-f0-9]{64}$/.test(bid.salt)) throw new Error('A 256-bit salt is required.');
   if (typeof bid.refund !== 'string') throw new Error('An Orchard refund Unified Address is required.');
-  validateOrchardAddress(bid.refund, bid.refund.startsWith('utest1') ? 'testnet' : 'mainnet');
+  validateOrchardAddress(bid.refund, unifiedAddressNetwork(bid.refund));
   // Typed tuple prevents field-boundary ambiguity and retains auction replay separation.
   return JSON.stringify(['DARKZEC/bid/v2', bid.auctionId, bid.refund, bid.salt, bid.price, bid.quantity]);
 }
-export async function computeBidCommitment(bid: BidPreimage): Promise<string> {
+/** Salted, auction-bound SHA-256 bid commitment. */
+export async function commitment(bid: BidPreimage): Promise<string> {
   return sha256(utf8(canonicalPreimage(bid)));
 }
-export const commitment = computeBidCommitment;

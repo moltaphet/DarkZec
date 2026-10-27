@@ -36,7 +36,8 @@ test('closed auction locks inputs and ignores late draft events while preserving
 test('reset restores valid defaults, restarts one preview and makes repeated seeding safe', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
   await page.locator('#wallet-tab').click(); await page.locator('#wallet-price').fill('1.2'); await page.locator('#wallet-quantity').fill('9');
-  await page.locator('#wallet-auction').fill('CHANGED'); await page.locator('#wallet-network').selectOption('mainnet');
+  await page.locator('#wallet-auction').fill('CHANGED');
+  await expect(page.locator('#wallet-network option[value="mainnet"]')).toBeDisabled();
   await page.locator('#wallet-vault').fill('u1edited-input'); await page.locator('#sandbox-tab').click();
   await page.locator('#bid-price').fill('0'); await page.locator('#bid-quantity').fill('0');
   await page.locator('#prepare').click(); await expect(page.locator('#error')).toBeVisible();

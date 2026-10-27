@@ -4,13 +4,16 @@ import { FIXTURE_REFUND_ADDRESS, SIMULATION_CONFIG } from '../src/fixtures';
 import { f4jumble } from '../src/protocol/address';
 import { commitment, hex, utf8 } from '../src/protocol/crypto';
 import { encodeMemo, serializeBidMemo, serializeCommitMemo } from '../src/protocol/memo';
-import { decodeBase64url, parseVaultMemo } from '../src/lib/vault-memo';
+import { decodeBase64url, parseVaultCommitMemo } from '../src/lib/vault-memo';
 import { createDemoNotes, encryptMockNote, mockNoteKey, MOCK_SCAN_SCOPE, paddedMockField, scanMockNotes } from '../src/lib/mock-note-scanner';
 import { DEMO_VIEWING_KEY, ViewingKeySession, VIEWING_SESSION_KEY, viewingKeyKind } from '../src/lib/viewing-key-session';
 import type { SessionStore } from '../src/lib/viewing-key-session';
 
 const bid = { auctionId: SIMULATION_CONFIG.auctionId, price: '0.74', quantity: 4, salt: 'a'.repeat(64), refund: FIXTURE_REFUND_ADDRESS };
 const memo = serializeBidMemo(bid, 'testnet');
+const hash = 'ab'.repeat(32);
+const commit = serializeCommitMemo(bid.auctionId, hash);
+const parse = (value: string, transport: 'json' | 'base64url' = 'json', auctionId = bid.auctionId) => parseVaultCommitMemo(value, transport, auctionId);
 
 function unifiedViewingKey(prefix: 'uview' | 'uviewtest'): string {
   const padding = new Uint8Array(16); padding.set(utf8(prefix));
@@ -20,31 +23,31 @@ function unifiedViewingKey(prefix: 'uview' | 'uviewtest'): string {
 describe('authenticated memo field parsing', () => {
   it('accepts direct JSON and canonical Base64url after stripping only trailing zero bytes', () => {
     for (const transport of ['json', 'base64url'] as const) {
-      const value = transport === 'json' ? memo : encodeMemo(memo);
-      const result = parseVaultMemo(hex(paddedMockField(value)), transport, 'testnet', bid.auctionId);
-      expect(result?.bid).toEqual(bid); expect(result?.transportBytes).toBe(utf8(value).length);
-      expect(result?.jsonBytes).toBe(utf8(memo).length);
+      const value = transport === 'json' ? commit : encodeMemo(commit);
+      const result = parse(hex(paddedMockField(value)), transport);
+      expect(result?.commit).toEqual({ auctionId: bid.auctionId, commitment: hash }); expect(result?.transportBytes).toBe(utf8(value).length);
+      expect(result?.jsonBytes).toBe(utf8(commit).length);
     }
   });
   it('enforces the 512-byte bound and canonical JSON even without padding', () => {
     // JSON whitespace is noncanonical and must be refused even though the field is exactly 512 bytes.
-    expect(() => parseVaultMemo(hex(paddedMockField(memo.padEnd(512, ' '))), 'json', 'testnet', bid.auctionId)).toThrow('schema');
+    expect(() => parse(hex(paddedMockField(commit.padEnd(512, ' '))))).toThrow('schema');
     expect(() => paddedMockField('a'.repeat(513))).toThrow('512-byte');
   });
-  it('handles ZIP-302 empty markers and rejects reserved, malformed UTF-8 and interior NUL bytes', () => {
-    expect(parseVaultMemo('00'.repeat(512), 'json', 'testnet', bid.auctionId)).toBeNull();
-    expect(parseVaultMemo('f6' + '00'.repeat(511), 'json', 'testnet', bid.auctionId)).toBeNull();
-    for (const value of ['f601' + '00'.repeat(510), 'ff' + '00'.repeat(511), 'c328' + '00'.repeat(510)]) {
-      expect(() => parseVaultMemo(value, 'json', 'testnet', bid.auctionId)).toThrow('encoding');
-    }
-    expect(() => parseVaultMemo(hex(paddedMockField(memo.replace('0.74', '0\u0000.74'))), 'json', 'testnet', bid.auctionId)).toThrow();
+  it('handles ZIP-302 empty markers and rejects reserved, malformed UTF-8, interior NUL bytes and a leading BOM', () => {
+    expect(parse('00'.repeat(512))).toBeNull();
+    expect(parse('f6' + '00'.repeat(511))).toBeNull();
+    for (const value of ['f601' + '00'.repeat(510), 'ff' + '00'.repeat(511), 'c328' + '00'.repeat(510)]) expect(() => parse(value)).toThrow('encoding');
+    expect(() => parse(hex(paddedMockField(commit.replace('commit', 'com\u0000mit'))))).toThrow();
+    expect(() => parse(hex(paddedMockField(`\ufeff${commit}`)))).toThrow('schema');
+    expect(() => parse(hex(paddedMockField(encodeMemo(`\ufeff${commit}`))), 'base64url')).toThrow('schema');
   });
-  it('rejects bad hex, noncanonical Base64url, schema, auction and transparent refunds', () => {
-    for (const value of ['00'.repeat(511), '00'.repeat(513), 'gg'.repeat(512)]) expect(() => parseVaultMemo(value, 'json', 'testnet', bid.auctionId)).toThrow('512-byte');
+  it('rejects bad hex, noncanonical Base64url, wrong schema, other auctions and bid preimages', () => {
+    for (const value of ['00'.repeat(511), '00'.repeat(513), 'gg'.repeat(512)]) expect(() => parse(value)).toThrow('512-byte');
     for (const value of ['Zg==', 'Zh', 'a', '+/8', 'a'.repeat(684)]) expect(() => decodeBase64url(value)).toThrow();
-    expect(() => parseVaultMemo(hex(paddedMockField(memo)), 'json', 'testnet', 'OTHER')).toThrow('another auction');
-    for (const value of [memo.replace('"v":1', '"v":2'), memo.replace('0.74', '0.740'), memo.replace('"q":4', '"q":1.5'), memo.replace('a'.repeat(64), 'bad'), memo.replace(FIXTURE_REFUND_ADDRESS, 't1bad'), memo.replace('{', '{"extra":1,')]) {
-      expect(() => parseVaultMemo(hex(paddedMockField(value)), 'json', 'testnet', bid.auctionId)).toThrow('schema');
+    expect(() => parse(hex(paddedMockField(commit)), 'json', 'OTHER')).toThrow('another auction');
+    for (const value of [commit.replace('"v":2', '"v":1'), commit.replace('"commit"', '"reveal"'), commit.replace(hash, 'AB'.repeat(32)), commit.replace('{', '{"extra":1,'), memo]) {
+      expect(() => parse(hex(paddedMockField(value)))).toThrow('schema');
     }
   });
 });

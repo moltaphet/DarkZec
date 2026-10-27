@@ -26,12 +26,12 @@ import { decodeUnifiedAddress } from './protocol/address';
 import { parseQuantity } from './protocol/amount';
 import { hex } from './protocol/crypto';
 import type { PreparedBid } from './protocol/memo';
-import { commitSubmission, prepareBid, serializeBidMemo } from './protocol/memo';
+import { commitSubmission, prepareBid } from './protocol/memo';
 import { verifyProof } from './protocol/merkle';
 import { Sandbox, settlementBalance } from './simulation';
 import type { SettlementResult } from './simulation';
 import { compareWithRequest, memoFingerprint, parseReceivedCommitMemo } from './lib/memo-import';
-import { downloadText, receiptFilename } from './lib/receipt-file';
+import { downloadText, receiptFilename, receiptText } from './lib/receipt-file';
 import { localTestnetStatus, verifyTestnetCommit } from './lib/testnet-chain';
 
 const el = (id: string): HTMLElement => element(id, HTMLElement);
@@ -86,6 +86,8 @@ effects.own(() => memoPreview.destroy()); effects.own(() => telemetry.destroy())
 let sandbox: Sandbox | undefined;
 let prepared: PreparedBid | undefined;
 let walletPrepared: PreparedBid | undefined;
+// A paid request whose receipt was lost can never be revealed, so the handoff stays locked until the receipt is saved.
+let walletReceiptSaved = false;
 let working = false;
 let demoSeedProgress = 0;
 let walletView = false;
@@ -101,7 +103,7 @@ const revealPanel = new RevealPanel(el('reveal-workspace'), operation => { void 
   const deadline = vault().publicSnapshot().revealDeadline;
   if (deadline === null) throw new Error('Open the reveal window first.');
   judgeTimeOffset = Math.max(judgeTimeOffset, deadline - Date.now() + 1); telemetry.log('expired');
-});
+}, SIMULATION_CONFIG.network);
 effects.own(() => revealPanel.destroy());
 
 function vault(): Sandbox { if (!sandbox) throw new Error('The local vault is still starting.'); return sandbox; }
@@ -119,7 +121,7 @@ function clearPrepared(): void {
   for (const id of ['prepared-amount', 'prepared-bytes', 'prepared-hash']) text(id, '');
 }
 function eraseWallet(): void {
-  walletPrepared = undefined; area('wallet-uri').value = '';
+  walletPrepared = undefined; walletReceiptSaved = false; area('wallet-uri').value = '';
   area('wallet-reveal').value = '';
   input('wallet-reviewed').checked = false;
   for (const id of ['wallet-amount', 'wallet-bytes']) text(id, '');
@@ -130,7 +132,7 @@ function eraseWallet(): void {
 }
 function updateWalletLink(): void {
   const link = element('open-wallet', HTMLAnchorElement);
-  const enabled = walletPrepared !== undefined && input('wallet-reviewed').checked && !working;
+  const enabled = walletPrepared !== undefined && walletReceiptSaved && input('wallet-reviewed').checked && !working;
   link.setAttribute('aria-disabled', String(!enabled));
   if (enabled && walletPrepared) { link.href = walletPrepared.uri; link.tabIndex = 0; }
   else { link.removeAttribute('href'); link.tabIndex = -1; }
@@ -183,6 +185,8 @@ function renderBook(): void {
 }
 async function action(operation: () => Promise<void>): Promise<void> {
   if (working) return;
+  // Disabling controls while busy drops keyboard focus, so return it to the control that started the operation.
+  const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   working = true; visible('error', false); controls();
   try { await operation(); }
   catch (error: unknown) {
@@ -192,6 +196,7 @@ async function action(operation: () => Promise<void>): Promise<void> {
   } finally {
     working = false;
     if (sandbox) renderBook(); controls();
+    if (origin?.isConnected && document.activeElement === document.body) origin.focus({ preventScroll: true });
   }
 }
 function setView(view: 'sandbox' | 'wallet' | 'scanner'): void {
@@ -287,8 +292,8 @@ button('clear').addEventListener('click', () => {
     const balance = settlementBalance(lastResult); const balanceLine = el('settlement-balance');
     balanceLine.textContent = `${balance.balanced ? 'BALANCED' : 'MISMATCH'} / payments ${balance.paid} + refunds ${balance.refunded} + forfeited ${balance.forfeited} = ${balance.posted} ZEC posted collateral`;
     balanceLine.classList.toggle('is-ok', balance.balanced); balanceLine.classList.toggle('is-bad', !balance.balanced);
-    text('excluded-bids', `${lastResult.excluded} unrevealed / ${lastResult.forfeitedCollateral} ZEC collateral forfeited to the vault`);
-    status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their full collateral is forfeited to the vault as the non-reveal penalty. No settlement transaction was sent.');
+    text('excluded-bids', `${lastResult.excluded} unrevealed / ${lastResult.forfeitedCollateral} ZEC collateral forfeited and burned`);
+    status('Only verified reveals entered clearing. Missing reveals are excluded from allocation but stay in the frozen commitment root; their full collateral is burned as the non-reveal penalty, so the operator gains nothing from a missing reveal. No settlement transaction was sent.');
   });
 });
 element('audit-form', HTMLFormElement).addEventListener('submit', event => {
@@ -324,7 +329,9 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
   event.preventDefault(); void action(async () => {
     eraseWallet();
     const selected = element('wallet-network', HTMLSelectElement).value;
-    if (selected !== 'mainnet' && selected !== 'testnet') throw new Error('Select a valid network.');
+    // No vault service exists for this prototype, so a mainnet request could only send real ZEC to an unmanaged address.
+    if (selected === 'mainnet') throw new Error('Mainnet requests are disabled in this prototype. Use testnet.');
+    if (selected !== 'testnet') throw new Error('Select a valid network.');
     const network: Network = selected;
     const vaultAddress = area('wallet-vault').value.trim(); const refund = area('wallet-refund').value.trim();
     for (const address of [vaultAddress, refund]) {
@@ -335,7 +342,7 @@ element('wallet-form', HTMLFormElement).addEventListener('submit', event => {
       quantity: parseQuantity(input('wallet-quantity').value), vault: vaultAddress, refund, network }, event => securityAudit.protocol(event, 'wallet'));
     telemetry.memo({ bytes: walletPrepared.byteLength, state: 'ready' }, 'wallet'); telemetry.log('wallet');
     area('wallet-uri').value = walletPrepared.uri;
-    area('wallet-reveal').value = serializeBidMemo(walletPrepared.reveal, network);
+    area('wallet-reveal').value = receiptText(walletPrepared.reveal, network);
     text('wallet-amount', `${walletPrepared.amount} ZEC`); text('wallet-bytes', `${walletPrepared.byteLength} / 512 BYTES`);
     visible('wallet-output', true);
     button('testnet-check').disabled = network !== 'testnet';
@@ -348,7 +355,8 @@ button('download-wallet-receipt').addEventListener('click', () => {
   void action(async () => {
     if (!walletPrepared) throw new Error('Prepare a request first.');
     downloadText(receiptFilename(walletPrepared.reveal, walletPrepared.commitment), area('wallet-reveal').value);
-    status('Reveal receipt downloaded. It holds your private price, quantity, salt and refund address: store it securely and never share it.');
+    walletReceiptSaved = true;
+    status('Reveal receipt downloaded. It holds your private price, quantity, salt and refund address: store it securely and never share it. Copy and Open wallet are now available.');
   });
 });
 function clearMemoVerification(): void {
@@ -385,10 +393,15 @@ button('testnet-check').addEventListener('click', () => { void action(async () =
     output.textContent = `NOT CONFIRMED / ${messages[result.status]}`; output.classList.add('is-bad'); telemetry.log('invalid');
   }
 }); });
-button('copy-wallet').addEventListener('click', () => { void action(() => copy(walletPrepared?.uri ?? '')); });
+button('copy-wallet').addEventListener('click', () => {
+  void action(async () => {
+    if (walletPrepared && !walletReceiptSaved) throw new Error('Download the reveal receipt before copying the payment request. Without it the commitment can never be revealed.');
+    await copy(walletPrepared?.uri ?? '');
+  });
+});
 button('erase-wallet').addEventListener('click', () => { eraseWallet(); telemetry.log('erased'); controls(); status('Sensitive payment request erased from the interface.'); });
 element('open-wallet', HTMLAnchorElement).addEventListener('click', event => {
-  if (!walletPrepared || !input('wallet-reviewed').checked || working) event.preventDefault();
+  if (!walletPrepared || !walletReceiptSaved || !input('wallet-reviewed').checked || working) event.preventDefault();
 });
 
 // Best-effort clear on page exit; JS strings and browser/OS clipboard cannot be securely erased.

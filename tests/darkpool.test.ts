@@ -36,6 +36,13 @@ describe('uniform opportunity-price clearing', () => {
     }
     expect(clearUniformAuction(config, [bid('0.9', 11, 1), bid('0.49', 100, 2)]).clearingPrice).toBe('0.5');
   });
+  it('documents that extra marginal quantity can raise the uniform price (not strategyproof)', () => {
+    const exact = clearUniformAuction(config, [bid('0.9', 9, 1), bid('0.8', 1, 2), bid('0.7', 5, 3)]);
+    const padded = clearUniformAuction(config, [bid('0.9', 9, 1), bid('0.8', 2, 2), bid('0.7', 5, 3)]);
+    expect(exact.clearingPrice).toBe('0.7'); expect(padded.clearingPrice).toBe('0.8');
+    expect(exact.allocations.map(row => row.filled)).toEqual(padded.allocations.map(row => row.filled));
+    expect([exact.allocations[0]?.paid, padded.allocations[0]?.paid]).toEqual(['6.3', '7.2']);
+  });
   it('rejects coerced runtime supply values before numeric allocation', () => {
     for (const supply of ['10', ['10'], 10n]) {
       const malformed = { ...config, supply } as unknown as typeof config;

@@ -26,7 +26,7 @@ describe('bounded local security audit', () => {
     expect(audit.snapshot().entries).toHaveLength(128); expect(audit.snapshot().dropped).toBe(75);
     audit.memo({ bytes: 512, state: 'ready' }, 'wallet');
     const sequence = audit.snapshot().totalEvents; audit.clear();
-    expect(audit.snapshot()).toMatchObject({ entries: [], dropped: 0, leaksBlocked: 1, shield: 'ACTIVE', networkGuard: true, memo: { bytes: 512 }, totalEvents: sequence });
+    expect(audit.snapshot()).toMatchObject({ entries: [], dropped: 0, leaksBlocked: 1, shield: 'MOCK', networkGuard: true, memo: { bytes: 512 }, totalEvents: sequence });
     audit.reset(); expect(audit.snapshot()).toMatchObject({ leaksBlocked: 1, shield: 'IDLE', memo: { bytes: 0, state: 'empty' } });
     expect(audit.snapshot().entries).toHaveLength(1); expect(audit.snapshot().entries[0]?.sequence).toBe(sequence + 1);
   });
@@ -86,13 +86,13 @@ describe('bounded local security audit', () => {
     const result = await scanMockNotes(notes, key, MOCK_SCAN_SCOPE, undefined, undefined, () => { throw new Error('ignored observer'); });
     expect(result.filter(row => row.status === 'accepted')).toHaveLength(3);
   });
-  it('requires verified local payload state for ACTIVE and clears it on lock, failure and reset', () => {
+  it('requires verified local payload state for MOCK and clears it on lock, failure and reset', () => {
     const audit = new SecurityAudit(); expect(audit.snapshot().shield).toBe('IDLE');
     audit.protocol({ type: 'memo-validated', bytes: 200 }, 'composer'); audit.protocol({ type: 'uri-generated' }, 'wallet');
     expect(audit.snapshot().shield).toBe('IDLE');
     audit.log('committed'); expect(audit.snapshot().shield).toBe('IDLE');
     audit.encryption('idle'); audit.vault({ type: 'decryption-succeeded' }); expect(audit.snapshot().shield).toBe('IDLE');
-    audit.vault({ type: 'scan-memo-validated', bytes: 200 }); expect(audit.snapshot()).toMatchObject({ shield: 'ACTIVE', payloadState: 'vault-verified' });
+    audit.vault({ type: 'scan-memo-validated', bytes: 200 }); expect(audit.snapshot()).toMatchObject({ shield: 'MOCK', payloadState: 'vault-verified' });
     audit.vault({ type: 'vault-locked' }); expect(audit.snapshot().shield).toBe('IDLE');
     audit.vault({ type: 'scan-completed', accepted: 0, rejected: 5, empty: 0 }); expect(audit.snapshot().shield).toBe('OFFLINE');
     audit.reset(); expect(audit.snapshot().shield).toBe('IDLE');

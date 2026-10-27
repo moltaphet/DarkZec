@@ -42,7 +42,8 @@ export interface AuditEntry {
 export interface SecuritySnapshot {
   readonly entries: readonly AuditEntry[];
   readonly leaksBlocked: number;
-  readonly shield: 'ACTIVE' | 'IDLE' | 'OFFLINE';
+  /** `MOCK` means a mock note authenticated locally; no real Orchard decryption ever sets this indicator. */
+  readonly shield: 'MOCK' | 'IDLE' | 'OFFLINE';
   readonly shieldDetail: string;
   readonly payloadState: PayloadSecurityState;
   readonly networkGuard: boolean;
@@ -73,7 +74,7 @@ const isBytes = (value: number): boolean => Number.isInteger(value) && value >= 
 const isCount = (value: number): boolean => Number.isInteger(value) && value >= 0 && value <= 128;
 const PAYLOAD_STATES: Readonly<Record<PayloadSecurityState, readonly [SecuritySnapshot['shield'], string]>> = {
   idle: ['IDLE', 'No authenticated mock note in this view. The commit/reveal sandbox stores hashes only; wallet URIs are readable.'],
-  'vault-verified': ['ACTIVE', 'Mock note authentication and bid validation verified locally; no real Orchard decryption.'],
+  'vault-verified': ['MOCK','Mock note authentication and bid validation verified locally; no real Orchard decryption.'],
   invalid: ['OFFLINE', 'Local payload verification failed; no verified payload is active in this view.'],
 };
 

@@ -71,6 +71,11 @@ test('wallet builder rejects fixtures and gates explicit handoff, invalidating s
   await expect(page.locator('#wallet-uri')).toHaveValue(/^zcash:utest1.+amount=10&memo=/);
   await expect(page.locator('#open-wallet')).not.toHaveAttribute('href');
   await page.locator('#wallet-reviewed').check();
+  // The handoff stays locked until the reveal receipt is saved.
+  await expect(page.locator('#open-wallet')).not.toHaveAttribute('href');
+  await page.locator('#copy-wallet').click();
+  await expect(page.locator('#error')).toContainText('Download the reveal receipt');
+  await Promise.all([page.waitForEvent('download'), page.locator('#download-wallet-receipt').click()]);
   await expect(page.locator('#open-wallet')).toHaveAttribute('href', /^zcash:utest1/);
   await page.locator('#wallet-price').fill('0.73');
   await expect(page.locator('#wallet-output')).toBeHidden();
@@ -123,9 +128,17 @@ test('unrevealed commitments are excluded from clearing and forfeit their collat
   await page.locator('#reveal-expire').click(); await expect(page.locator('#clear')).toBeEnabled();
   await expect(page.locator('#reveal-status')).toContainText('collateral is forfeited');
   await page.locator('#clear').click();
-  await expect(page.locator('#excluded-bids')).toHaveText('2 unrevealed / 20 ZEC collateral forfeited to the vault');
+  await expect(page.locator('#excluded-bids')).toHaveText('2 unrevealed / 20 ZEC collateral forfeited and burned');
   await expect(page.locator('#result-rows tr')).toHaveCount(1);
   await expect(page.locator('#reveal-status')).toContainText('forfeited');
   await page.locator('#audit-index').fill('3'); await page.getByRole('button', { name: 'Verify inclusion' }).click();
   await expect(page.locator('#audit-result')).toContainText('VERIFIED / Entry 3');
+});
+
+test('keyboard focus returns to the control that started an operation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
+  await page.locator('#prepare').click(); await page.locator('#commit').click(); await page.locator('#close').click();
+  await page.locator('#verify-proof').focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#audit-result')).toContainText('VERIFIED');
+  await expect(page.locator('#verify-proof')).toBeFocused();
 });

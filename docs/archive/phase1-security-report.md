@@ -1,6 +1,6 @@
 # Phase 1 — registry, commitments and clearing security
 
-> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](../engineering-report.md) and the README for the current build.
 
 Implemented against the existing Vite/strict TypeScript terminal, preserving the earlier vault, live stream and README work. Address/URI code lives in `src/protocol/`, not a pre-existing `src/lib/zip321.ts`. The clearing calculation now lives in `src/lib/darkpool.ts` and is called by the existing sandbox.
 

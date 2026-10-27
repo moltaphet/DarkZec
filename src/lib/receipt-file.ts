@@ -13,7 +13,7 @@ export function parseReceiptText(text: string, network: Network): BidMemo {
   const value = text.trim();
   if (!value) throw new Error('The receipt file is empty.');
   try { return parseBidMemo(value, network); }
-  catch { throw new Error('This file is not a canonical DarkZec reveal receipt.'); }
+  catch { throw new Error('This is not a canonical DarkZec reveal receipt.'); }
 }
 
 export async function readReceiptFile(file: File, network: Network): Promise<BidMemo> {

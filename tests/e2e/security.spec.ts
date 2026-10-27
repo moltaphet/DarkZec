@@ -46,7 +46,9 @@ test('wallet accepts mixed UAs, projects Orchard payments, and rejects equivalen
   const uri = await page.locator('#wallet-uri').inputValue(); expect(uri.startsWith(`zcash:${WALLET_VAULT}?`)).toBe(true);
   const encoded = new URLSearchParams(uri.split('?')[1]).get('memo'); if (!encoded) throw new Error('Missing memo');
   const memo: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')); expect(memo).toMatchObject({ v: 2, t: 'commit' }); expect(memo).not.toHaveProperty('r');
-  await page.locator('#wallet-reviewed').check(); await expect(page.locator('#open-wallet')).toHaveAttribute('href', uri);
+  await page.locator('#wallet-reviewed').check(); await expect(page.locator('#open-wallet')).not.toHaveAttribute('href');
+  await Promise.all([page.waitForEvent('download'), page.locator('#download-wallet-receipt').click()]);
+  await expect(page.locator('#open-wallet')).toHaveAttribute('href', uri);
   await page.locator('#wallet-refund').fill(vault); await page.locator('#wallet-prepare').click();
   await expect(page.locator('#error')).toContainText('Security error: refund');
   await expect(page.locator('#wallet-uri')).toHaveValue(''); await expect(page.locator('#open-wallet')).not.toHaveAttribute('href');

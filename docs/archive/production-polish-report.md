@@ -1,6 +1,6 @@
 # Production polish: CI, typography and mobile results
 
-> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](../engineering-report.md) and the README for the current build.
 
 Date: 2026-10-18. This pass supersedes the earlier 11px typography minimum and build/unit-only CI configuration.
 

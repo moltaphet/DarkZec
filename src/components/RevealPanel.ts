@@ -1,7 +1,7 @@
 import { Lifetime } from '../lib/dom';
 import type { Disposable } from '../lib/dom';
-import { parseBidMemo, serializeBidMemo } from '../protocol/memo';
-import { downloadText, readReceiptFile, receiptFilename } from '../lib/receipt-file';
+import { downloadText, parseReceiptText, readReceiptFile, receiptFilename, receiptText } from '../lib/receipt-file';
+import type { Network } from '../protocol/address';
 import type { BidMemo, PreparedBid } from '../protocol/memo';
 import type { PublicSnapshot } from '../simulation';
 
@@ -11,6 +11,7 @@ const node = <K extends keyof HTMLElementTagNameMap>(tag: K, text = ''): HTMLEle
 /** Bidder-owned receipt cache, deliberately outside the hash-only auction ledger. */
 export class RevealPanel implements Disposable {
   readonly #host: HTMLElement;
+  readonly #network: Network;
   readonly #receipts = new Map<string, BidMemo>();
   /** Receipts the bidder has downloaded (or that belong to simulated demo bidders). */
   readonly #saved = new Set<string>();
@@ -27,12 +28,12 @@ export class RevealPanel implements Disposable {
   readonly #status = node('p');
   #importedReceipt: BidMemo | undefined;
   constructor(host: HTMLElement, run: (operation: () => Promise<void>) => void,
-    reveal: (bid: BidMemo) => Promise<void>, expire: () => void) {
-    this.#host = host; host.className = 'panel reveal-panel'; host.setAttribute('data-independent-controls', '');
+    reveal: (bid: BidMemo) => Promise<void>, expire: () => void, network: Network) {
+    this.#host = host; this.#network = network; host.className = 'panel reveal-panel'; host.setAttribute('data-independent-controls', '');
     host.setAttribute('aria-label', 'Bidder reveal workspace');
     const heading = node('div'); heading.className = 'panel-heading'; heading.append(node('h2', '03 / Commit → Reveal'), node('span', 'BIDDER WORKSPACE'));
     const content = node('div'); content.className = 'reveal-content';
-    const help = node('p', 'Keep this receipt private until the reveal window. Commit payments contain only an auction ID and hash. The operator cannot recover missing receipts, and a commitment that is not revealed before the deadline forfeits its full collateral. This browser hosts both roles for the demo; it does not isolate them from a compromised device.');
+    const help = node('p', 'Keep this receipt private until the reveal window. Commit payments contain only an auction ID and hash. The operator cannot recover missing receipts, and a commitment that is not revealed before the deadline forfeits its full collateral, which is burned rather than paid to the operator. This browser hosts both roles for the demo; it does not isolate them from a compromised device.');
     const label = node('label', 'Your locally held reveal receipts'); label.htmlFor = 'reveal-select'; this.#select.id = 'reveal-select';
     this.#details.append(node('summary', 'Inspect / copy or paste a private reveal receipt'));
     this.#receipt.id = 'reveal-receipt'; this.#receipt.spellcheck = false; this.#receipt.maxLength = 512;
@@ -48,13 +49,13 @@ export class RevealPanel implements Disposable {
     content.append(help, label, this.#select, this.#details, actions, this.#file, this.#status); host.append(heading, content);
     const fill = (): void => {
       if (!this.#details.open) { this.#receipt.value = ''; return; }
-      this.#receipt.value = this.#importedReceipt ? serializeBidMemo(this.#importedReceipt, 'testnet') : this.#serialized();
+      this.#receipt.value = this.#importedReceipt ? receiptText(this.#importedReceipt, this.#network) : this.#serialized();
     };
     this.#details.addEventListener('toggle', fill, { signal: this.#life.signal });
     this.#select.addEventListener('change', () => { this.#importedReceipt = undefined; fill(); }, { signal: this.#life.signal });
     this.#reveal.addEventListener('click', () => run(async () => {
-      const text = this.#receipt.value || (this.#importedReceipt ? serializeBidMemo(this.#importedReceipt, 'testnet') : this.#serialized());
-      await reveal(parseBidMemo(text, 'testnet')); this.#importedReceipt = undefined; this.#details.open = false; this.#receipt.value = '';
+      const text = this.#receipt.value || (this.#importedReceipt ? receiptText(this.#importedReceipt, this.#network) : this.#serialized());
+      await reveal(parseReceiptText(text, this.#network)); this.#importedReceipt = undefined; this.#details.open = false; this.#receipt.value = '';
     }), { signal: this.#life.signal });
     this.#all.addEventListener('click', () => run(async () => {
       for (const [hash, bid] of this.#receipts) if (!this.#verified.has(hash)) await reveal(bid);
@@ -70,9 +71,9 @@ export class RevealPanel implements Disposable {
     this.#file.addEventListener('change', () => {
       const file = this.#file.files?.[0]; this.#file.value = ''; if (!file) return;
       run(async () => {
-        const bid = await readReceiptFile(file, 'testnet');
+        const bid = await readReceiptFile(file, this.#network);
         this.#importedReceipt = Object.freeze({ ...bid });
-        this.#receipt.value = serializeBidMemo(bid, 'testnet'); this.#details.open = true;
+        this.#receipt.value = receiptText(bid, this.#network); this.#details.open = true;
         this.#note = 'Receipt file loaded and validated. Choose Reveal selected receipt to submit it.';
         this.#refresh();
       });
@@ -85,7 +86,7 @@ export class RevealPanel implements Disposable {
   #busy = false;
   #note = '';
   #refresh(): void { if (this.#snapshot) this.update(this.#snapshot, this.#busy); }
-  #serialized(): string { const bid = this.#receipts.get(this.#select.value); return bid ? serializeBidMemo(bid, 'testnet') : ''; }
+  #serialized(): string { const bid = this.#receipts.get(this.#select.value); return bid ? receiptText(bid, this.#network) : ''; }
   /** `saved` marks receipts that need no bidder backup, such as simulated demo bidders. */
   remember(prepared: PreparedBid, saved = false): void {
     if (this.#receipts.has(prepared.commitment)) return;

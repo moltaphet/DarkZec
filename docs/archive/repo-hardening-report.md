@@ -1,6 +1,6 @@
 # Comprehensive repository hardening audit
 
-> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](../engineering-report.md) and the README for the current build.
 
 Date: 2026-10-18. Scope: A1, B1, B2, B3, B6 and D1–D4 against the combined active Git working tree. Earlier Phase 1/Phase 2 work was preserved and reverified. No commit, push or deployment was performed.
 

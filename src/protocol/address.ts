@@ -50,6 +50,13 @@ function readCompact(bytes: Uint8Array, cursor: { offset: number }): number {
   return Number(value);
 }
 
+/** Network named by a Revision 0 UA's human-readable part; anything else is refused rather than guessed. */
+export function unifiedAddressNetwork(address: string): Network {
+  if (address.startsWith('utest1')) return 'testnet';
+  if (address.startsWith('u1')) return 'mainnet';
+  throw new Error('A u1… (mainnet) or utest1… (testnet) Unified Address is required.');
+}
+
 export function decodeUnifiedAddress(address: string, network: Network): readonly Receiver[] {
   if (network !== 'mainnet' && network !== 'testnet') throw new Error('Select a valid network.');
   if (address.length > MAX_ADDRESS_LENGTH || address !== address.toLowerCase()) throw new Error('Use a lowercase Unified Address (maximum 2048 characters).');

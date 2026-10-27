@@ -44,7 +44,10 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 | Bidder changes price, quantity, salt or refund after committing | Prevented | Reveal must recompute to a recorded commitment; tests cover each substitution. |
 | Attacker copies a victim's commitment hash | Prevented | Duplicate commitments are refused and the copier cannot produce the preimage. |
 | Reveal on another auction | Prevented | The commitment is `["DARKZEC/bid/v2", auction_id, ...]`, so it is auction-bound. |
-| Free option / griefing by never revealing | **Mitigated by forfeiture** | Unrevealed commitments forfeit the whole collateral; they still appear in the frozen root. Not enforced on-chain in the prototype. |
+| Free option / griefing by never revealing | **Mitigated by forfeiture** | Unrevealed commitments forfeit the whole collateral, which is burned; they still appear in the frozen root. Not enforced on-chain in the prototype. |
+| Operator ignores honest reveals to keep their collateral | **Incentive removed** | Forfeited collateral is burned, never credited to the operator, so rejecting a valid reveal earns the operator nothing. Censorship itself is still possible without signed reveal acknowledgements (see roadmap). |
+| Operator places shill bids and withholds their reveal after seeing others | **Made costly** | A withheld shill reveal burns the operator's own collateral instead of returning it to the operator's vault. The operator still sees revealed bids before clearing. |
+| Bidder inflates the price with lots it cannot win | Not solved (rule property) | A partially filled marginal bid sets the uniform price, so extra requested quantity can raise what every winner pays (`0.8 x 1` vs `0.8 x 2` in the README example). This is a known property of multi-unit uniform-price auctions and is pinned by a regression test. |
 | Refund redirected to the vault | Prevented | Refund and vault must resolve to different Orchard receivers, even across different UA strings. |
 | Transparent fallback leaks the payer | Mitigated | Every instruction is projected to an Orchard-only UA; bare transparent addresses are refused. |
 | Operator drops a commitment | **Partly mitigated** | A bidder can prove inclusion only if the root covers their commitment. A dropped commitment cannot be proven after the fact without an external timestamp. |
@@ -57,7 +60,7 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 
 ## Trust assumptions in this build
 
-The vault operator is trusted to: not leak revealed bids, run the announced clearing rule, publish the true root, return refunds and apply forfeiture honestly. The sandbox hosts bidder and operator in one browser, so it demonstrates the rules and data flow, not the separation.
+The vault operator is trusted to: not leak revealed bids, run the announced clearing rule, publish the true root, return refunds, accept every valid reveal and burn forfeited collateral honestly. The sandbox hosts bidder and operator in one browser, so it demonstrates the rules and data flow, not the separation.
 
 ## Roadmap to reduce operator trust (not implemented)
 
@@ -65,7 +68,8 @@ The vault operator is trusted to: not leak revealed bids, run the announced clea
 2. Encrypt reveals to a **threshold key**, or run the operator in a **TEE** with attestation, so no single party reads bids before clearing.
 3. **Anchor the root** at close in an external timestamped record, so omission becomes provable.
 4. Publish the full reveal set after clearing so anyone can re-run the deterministic clearing, or prove clearing in zero knowledge.
-5. Real Orchard scanning through an audited adapter in place of the mock vault, and on-chain handling of refunds and forfeiture.
+5. Real Orchard scanning through an audited adapter in place of the mock vault, and on-chain handling of refunds and the forfeiture burn.
+6. **Signed reveal acknowledgements**: the operator signs each received reveal inside the window, so a bidder can prove an ignored reveal.
 
 ## What the prototype demonstrates
 

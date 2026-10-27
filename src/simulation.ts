@@ -113,7 +113,8 @@ export class Sandbox {
       // The root covers every accepted commitment, so it equals the value a bidder verified after close.
       const root = await merkleRoot(this.#records.map(record => record.commitment));
       const excluded = this.#records.length - bids.length;
-      // Non-reveal penalty: the full collateral of every unrevealed commitment is forfeited to the vault.
+      // Non-reveal penalty: the full collateral of every unrevealed commitment is burned. It is never credited to the
+      // operator, who would otherwise profit from ignoring reveals or from withholding the reveal of its own shill bids.
       const forfeited = this.#records.filter(record => !record.reveal).reduce((total, record) => total + parseZec(record.collateral), 0n);
       const posted = this.#records.reduce((total, record) => total + parseZec(record.collateral), 0n);
       const settlement = Object.freeze({ ...result, root, excluded, forfeitedCollateral: formatZec(forfeited), postedCollateral: formatZec(posted) });

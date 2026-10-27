@@ -8,7 +8,7 @@ The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Thi
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification (Node 26.10.0): **73 unit/privacy/CLI tests across 10 files, 39 E2E tests and 46 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
+Current observed verification (Node 26.10.0): **78 unit/privacy/CLI tests across 11 files, 41 E2E tests and 49 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -80,7 +80,7 @@ Web Crypto derives fresh salts using secret entropy, a fresh nonce and HMAC-SHA2
 
 **Persistence exception.** Auction bids and telemetry are not persisted. Only the viewing-key session adapter writes mock-key tab-session ciphertext: AES-256-GCM with a passphrase-derived PBKDF2-SHA256 key at 600,000 iterations. Invalid/non-mock input is rejected before storage access. Stored ciphertext must have the exact mock-key-plus-tag length, and decrypted credentials are validated again, so legacy non-mock records cannot unlock. Reload requires the passphrase again. Lock/view changes clear live vault references and private rows; Forget removes the stored record. JavaScript strings, garbage collection and OS clipboards cannot provide reliable secure erasure.
 
-**Non-reveal penalty.** A commitment not revealed (and verified) before the reveal deadline forfeits its full collateral to the vault: `SettlementResult.forfeitedCollateral` is the sum of those collaterals and `payments + refunds + forfeited` equals every posted collateral. Unrevealed commitments stay in the frozen Merkle tree. Actual settlement of the forfeiture is outside the sandbox.
+**Non-reveal penalty.** A commitment not revealed (and verified) before the reveal deadline forfeits its full collateral, which is burned rather than credited to the operator (otherwise the operator, who judges reveal validity, would profit from ignoring reveals): `SettlementResult.forfeitedCollateral` is the sum of those collaterals and `payments + refunds + forfeited` equals every posted collateral. Unrevealed commitments stay in the frozen Merkle tree. Actual settlement of the forfeiture is outside the sandbox.
 
 **Receipts and wallet memo round trip.** `src/lib/receipt-file.ts` downloads and imports the canonical reveal JSON (size-capped, strictly parsed, never auto-persisted). `src/lib/memo-import.ts` parses a memo copied from a wallet (text, unpadded Base64url or zero-padded hex), accepts only the public commit shape and compares it with the prepared request. `settlementBalance()` independently checks `payments + refunds + forfeited = posted collateral`, and the UI shows the result. See [threat-model.md](threat-model.md) and [testnet-interop.md](testnet-interop.md).
 
@@ -124,19 +124,19 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 73 tests passed across 10 files. |
-| `npm run build` | Strict TypeScript passed; 46 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 39 passing E2E tests. |
+| `npm test` | 78 tests passed across 11 files. |
+| `npm run build` | Strict TypeScript passed; 49 transformed modules. |
+| `npm run test:e2e` | Fresh build followed by 41 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |
-| CI configuration | YAML validated; push/PR triggers, read-only permissions, SHA-pinned actions, Node 22/24, `npm ci`, Chromium dependencies and sequential build/unit/E2E steps. |
+| CI configuration | YAML validated; push-to-main/PR triggers, a runtime `npm audit` gate, read-only permissions, SHA-pinned actions, Node 22/24, `npm ci`, Chromium dependencies and sequential build/unit/E2E steps. |
 
 The temporary browser config only selects cached Chromium for this workspace. The maintained configuration is portable. Browser coverage includes existing protocol/wallet/vault/security flows, the five reproduced Phase 2 regressions, failed Merkle compilation and an oversized winning bid priced against competing demand; unit coverage includes missing-build CLI failures. Source privacy, registry origin and strict typing checks remain enabled. Desktop/mobile screenshots are generated under `test-results/` and visually reviewed. No public CI or independent audit result is claimed.
 
-The targeted pass additionally rejects checksum-valid real viewing keys before storage and authentic legacy encrypted non-mock records during unlock. Source and runtime privacy guards now restrict the storage exception to encrypted mock credentials. A timing race in the CSP/log-clear test was fixed by waiting for the initial memo operation to finish before asserting that history clears; legitimate later events are not suppressed. See the [targeted hardening report](targeted-hardening-report.md) for the full changed-file inventory and verification commands.
+The targeted pass additionally rejects checksum-valid real viewing keys before storage and authentic legacy encrypted non-mock records during unlock. Source and runtime privacy guards now restrict the storage exception to encrypted mock credentials. A timing race in the CSP/log-clear test was fixed by waiting for the initial memo operation to finish before asserting that history clears; legitimate later events are not suppressed. See the [targeted hardening report](archive/targeted-hardening-report.md) for the full changed-file inventory and verification commands.
 
-The later [production polish report](production-polish-report.md) records the 12px/14px typography upgrade, exact placeholders, explicit scrolling utilities and complete CI verification. CI has no failure-tolerating steps. GitHub-hosted execution requires pushing the workflow; enforcing merge blocking additionally requires the repository's `main` branch protection to require both Node matrix checks, up-to-date branches and restricted direct pushes/bypasses. Local changes do not assert that those repository settings have been configured.
+The later [production polish report](archive/production-polish-report.md) records the 12px/14px typography upgrade, exact placeholders, explicit scrolling utilities and complete CI verification. CI has no failure-tolerating steps. GitHub-hosted execution requires pushing the workflow; enforcing merge blocking additionally requires the repository's `main` branch protection to require both Node matrix checks, up-to-date branches and restricted direct pushes/bypasses. Local changes do not assert that those repository settings have been configured.
 
 ## References, provenance and remaining integration work
 
@@ -145,4 +145,4 @@ The later [production polish report](production-polish-report.md) records the 12
 - [Zodl](https://github.com/zodl-inc) is the wallet UX/handoff reference; device compatibility and actual payment execution require testing. [NEAR Intents](https://docs.near-intents.org/) is a future settlement reference; no solver/API integration is active.
 - Production requires audited Orchard adapters, restricted viewing/spending authority, authenticated bidder/settlement instructions, durable receipts, root publication, deadlines and selective disclosure. The browser/operator/device remain trusted. This is a verified local prototype, not an audited custody system or a ZK proof of auction execution.
 
-See the [comprehensive hardening audit](repo-hardening-report.md), [Phase 1 security audit](phase1-security-report.md), [Phase 2 QA audit](phase2-qa-report.md), [vault report](viewing-key-vault-report.md), [live-stream report](live-terminal-report.md) and [UI report](ui-polish-report.md). Earlier stage reports retain historical measurements; this report and the README describe the active combined checkout.
+See the [comprehensive hardening audit](archive/repo-hardening-report.md), [Phase 1 security audit](archive/phase1-security-report.md), [Phase 2 QA audit](archive/phase2-qa-report.md), [vault report](archive/viewing-key-vault-report.md), [live-stream report](archive/live-terminal-report.md) and [UI report](archive/ui-polish-report.md). Earlier stage reports retain historical measurements; this report and the README describe the active combined checkout.

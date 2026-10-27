@@ -16,7 +16,7 @@ This checks that the payment request DarkZec builds really survives a trip throu
 2. Paste the vault address and your refund address. Enter a limit price and quantity. DarkZec refuses its public demo fixtures, identical refund and vault receivers, transparent addresses and non-Orchard UAs.
 3. Choose **Prepare private payment request**. Check the memo audit (`N / 512 BYTES`).
 4. **Download the receipt (.json) now.** It holds your private price, quantity, salt and refund address, and it is needed to reveal later.
-5. Tick the review box and choose **Open wallet**, or copy the URI into your wallet manually. In the wallet confirm the **network, the full vault address, the amount and the memo** before sending.
+5. Tick the review box and choose **Open wallet**, or **Copy sensitive URI** into your wallet. Both stay locked until the receipt from step 4 is downloaded. In the wallet confirm the **network, the full vault address, the amount and the memo** before sending.
 6. In the vault wallet, wait for the incoming shielded note and open its memo. Copy the memo text exactly as the wallet shows it. Unpadded Base64url and hex are also accepted.
 7. Back in DarkZec, under **Verify the memo your wallet received**, paste it and choose **Verify received memo**.
 

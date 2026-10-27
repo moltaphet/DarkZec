@@ -38,7 +38,7 @@ test('vault attempts, authentication, quarantine and lock are audited without pr
   await page.locator('#vault-passphrase').fill(DEMO_UNLOCK_PASSPHRASE); await page.locator('#vault-unlock').click();
   await expect(page.locator('#vault-mode')).toHaveText('MOCK / UNLOCKED'); await page.locator('#vault-load-notes').click();
   await expect(page.locator('#vault-accepted dd')).toHaveText('3');
-  await expect(page.locator('#stream-shield')).toHaveText('ACTIVE');
+  await expect(page.locator('#stream-shield')).toHaveText('MOCK');
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded();
   await expect(log).toContainText('Attempt refused: local session unlock'); await expect(log).toContainText('authenticated mock decryption');
   await expect(log).toContainText('3 accepted / 1 quarantined / 1 empty');

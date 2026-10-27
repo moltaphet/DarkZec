@@ -1,6 +1,6 @@
 # NODE 07 UI/UX polish
 
-> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](engineering-report.md) and the README for the current build.
+> **Historical stage report.** Written before the commit/reveal ledger rewrite and the UI merge: its test counts, commitment/sandbox-encryption wording and Merkle timing may be outdated. See the [engineering report](../engineering-report.md) and the README for the current build.
 
 Historical UI stage report. [Phase 2 QA](phase2-qa-report.md) supersedes its canvas ArrowLeft behavior, reset flow, startup shield/address-policy meaning and verification counts. The current engineering report documents the combined Git-enabled checkout.
 

@@ -11,7 +11,8 @@ export interface ImportedCommitMemo {
 }
 export interface MemoComparison { readonly matches: boolean; readonly detail: string }
 
-const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+// ignoreBOM keeps a leading BOM, so the canonical commit-memo check rejects it instead of it being stripped silently.
+const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 function decodeText(bytes: Uint8Array): string {
   try { return STRICT_UTF8.decode(bytes); } catch { throw new Error('The memo is not valid UTF-8.'); }
 }
@@ -27,9 +28,11 @@ export function parseReceivedCommitMemo(input: string): ImportedCommitMemo {
   if (!value) throw new Error('Paste the memo text from your wallet.');
   if (value.length > 1100) throw new Error('A memo field is at most 512 bytes; this input is too long.');
   let transport: ImportTransport; let text: string;
+  // Wallets and CLIs print hex in either case, sometimes with a 0x prefix.
+  const hexDigits = /^0x/i.test(value) ? value.slice(2) : value;
   if (value.startsWith('{')) { transport = 'json'; text = value; }
-  else if (/^(?:[a-f0-9]{2})+$/.test(value)) {
-    const bytes = unhex(value);
+  else if (/^(?:[a-fA-F0-9]{2})+$/.test(hexDigits)) {
+    const bytes = unhex(hexDigits.toLowerCase());
     if (bytes.length > 512) throw new Error('A memo field is at most 512 bytes; this input is too long.');
     let end = bytes.length; while (end > 0 && bytes[end - 1] === 0) end--;
     if (bytes[0] !== 0x7b) throw new Error('The hex memo is not a JSON commit memo.');

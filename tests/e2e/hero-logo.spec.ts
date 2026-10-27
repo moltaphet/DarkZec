@@ -21,6 +21,16 @@ test('full-page WebGL scene renders, animates and brand text settles back', asyn
   expect(errors).toEqual([]);
 });
 
+test('skip intro jumps past the journey and keeps the frame heading below the masthead', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
+  await expect(page.locator('html')).toHaveClass(/has-scene/);
+  await page.getByRole('link', { name: /Skip intro/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-phase', 'app');
+  const [titleTop, mastheadBottom] = await page.evaluate(() => [
+    document.querySelector('.deal-title')?.getBoundingClientRect().top ?? -1, document.querySelector('.masthead')?.getBoundingClientRect().bottom ?? Infinity]);
+  expect(titleTop).toBeGreaterThanOrEqual(mastheadBottom);
+});
+
 test('reduced motion renders one static 3D frame', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
