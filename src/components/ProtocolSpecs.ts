@@ -25,7 +25,7 @@ const ENTRIES: readonly ProtocolEntry[] = [
       'The commit memo is compact JSON containing a version, the auction ID and the 64-character commitment hash. The private bid (canonical price, quantity, secret salt and Orchard refund address) stays in a separate reveal receipt. DarkZec checks the UTF-8 byte length of every memo before encoding: the decoded payload must fit within the 512-byte shielded memo field. ZIP-302 describes memo-field interpretation; the wallet’s Zcash transaction machinery performs the actual note and memo encryption.',
       'ZIP-321 carries the commit memo bytes as unpadded Base64url in the memo parameter of a zcash: payment URI. The request includes an Orchard-only Unified Address and an exact ZEC amount. Zodl or another compatible Orchard wallet can review the request and construct the shielded payment; URI handling depends on the installed wallet and device.',
     ],
-    formula: 'JSON → UTF-8 ≤ 512 bytes → Base64url → ZIP-321 URI → wallet → encrypted Orchard memo',
+    formula: 'JSON → UTF-8 ≤ 512 bytes → Base64url → ZIP-321 URI → wallet → encrypted shielded memo (Ironwood pool)',
     note: 'PRIVATE HANDOFF / Base64url is readable encoding, not encryption. The URI contains only the auction ID and commitment hash; your reveal receipt holds the private bid and salt, so keep it secret. Share the URI only with a trusted wallet, and verify the full destination, network and amount there. No seed or spending key is requested.',
   },
   {

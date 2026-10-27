@@ -125,7 +125,7 @@ export class ViewingKeyVault implements Disposable {
       const key = await mockNoteKey(value); this.#check(signal);
       this.#key = key; this.#kind = kind; this.#results = [];
       notifyAudit(this.#audit, { type: 'vault-saved' }); notifyAudit(this.#audit, { type: 'vault-unlocked', mock: true });
-      this.#message('Mock vault unlocked. Load demo notes to scan locally; no real Orchard decryption occurs.');
+      this.#message('Mock vault unlocked. Load demo notes to scan locally; no real shielded-note decryption occurs.');
     }); }, { signal });
     this.#unlock.addEventListener('click', () => { void this.#run('unlock', async signal => {
       const passphrase = this.#passphrase.value; this.#clearInputs();

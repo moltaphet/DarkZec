@@ -497,7 +497,7 @@ button('testnet-check').addEventListener('click', () => { void action(async () =
     output.textContent = `CONFIRMED / ${result.confirmations} confirmation${result.confirmations === 1 ? '' : 's'} / ${formatZec(BigInt(result.amountZat))} ZEC / tx ${result.txid}`;
     output.classList.add('is-ok'); telemetry.log('wallet');
   } else {
-    const messages = { 'not-found': 'No matching confirmed Orchard payment was found. Check that the local wallet can view the vault address and that the memo and collateral are exact.', 'wrong-network': 'The local wallet is not connected to Zcash testnet.', syncing: 'Wait for the local testnet node to finish syncing, then check again.', 'wallet-not-configured': 'Configure the local zcashd RPC credentials, then restart DarkZec.', 'node-unavailable': 'The local testnet wallet RPC could not complete the check.' } as const;
+    const messages = { 'not-found': 'No matching confirmed shielded payment reached the vault\'s Orchard receiver. Check that the local wallet can view the vault address and that the memo and collateral are exact.', 'wrong-network': 'The local wallet is not connected to Zcash testnet.', syncing: 'Wait for the local testnet node to finish syncing, then check again.', 'wallet-not-configured': 'Configure the local zcashd RPC credentials, then restart DarkZec.', 'node-unavailable': 'The local testnet wallet RPC could not complete the check.' } as const;
     output.textContent = `NOT CONFIRMED / ${messages[result.status]}`; output.classList.add('is-bad'); telemetry.log('invalid');
   }
 }); });

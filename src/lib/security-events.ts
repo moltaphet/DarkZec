@@ -74,7 +74,7 @@ const isBytes = (value: number): boolean => Number.isInteger(value) && value >= 
 const isCount = (value: number): boolean => Number.isInteger(value) && value >= 0 && value <= 128;
 const PAYLOAD_STATES: Readonly<Record<PayloadSecurityState, readonly [SecuritySnapshot['shield'], string]>> = {
   idle: ['IDLE', 'No authenticated mock note in this view. The commit/reveal sandbox stores hashes only; wallet URIs are readable.'],
-  'vault-verified': ['MOCK','Mock note authentication and bid validation verified locally; no real Orchard decryption.'],
+  'vault-verified': ['MOCK','Mock note authentication and bid validation verified locally; no real shielded-note decryption.'],
   invalid: ['OFFLINE', 'Local payload verification failed; no verified payload is active in this view.'],
 };
 

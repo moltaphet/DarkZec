@@ -28,7 +28,7 @@ The key property is the first row: during the commit phase the operator cannot r
 | Property | Plain auction server | DarkZec design |
 | --- | --- | --- |
 | Operator can read bids while they are submitted | Yes | **No**, hash only until reveal |
-| Link between bidder and bid on a public ledger | Account or IP, often public payment rails | Shielded Orchard payment with fixed amount and no bid data |
+| Link between bidder and bid on a public ledger | Account or IP, often public payment rails | Shielded payment to an Orchard receiver (Ironwood pool) with fixed amount and no bid data |
 | Participant can prove they were included | No | **Yes**, SHA-256 Merkle proof against a root frozen at close |
 | Cost of withholding a losing or unfavorable bid | None | **Full collateral is forfeited** if the reveal never verifies |
 | Bid substitution after seeing others | Possible | **Prevented**, the commitment binds price, quantity, salt, refund and auction |

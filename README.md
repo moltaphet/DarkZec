@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/assets/darkzec-logo.png" width="360" alt="DarkZec logo: a vault-locked order book with a Z and a green gem" /></p>
 
-# DarkZec // Sealed-Bid Auctions & OTC Dark Pools on Zcash
+# DarkZec // Sealed-Bid Auctions on Zcash
 
 ![ZECATHON · Track: Private Markets · NODE 07 · Local prototype](docs/assets/darkzec-badges.svg)
 
@@ -10,9 +10,28 @@
 
 **Proven on testnet: [DZ-TESTNET-1](docs/testnet-run/README.md)** — a complete auction on the public Zcash testnet: two commits paid as shielded memos, two reveals sent as shielded memos, imported from the chain, cleared at the Vickrey second price and audited 8/8. Txids, the audit bundle and the lessons learned (Ironwood routing, memo enhancement) are in that report.
 
-DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** settled through Zcash's Orchard shielded pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
+DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** paid to Orchard receivers and settled in Zcash's shielded Ironwood pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
 
-[Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
+[Judge path](#judge-path-60-seconds) · [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
+
+## Judge path (60 seconds)
+
+<p align="center"><img src="docs/media/walkthrough.gif" width="820" alt="DarkZec walkthrough: sealed book, operator view, clearing result and audit mode verifying the real testnet bundle" /></p>
+
+1. Open **[darkzec.xyz](https://darkzec.xyz)** and choose **Skip intro**.
+2. **+ Load 3 demo bids**, then **Prepare sealed bid** and **Commit to local vault**. The book holds four hashes; **Operator view** reads *Bid data held: None*.
+3. **Close auction** (the operator signs the frozen root), then **Reveal all local receipts / demo** (each reveal gets a signed acknowledgement; only now does the operator see bids).
+4. **Finalize & clear**: `0.68 ZEC`, `10 / 10` lots and a green `BALANCED` conservation line.
+5. **Audit mode** → **Load this session's bundle**: all 8 checks pass. Edit the clearing price in the JSON and verify again: the clearing re-run and the result signature fail.
+6. **Real chain:** in Audit mode, import [`DZ-TESTNET-1-audit-bundle.json`](docs/testnet-run/DZ-TESTNET-1-audit-bundle.json), the auction run on the public Zcash testnet with shielded commits and reveals ([txids](docs/testnet-run/README.md)). It verifies 8/8.
+
+| Sealed book: hashes only | Operator view after reveal |
+| --- | --- |
+| <img src="docs/media/sealed-book.png" alt="Composer and sealed book with four commitment hashes" /> | <img src="docs/media/operator-view.png" alt="Operator view listing revealed bids, signed statements and signing key" /> |
+| **Clearing result and conservation check** | **Audit mode on the real testnet auction** |
+| <img src="docs/media/clearing-result.png" alt="Uniform price 0.68 ZEC, 10 of 10 lots, balanced settlement" /> | <img src="docs/media/audit-mode-testnet.png" alt="Audit mode verifying DZ-TESTNET-1 with all eight checks passing" /> |
+
+Screenshots are regenerated with `node scripts/capture-media.ts` against a running build.
 
 ## What is real and what is mock
 
@@ -22,8 +41,8 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 | ZIP-302 memo sizing (exact UTF-8 ≤ 512 bytes) and ZIP-321 `zcash:` URI generation (unpadded Base64url) | **Real**. |
 | Salted, domain-separated bid commitments and SHA-256 Merkle inclusion proofs | **Real**, computed locally with Web Crypto. |
 | Memo round trip: verify a commit memo copied from a real wallet against your prepared request; reveal receipt download/import | **Real**, local checks (see [testnet round trip](docs/testnet-interop.md)). |
-| Local Zcash testnet payment check | **Real read-only wallet RPC check** for a confirmed Orchard note with the exact collateral tier and commit memo; user-triggered, local node only. |
-| Live testnet auction | **Real** commit and reveal ingestion from confirmed Orchard memos at a vault the local wallet views (read-only RPC). Commits enter the ledger oldest first; reveals arrive as a second shielded memo. No funds are settled. |
+| Local Zcash testnet payment check | **Real read-only wallet check** for a confirmed shielded note at the vault's Orchard receiver (Ironwood pool) with the exact collateral tier and commit memo; user-triggered, local node only. |
+| Live testnet auction | **Real** commit and reveal ingestion from confirmed shielded memos (Ironwood pool) at a vault the local wallet views (read-only RPC). Commits enter the ledger oldest first; reveals arrive as a second shielded memo. No funds are settled. |
 | Operator signatures and audit mode | **Real**: ECDSA P-256 signatures over the frozen root at close, every accepted reveal and the result; an exportable audit bundle that any browser re-verifies in eight checks. The signing key is per session and not bound to an identity. |
 | Collateral tiers and unit-demand mode | **Real**: 0.1, 1, 10 or 100 ZEC per auction; unit-demand auctions clear at the truthful (k+1)-th price (Vickrey for one lot). |
 | Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; refunds are accounting results, not transactions. |
@@ -219,7 +238,7 @@ Saved mock keys are wrapped with AES-256-GCM using PBKDF2-SHA256 (600,000 iterat
 
 ### 3. Security stream and wallet request
 
-The **Security event stream** records fixed-vocabulary events with numeric metadata only (no keys, salts, addresses, amounts or payloads). `LEAKS BLOCKED` counts observed CSP blocks; `MEMO BYTE CAPACITY` reports validated JSON bytes; the `ORCHARD SHIELD` indicator reads `MOCK` only after an authenticated mock note scan (it never claims real Orchard decryption), and stays `IDLE` for the commit/reveal ledger, which stores hashes only. History keeps 128 events (18 shown in the rail).
+The **Security event stream** records fixed-vocabulary events with numeric metadata only (no keys, salts, addresses, amounts or payloads). `LEAKS BLOCKED` counts observed CSP blocks; `MEMO BYTE CAPACITY` reports validated JSON bytes; the `SHIELD STATUS` indicator reads `MOCK` only after an authenticated mock note scan (it never claims real Orchard decryption), and stays `IDLE` for the commit/reveal ledger, which stores hashes only. History keeps 128 events (18 shown in the rail).
 
 **Wallet request** builds a testnet payment URI from addresses you supply; mainnet is disabled because no vault service exists for this prototype. **Copy** and **Open wallet** stay locked until you download the reveal receipt and confirm the Orchard destination, network and escrow, so a request cannot be paid without the receipt needed to reveal it. Opening a wallet is an explicit transfer of the request to that handler.
 

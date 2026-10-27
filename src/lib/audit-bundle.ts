@@ -31,6 +31,7 @@ export interface AuditReport { readonly ok: boolean; readonly auctionId: string 
 export const AUDIT_BUNDLE_MAX_BYTES = 262_144;
 const HASH = /^[a-f0-9]{64}$/;
 const keysAre = (value: object, expected: string): boolean => Object.keys(value).sort().join(',') === expected;
+const lots = (count: number): string => `${count} lot${count === 1 ? '' : 's'}`;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export function buildAuditBundle(input: {
@@ -114,7 +115,7 @@ export async function verifyAuditBundle(text: string): Promise<AuditReport> {
     if (parseZec(auction.reserve) === 0n || parseZec(auction.collateral) === 0n || formatZec(parseZec(auction.collateral)) !== auction.collateral) throw new Error('Reserve and collateral must be positive canonical ZEC amounts.');
     if (orchardPaymentAddress(auction.vault, auction.network) !== auction.vault) throw new Error('The vault must be an Orchard-only Unified Address.');
     config = Object.freeze({ auctionId: auction.auctionId, supply: auction.supply, reserve: auction.reserve, vault: auction.vault, network: auction.network, collateral: auction.collateral, unitDemand: auction.unitDemand });
-    add('rules', 'Auction rules', true, `${auction.auctionId} / ${auction.supply} lots / reserve ${auction.reserve} ZEC / ${auction.collateral} ZEC collateral${auction.unitDemand ? ' / unit demand' : ''}.`);
+    add('rules', 'Auction rules', true, `${auction.auctionId} / ${lots(auction.supply)} / reserve ${auction.reserve} ZEC / ${auction.collateral} ZEC collateral${auction.unitDemand ? ' / unit demand' : ''}.`);
   } catch (error: unknown) { add('rules', 'Auction rules', false, error instanceof Error ? error.message : 'Invalid auction rules.'); }
 
   // 2. Frozen Merkle root over every commitment, revealed or not.
@@ -151,7 +152,7 @@ export async function verifyAuditBundle(text: string): Promise<AuditReport> {
       const collateral = parseZec(auction.collateral); const unrevealed = BigInt(commitments.length - opened.size);
       recomputed = Object.freeze({ ...cleared, excluded: commitments.length - opened.size, forfeitedCollateral: formatZec(collateral * unrevealed), postedCollateral: formatZec(collateral * BigInt(commitments.length)) });
       const same = canonicalResult(recomputed) === canonicalResult(result);
-      add('clearing', 'Clearing re-run', same, same ? `Recomputed ${recomputed.clearingPrice} ZEC for ${recomputed.filled} lots; every allocation matches.` : `The published result differs from the recomputed one (${recomputed.clearingPrice} ZEC, ${recomputed.filled} lots).`);
+      add('clearing', 'Clearing re-run', same, same ? `Recomputed ${recomputed.clearingPrice} ZEC for ${lots(recomputed.filled)}; every allocation matches.` : `The published result differs from the recomputed one (${recomputed.clearingPrice} ZEC, ${lots(recomputed.filled)}).`);
     } catch (error: unknown) { add('clearing', 'Clearing re-run', false, error instanceof Error ? error.message : 'Clearing could not be recomputed.'); }
   } else add('clearing', 'Clearing re-run', false, 'Skipped: the rules or reveals above are invalid.');
 

@@ -71,7 +71,7 @@ export class LiveTerminalStream implements Disposable {
     const metric = (label: string, id: string): HTMLElement => {
       const group = node('div'); const value = node('dd'); value.id = id; group.append(node('dt', '', label), value); metrics.append(group); return value;
     };
-    const leaks = metric('LEAKS BLOCKED', 'stream-leaks'); const shield = metric('ORCHARD SHIELD', 'stream-shield');
+    const leaks = metric('LEAKS BLOCKED', 'stream-leaks'); const shield = metric('SHIELD STATUS', 'stream-shield');
     const bytes = metric('MEMO BYTE CAPACITY', 'stream-bytes');
     const capacity = node('meter', 'stream-capacity'); capacity.min = 0; capacity.max = 512; capacity.setAttribute('aria-label', 'Memo byte capacity');
     const memoState = node('p', 'stream-memo-state'); memoState.id = 'stream-memo-state';

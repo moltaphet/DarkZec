@@ -39,7 +39,7 @@ A `MISMATCH` means the memo that arrived differs from the request (another aucti
 
 1. In **Auction sandbox**, open **Live testnet auction**, paste the vault address your local wallet views, choose the auction ID, collateral tier and clearing mode, then **Start live testnet auction**.
 2. Each bidder prepares a request in **Wallet request** with the same auction ID and tier, downloads the receipt and pays it.
-3. When the commits are confirmed, choose **Sync from vault**. Only confirmed Orchard notes with the exact tier and an exact commit memo enter the book, oldest first.
+3. When the commits are confirmed, choose **Sync from vault**. Only confirmed shielded notes at the vault's Orchard receiver (Ironwood pool since NU6.3) with the exact tier and an exact commit memo enter the book, oldest first.
 4. **Close auction**. Each bidder loads their receipt under **Reveal on chain** and pays the `0.0001` ZEC reveal request before the deadline.
 5. **Sync from vault** again: each valid reveal is accepted and acknowledged with an operator signature. Then **Finalize & clear**.
 6. In **Operator view**, download the audit bundle and verify it in **Audit mode**.
