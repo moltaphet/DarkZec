@@ -35,14 +35,12 @@ code, pre, textarea, .hash, table, .commitment-row, [role="log"], .memo-console,
   font-family: var(--mono);
 }
 
-/* Header: brand emblem, hairline rules. */
-.brand-emblem { display: block; width: 44px; height: 44px; flex: none; filter: drop-shadow(0 0 10px rgb(0 255 102 / 22%)); transition: filter .2s; }
-.brand:hover .brand-emblem, .brand:focus-visible .brand-emblem { filter: drop-shadow(0 0 14px rgb(0 255 102 / 45%)); }
-@media (max-width: 760px) { .brand-emblem { width: 36px; height: 36px; } }
+/* Header: the official DarkZec logo (public/brand/darkzec-logo.svg), hairline rules. */
+.brand-logo { display: block; width: auto; height: 60px; flex: none; filter: drop-shadow(0 0 10px rgb(0 255 102 / 20%)); transition: filter .2s; }
+.brand:hover .brand-logo, .brand:focus-visible .brand-logo { filter: drop-shadow(0 0 16px rgb(0 255 102 / 45%)); }
+@media (max-width: 760px) { .brand-logo { height: 46px; } }
 .masthead { height: 96px; gap: 24px; background: var(--bg); }
 .brand { display: flex; align-items: center; gap: 14px; font-size: 17px; letter-spacing: 0; font-weight: 700; }
-.brand-word { letter-spacing: -.01em; }
-.brand-slash { display: none; }
 .masthead-sub { border-left: 1px solid var(--line); padding-left: 22px; letter-spacing: .1em; text-transform: uppercase; }
 .node-label {
   padding: 9px 12px;

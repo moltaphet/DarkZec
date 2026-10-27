@@ -12,7 +12,6 @@ import { mountNetworkHeader } from './components/NetworkHeader';
 import { mountActionRipples } from './components/ActionRipples';
 import { mountHeroLogo } from './components/HeroLogo';
 import { mountScene } from './components/Scene3D';
-import { mountBrandDecode } from './components/BrandDecode';
 import { MemoScramble } from './components/MemoScramble';
 import { BlindOrderflow } from './components/BlindOrderflow';
 import { TelemetryRail } from './components/TelemetryRail';
@@ -89,8 +88,6 @@ if (scene) {
   document.querySelectorAll('.callout').forEach(node => reveal.observe(node));
   effects.own(() => { root.classList.remove('has-scene'); delete root.dataset.phase; reveal.disconnect(); scene.destroy(); });
 }
-const brandWord = document.querySelector<HTMLElement>('.brand-word');
-if (brand && brandWord) { const decode = mountBrandDecode(brandWord, brand); effects.own(() => decode.destroy()); }
 const ripples = mountActionRipples(document.body);
 effects.own(() => ripples.destroy()); effects.own(() => orderflow.destroy());
 effects.own(() => memoPreview.destroy()); effects.own(() => telemetry.destroy());

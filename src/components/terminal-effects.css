@@ -36,37 +36,15 @@ body::before {
   transition: color .2s, text-shadow .2s;
 }
 
-.brand-word { display: inline-block; position: relative; }
 .brand:hover, .brand:focus-visible { color: #ffce73; text-shadow: 0 0 22px #ffce7344; }
 
-.brand-word::before, .brand-word::after {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-}
+/* Hover or focus briefly jitters the logo; NetworkHeader clears the class on animationend. */
+.is-glitching .brand-logo { animation: logo-jitter .38s steps(2, end); }
 
-.brand-word::before { color: #ffce73; clip-path: inset(15% 0 54%); }
-.brand-word::after { color: #00f058; clip-path: inset(59% 0 15%); }
-.is-glitching .brand-word { animation: brand-jitter .38s steps(2, end); }
-.is-glitching .brand-word::before { animation: glitch-upper .38s steps(2, end); }
-.is-glitching .brand-word::after { animation: glitch-lower .38s steps(2, end); }
-
-@keyframes brand-jitter {
-  15%, 55% { transform: translateX(1px); text-shadow: -2px 0 #ffce73; }
-  30%, 75% { transform: translateX(-1px); text-shadow: 2px 0 #00f058; }
+@keyframes logo-jitter {
+  15%, 55% { transform: translateX(1px); filter: drop-shadow(-2px 0 #ffce73); }
+  30%, 75% { transform: translateX(-1px); filter: drop-shadow(2px 0 #00f058); }
   100% { transform: none; }
-}
-@keyframes glitch-upper {
-  12%, 54% { opacity: .8; transform: translate(3px, -1px); }
-  30%, 75% { opacity: .4; transform: translate(-3px, 0); }
-  100% { opacity: 0; transform: none; }
-}
-@keyframes glitch-lower {
-  18%, 60% { opacity: .8; transform: translate(-2px, 1px); }
-  38%, 80% { opacity: .5; transform: translate(3px, 0); }
-  100% { opacity: 0; transform: none; }
 }
 
 .intro { padding: 38px 0 30px; }
@@ -298,9 +276,6 @@ a.button.primary:not([aria-disabled='true']):hover { background: #2c2a2e; }
 }
 @media (prefers-reduced-motion: reduce) {
   .panel::before, .memo-console[data-state='scrambling'] .memo-hex-stream,
-  .is-glitching .brand-word, .is-glitching .brand-word::before, .is-glitching .brand-word::after {
-    animation: none;
-  }
-  .brand-word::before, .brand-word::after { display: none; }
+  .is-glitching .brand-logo { animation: none; }
   .action-ripple { display: none; }
 }

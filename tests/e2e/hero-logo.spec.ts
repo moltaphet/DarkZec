@@ -17,7 +17,9 @@ test('full-page WebGL scene renders, animates and brand text settles back', asyn
   const first = await frames(page); await page.waitForTimeout(1200);
   expect(await frames(page)).toBeGreaterThan(first);
   await page.mouse.wheel(0, 600); await page.waitForTimeout(400);
-  await expect(page.locator('.brand-word')).toHaveText('DARKZEC');
+  await expect(page.locator('.brand-logo')).toBeVisible();
+  // The official SVG logo must load under the CSP (it embeds its image as a data: URI).
+  expect(await page.locator('.brand-logo').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -37,7 +39,7 @@ test('reduced motion renders one static 3D frame', async ({ page }) => {
   await expect(page.locator('#scene-3d')).toHaveAttribute('data-scene', 'webgl');
   const first = await frames(page); await page.waitForTimeout(900);
   expect(await frames(page) - first).toBeLessThanOrEqual(2);
-  await expect(page.locator('.brand-word')).toHaveText('DARKZEC');
+  await expect(page.locator('.brand-logo')).toBeVisible();
 });
 
 test('without WebGL the flat particle mark takes over', async ({ page }) => {

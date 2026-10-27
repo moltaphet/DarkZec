@@ -77,11 +77,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   text-decoration: none;
 }
 
-.brand-slash {
-  color: var(--green);
-  margin-left: 10px;
-}
-
 .masthead-sub {
   letter-spacing: 1px;
   border-left: 1px solid var(--line);
