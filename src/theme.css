@@ -36,7 +36,7 @@ code, pre, textarea, .hash, table, .commitment-row, [role="log"], .memo-console,
 }
 
 /* Header: the official DarkZec logo (public/brand/darkzec-logo.svg), hairline rules. */
-.brand-logo { display: block; width: auto; height: 60px; flex: none; filter: drop-shadow(0 0 10px rgb(0 255 102 / 20%)); transition: filter .2s; }
+.brand-logo { display: block; width: auto; height: 60px; flex: none; filter: drop-shadow(0 0 10px rgb(0 255 102 / 20%)); transition: filter .2s, height .3s; }
 .brand:hover .brand-logo, .brand:focus-visible .brand-logo { filter: drop-shadow(0 0 16px rgb(0 255 102 / 45%)); }
 @media (max-width: 760px) { .brand-logo { height: 46px; } }
 .masthead { height: 96px; gap: 24px; background: var(--bg); }
@@ -217,8 +217,11 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .has-scene .masthead { position: fixed; inset: 0 0 auto; z-index: 30; height: auto; padding: 18px 28px; gap: 14px; border: 0; background: none; pointer-events: none; }
 .has-scene .masthead > * { pointer-events: auto; }
 /* Inside the terminal the transparent fixed bar would overlap scrolling text, so it gains a backdrop there only. */
-.has-scene[data-phase="app"] .masthead::before { content: ""; position: fixed; inset: 0 0 auto; height: 96px; z-index: -1; pointer-events: none;
+.has-scene[data-phase="app"] .masthead::before { content: ""; position: fixed; inset: 0 0 auto; height: 70px; z-index: -1; pointer-events: none;
   background: rgb(6 7 7 / 94%); border-bottom: 1px solid var(--line); }
+/* The bar stays compact in the terminal: a smaller logo keeps the backdrop line below it and above the telemetry dock. */
+.has-scene[data-phase="app"] .masthead { padding-top: 6px; }
+.has-scene[data-phase="app"] .brand-logo { height: 44px; }
 @media (max-width: 760px) { .has-scene[data-phase="app"] .masthead::before { height: 112px; } }
 .has-scene .masthead-sub, .has-scene .node-label { display: none; }
 .has-scene .navigation { position: fixed; top: 16px; right: 28px; z-index: 31; width: auto; height: auto; gap: 8px; border: 0; overflow: visible; }
