@@ -115,12 +115,14 @@ test('the wallet builds tiered commit requests and an on-chain reveal request fr
   const receipt = await readFile(await download.path(), 'utf8');
 
   await expect(page.locator('#wallet-reveal-open')).not.toHaveAttribute('href');
+  await expect(page.locator('#wallet-reveal-qr')).toBeHidden();
   await page.locator('#wallet-reveal-file').setInputFiles(await download.path());
   await expect(page.locator('#wallet-reveal-output')).toBeVisible();
   const uri = await page.locator('#wallet-reveal-uri').inputValue();
   expect(uri.startsWith(`zcash:${WALLET_VAULT}?amount=0.0001&memo=`)).toBe(true);
   expect(Buffer.from(new URLSearchParams(uri.split('?')[1]).get('memo') ?? '', 'base64url').toString('utf8')).toBe(receipt);
   await expect(page.locator('#wallet-reveal-open')).toHaveAttribute('href', uri);
+  await expect(page.locator('#wallet-reveal-qr canvas')).toBeVisible();
   await page.locator('#wallet-vault').fill(WALLET_REFUND); await page.locator('#wallet-reveal-file').setInputFiles(await download.path());
   await expect(page.locator('#error')).toContainText('refund address must differ');
   await expect(page.locator('#wallet-reveal-output')).toBeHidden();

@@ -64,7 +64,7 @@ The vault operator is trusted to: not leak revealed bids, run the announced clea
 
 ## Roadmap to reduce operator trust
 
-1. ~~Deliver reveals as a second shielded memo to the vault~~ **Done:** the Wallet request tab builds a reveal payment and the live auction imports reveal memos.
+1. ~~Deliver reveals as a second shielded memo to the vault~~ **Done:** the Pay with wallet tab builds a reveal payment and the live auction imports reveal memos.
 2. Encrypt reveals to a **threshold key**, or run the operator in a **TEE** with attestation, so no single party reads bids before clearing.
 3. **Anchor the root** at close in an external timestamped record, so omission becomes provable.
 4. ~~Publish the full reveal set after clearing so anyone can re-run the clearing~~ **Done** as the audit bundle and audit mode. Proving clearing in zero knowledge without publishing bids remains open.

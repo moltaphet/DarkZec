@@ -22,6 +22,7 @@ import { LiveAuctionPanel } from './components/LiveAuctionPanel';
 import type { LiveAuctionSettings } from './components/LiveAuctionPanel';
 import { OperatorPanel } from './components/OperatorPanel';
 import { AuditView } from './components/AuditView';
+import { PaymentQr } from './components/PaymentQr';
 import { AuctionSession } from './lib/auction-session';
 import { serializeAuditBundle } from './lib/audit-bundle';
 import { SecurityAudit } from './lib/security-events';
@@ -131,6 +132,8 @@ const operatorPanel = new OperatorPanel(el('operator-view'), () => { void action
 }); });
 effects.own(() => operatorPanel.destroy());
 const auditView = new AuditView(el('audit-view'), () => { const bundle = session?.bundle(); return bundle ? serializeAuditBundle(bundle) : undefined; });
+const walletQr = new PaymentQr(el('wallet-qr'), 'QR code of the ZIP-321 commit payment request');
+const revealQr = new PaymentQr(el('wallet-reveal-qr'), 'QR code of the ZIP-321 reveal payment request');
 effects.own(() => auditView.destroy());
 
 function currentSession(): AuctionSession { if (!session) throw new Error('The local vault is still starting.'); return session; }
@@ -166,6 +169,7 @@ function updateWalletLink(): void {
   link.setAttribute('aria-disabled', String(!enabled));
   if (enabled && walletPrepared) { link.href = walletPrepared.uri; link.tabIndex = 0; }
   else { link.removeAttribute('href'); link.tabIndex = -1; }
+  walletQr.show(enabled && walletPrepared ? walletPrepared.uri : '');
 }
 function eraseWalletReveal(): void {
   walletRevealUri = ''; area('wallet-reveal-uri').value = ''; visible('wallet-reveal-output', false); updateRevealLink();
@@ -174,6 +178,7 @@ function updateRevealLink(): void {
   const link = element('wallet-reveal-open', HTMLAnchorElement); const enabled = walletRevealUri !== '' && !working;
   link.setAttribute('aria-disabled', String(!enabled));
   if (enabled) { link.href = walletRevealUri; link.tabIndex = 0; } else { link.removeAttribute('href'); link.tabIndex = -1; }
+  revealQr.show(enabled ? walletRevealUri : '');
 }
 function renderNodeStatus(label: string): void { text('network-status', `● ${label}`); }
 /** The testnet checker only answers same-origin loopback requests, so a public deployment never probes it. */
@@ -463,7 +468,7 @@ button('download-wallet-receipt').addEventListener('click', () => {
     if (!walletPrepared) throw new Error('Prepare a request first.');
     downloadText(receiptFilename(walletPrepared.reveal, walletPrepared.commitment), area('wallet-reveal').value);
     walletReceiptSaved = true;
-    status('Reveal receipt downloaded. It holds your private price, quantity, salt and refund address: store it securely and never share it. Copy and Open wallet are now available.');
+    status('Reveal receipt downloaded. It holds your private price, quantity, salt and refund address: store it securely and never share it. Tick the review box to unlock Copy, the QR code and Open in wallet.');
   });
 });
 function clearMemoVerification(): void {

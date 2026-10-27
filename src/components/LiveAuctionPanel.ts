@@ -46,7 +46,7 @@ export class LiveAuctionPanel implements Disposable {
     const heading = node('div', '', 'panel-heading'); heading.append(node('h2', 'Live testnet auction'), node('span', 'COMMITS AND REVEALS FROM SHIELDED MEMOS'));
     const content = node('div', '', 'tool-content');
     this.#details.append(node('summary', 'Run this auction against a real Zcash testnet vault'));
-    const help = node('p', 'Bidders pay the collateral tier to the vault with a commit memo from the Wallet request tab, then pay a small reveal memo after close. The local wallet must already view the vault address. Sync reads only confirmed shielded notes at the vault\'s Orchard receiver (Ironwood pool since NU6.3, or legacy Orchard): commits before close, reveals after it. Order follows confirmations, oldest first, so the operator does not choose tie priority. No funds move from this page.');
+    const help = node('p', 'Bidders pay the collateral tier to the vault with a commit memo from the Pay with wallet tab, then pay a small reveal memo after close. The local wallet must already view the vault address. Sync reads only confirmed shielded notes at the vault\'s Orchard receiver (Ironwood pool since NU6.3, or legacy Orchard): commits before close, reveals after it. Order follows confirmations, oldest first, so the operator does not choose tie priority. No funds move from this page.');
     this.#vault.spellcheck = false; this.#vault.placeholder = "Vault utest1… address viewed by your local wallet";
     this.#auction.value = 'LIVE-001'; this.#auction.maxLength = 48; this.#auction.spellcheck = false;
     this.#reserve.value = '0.5'; this.#reserve.inputMode = 'decimal'; this.#reserve.maxLength = 17;

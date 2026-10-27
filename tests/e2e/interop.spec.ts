@@ -5,7 +5,7 @@ import { WALLET_REFUND, WALLET_VAULT } from '../fixtures';
 import { revealLocalReceipts } from './auction-helpers';
 
 async function prepareWalletRequest(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Wallet request' }).click();
+  await page.getByRole('button', { name: 'Pay with wallet' }).click();
   await page.locator('#wallet-vault').fill(WALLET_VAULT); await page.locator('#wallet-refund').fill(WALLET_REFUND);
   await page.locator('#wallet-price').fill('0.72'); await page.locator('#wallet-quantity').fill('4');
   await page.locator('#wallet-prepare').click(); await expect(page.locator('#wallet-output')).toBeVisible();

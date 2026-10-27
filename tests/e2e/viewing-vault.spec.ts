@@ -53,7 +53,7 @@ test('reload requires passphrase, wrong passphrases cannot unlock, and forget re
   await page.locator('#vault-passphrase').fill(DEMO_UNLOCK_PASSPHRASE); await page.locator('#vault-unlock').click();
   await expect(page.locator('#vault-mode')).toHaveText('MOCK / UNLOCKED');
   await page.locator('#vault-load-notes').click(); await expect(page.locator('#vault-accepted dd')).toHaveText('3');
-  await page.getByRole('button', { name: 'Wallet request' }).click();
+  await page.getByRole('button', { name: 'Pay with wallet' }).click();
   await page.getByRole('button', { name: 'Vault scanner' }).click();
   await expect(page.locator('#vault-mode')).toHaveText('LOCKED');
   await expect(page.locator('#vault-result-rows tr[data-status="accepted"]')).toHaveCount(0);

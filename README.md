@@ -182,15 +182,15 @@ The full table, the attack-by-attack responses and the roadmap to reduce operato
 
 ### Real-wallet round trip
 
-The Wallet request tab can verify a memo copied out of a real wallet: build a request, pay it on testnet, paste the memo the vault wallet received into **Verify received memo**, and DarkZec reports whether it is exactly your commitment (text, unpadded Base64url or zero-padded hex accepted; bid preimages are rejected). Step-by-step instructions are in [docs/testnet-interop.md](docs/testnet-interop.md). This is a local check; nothing is sent anywhere.
+The Pay with wallet tab can verify a memo copied out of a real wallet: build a request, pay it on testnet, paste the memo the vault wallet received into **Verify received memo**, and DarkZec reports whether it is exactly your commitment (text, unpadded Base64url or zero-padded hex accepted; bid preimages are rejected). Step-by-step instructions are in [docs/testnet-interop.md](docs/testnet-interop.md). This is a local check; nothing is sent anywhere.
 
 ### Live testnet auction
 
 The sandbox can run against a real Zcash testnet vault. Open **Live testnet auction**, enter a vault address your local wallet already views, an auction ID, a collateral tier, a clearing mode and a reveal window, and start it. Then:
 
-1. Bidders build commit requests in **Wallet request** (same auction ID and tier) and pay them.
+1. Bidders build commit requests in **Pay with wallet** (same auction ID and tier) and pay them.
 2. **Sync from vault** imports every confirmed Orchard note at the vault whose memo is an exact commit for this auction and whose value is exactly the tier. Notes are ordered by confirmations, oldest first, so tie priority follows the chain rather than the operator.
-3. After **Close auction**, bidders send their receipt as a second shielded memo with **Reveal on chain** (Wallet request tab). **Sync from vault** now reads reveal memos, verifies each against its commitment, and signs an acknowledgement for every accepted one.
+3. After **Close auction**, bidders send their receipt as a second shielded memo with **Reveal on chain** (Pay with wallet tab). **Sync from vault** now reads reveal memos, verifies each against its commitment, and signs an acknowledgement for every accepted one.
 4. **Finalize & clear**, then export and verify the audit bundle.
 
 The server reads the vault in one of two ways, both read-only and loopback-only. With `DARKZEC_DEVTOOL_WALLET=<wallet dir>` it reads a [zcash-devtool](https://github.com/zcash/zcash-devtool) light wallet's SQLite data; keep that wallet current with `zcash-devtool wallet -w <dir> sync` and then `enhance` (light-client sync stores notes without memos until `enhance` fetches the full transactions). Otherwise it uses zcashd's `getblockchaininfo` and `z_listreceivedbyaddress`. Viewing keys and RPC credentials never reach the browser. The reveal deadline is judged by the operator's clock at import time, not by block time. The RPC is zcashd's; zcashd reached end of support in 2026, so a Zallet or Zebra-based adapter is the next integration step.
@@ -236,11 +236,11 @@ Fixtures are public test-vector receiving data, not deposit instructions; no wal
 
 Saved mock keys are wrapped with AES-256-GCM using PBKDF2-SHA256 (600,000 iterations) and a 12–128 character passphrase in tab session storage. Never enter real viewing keys, seed phrases or spending keys.
 
-### 3. Security stream and wallet request
+### 3. Security stream and paying with a wallet
 
 The **Security event stream** records fixed-vocabulary events with numeric metadata only (no keys, salts, addresses, amounts or payloads). `LEAKS BLOCKED` counts observed CSP blocks; `MEMO BYTE CAPACITY` reports validated JSON bytes; the `SHIELD STATUS` indicator reads `MOCK` only after an authenticated mock note scan (it never claims real Orchard decryption), and stays `IDLE` for the commit/reveal ledger, which stores hashes only. History keeps 128 events (18 shown in the rail).
 
-**Wallet request** builds a testnet payment URI from addresses you supply; mainnet is disabled because no vault service exists for this prototype. **Copy** and **Open wallet** stay locked until you download the reveal receipt and confirm the Orchard destination, network and escrow, so a request cannot be paid without the receipt needed to reveal it. Opening a wallet is an explicit transfer of the request to that handler.
+**Pay with wallet** builds a testnet ZIP-321 payment request from addresses you supply; mainnet is disabled because no vault service exists for this prototype. There is no wallet connect, by design: shielded Zcash wallets are separate apps, and the page never asks for keys, balances or addresses. The request is handed over as a URI, an **Open in wallet** link or a QR code drawn in the browser. **Copy**, the QR code and **Open in wallet** stay locked until you download the reveal receipt and confirm the Orchard destination, network and escrow, so a request cannot be paid without the receipt needed to reveal it. Opening a wallet is an explicit transfer of the request to that handler.
 
 ## Verification
 

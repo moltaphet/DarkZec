@@ -55,7 +55,7 @@ test('complete local auction stays same-origin, reveals deliberately, audits and
 
 test('wallet builder rejects fixtures and gates explicit handoff, invalidating stale requests', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Wallet request' }).click();
+  await page.getByRole('button', { name: 'Pay with wallet' }).click();
   await page.locator('#wallet-vault').fill('t1transparent');
   await page.locator('#wallet-refund').fill(WALLET_REFUND);
   await page.locator('#wallet-price').fill('0.72');

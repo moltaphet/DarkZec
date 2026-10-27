@@ -887,6 +887,40 @@ td:first-child {
   height: 150px;
 }
 
+.wallet-why {
+  margin: 26px 28px 0;
+  padding: 14px 16px;
+  border-left: 2px solid var(--accent);
+  background: rgb(0 255 102 / 6%);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.wallet-why + .wallet-description {
+  margin-top: 16px;
+}
+
+.payment-qr:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 18px;
+}
+
+.payment-qr canvas {
+  display: block;
+  width: min(260px, 100%);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.payment-qr figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .wallet-buttons {
   flex-wrap: wrap;
   gap: 12px;
