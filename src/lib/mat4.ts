@@ -41,3 +41,13 @@ export function model(scale: number, rx: number, ry: number, rz: number, tx: num
   out[12] = tx; out[13] = ty; out[14] = tz; out[15] = 1;
   return out;
 }
+
+/** Projects a world point through a view-projection matrix to CSS pixels; null when it is behind the camera. */
+export function projectToScreen(matrix: Mat4, point: readonly [number, number, number], width: number, height: number): { readonly x: number; readonly y: number } | null {
+  const [px, py, pz] = point;
+  const w = at(matrix, 3) * px + at(matrix, 7) * py + at(matrix, 11) * pz + at(matrix, 15);
+  if (w <= 0) return null;
+  const x = (at(matrix, 0) * px + at(matrix, 4) * py + at(matrix, 8) * pz + at(matrix, 12)) / w;
+  const y = (at(matrix, 1) * px + at(matrix, 5) * py + at(matrix, 9) * pz + at(matrix, 13)) / w;
+  return { x: (x + 1) / 2 * width, y: (1 - y) / 2 * height };
+}

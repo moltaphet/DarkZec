@@ -235,6 +235,11 @@ h1 span, .stream-metrics dd, .telemetry-counters dd { text-shadow: none; }
 .has-scene .journey { height: 400vh; }
 .has-scene .intro { position: absolute; top: max(14vh, 96px); right: 0; left: 0; padding: 0 24px; display: block; padding: 0; text-align: center; }
 .has-scene .intro::before, .has-scene .intro::after { display: none; }
+/* The official logo leads the introduction; it is shown as supplied, only scaled. */
+.intro-logo { display: block; width: min(220px, 52vw); height: auto; margin: 0 0 18px; filter: drop-shadow(0 0 24px rgb(0 255 102 / 18%)); }
+/* With the 3D scene the logo sits inside the gate ring and fades as the camera starts flying into it. */
+.has-scene .intro-logo { position: fixed; left: var(--gate-x, 50%); top: var(--gate-y, 62%); z-index: 1; width: calc(var(--gate-r, 120px) * 1.7); max-width: none; margin: 0;
+  transform: translate(-50%, -39%); pointer-events: none; opacity: clamp(0, calc(1 - var(--journey, 0) * 9), 1); }
 .has-scene .eyebrow { margin-bottom: 18px; font-size: 12px; letter-spacing: .3em; }
 .has-scene h1 { font-family: var(--display); font-weight: 900; font-size: clamp(30px, 4.4vw, 64px); line-height: 1.1; letter-spacing: .005em; display: inline-block; transform: scaleX(1.1); }
 .has-scene h1 span { color: var(--accent); text-shadow: 0 0 26px rgb(0 255 102 / 55%); }

@@ -77,6 +77,11 @@ const scene = mountScene(element('scene-3d', HTMLCanvasElement), () => { root.cl
   root.style.setProperty('--journey', progress.toFixed(3));
   const phase = progress >= 0.985 ? 'app' : 'journey';
   if (root.dataset.phase !== phase) root.dataset.phase = phase;
+}, gate => {
+  // The official logo is pinned inside the gate ring; whole pixels keep style writes rare.
+  for (const [name, value] of [['--gate-x', gate.x], ['--gate-y', gate.y], ['--gate-r', gate.radius]] as const) {
+    const next = `${Math.round(value)}px`; if (root.style.getPropertyValue(name) !== next) root.style.setProperty(name, next);
+  }
 });
 if (scene) {
   root.classList.add('has-scene');

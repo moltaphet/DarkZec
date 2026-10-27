@@ -1,6 +1,6 @@
 import { Lifetime } from '../lib/dom';
 import type { Disposable } from '../lib/dom';
-import { lookAt, model, multiply, perspective } from '../lib/mat4';
+import { lookAt, model, multiply, perspective, projectToScreen } from '../lib/mat4';
 import type { Mat4 } from '../lib/mat4';
 import { buildLogoParticles } from './HeroLogo';
 
@@ -106,7 +106,10 @@ const smooth = (edge0: number, edge1: number, x: number): number => { const t = 
  * Full-page scroll-driven scene: a particle portal ring with HUD halos and the DarkZec mark, standing in a misty
  * particle field. The camera flies towards the gate as the introduction scrolls by.
  */
-export function mountScene(canvas: HTMLCanvasElement, onUnavailable: () => void, onProgress: (progress: number) => void = () => undefined): Disposable | null {
+/** The gate ring's on-screen centre and outer radius in CSS pixels, so page elements can sit inside it. */
+export interface GateFrame { readonly x: number; readonly y: number; readonly radius: number }
+export function mountScene(canvas: HTMLCanvasElement, onUnavailable: () => void, onProgress: (progress: number) => void = () => undefined,
+  onGate: (gate: GateFrame) => void = () => undefined): Disposable | null {
   const gl = canvas.getContext('webgl', { antialias: false, alpha: true, premultipliedAlpha: true, powerPreference: 'high-performance' });
   if (!gl) return null;
   let program: WebGLProgram;
@@ -200,6 +203,9 @@ export function mountScene(canvas: HTMLCanvasElement, onUnavailable: () => void,
     const view = lookAt(eye, [0, 3.5 * (1 - pe) + RING_Y * pe, -3 * pe]);
     const projection = perspective(0.9, aspect, 0.1, 120);
     const viewProjection = multiply(projection, view);
+    const centre = projectToScreen(viewProjection, [0, RING_Y, 0], canvas.clientWidth, canvas.clientHeight);
+    const rim = projectToScreen(viewProjection, [1.9, RING_Y, 0], canvas.clientWidth, canvas.clientHeight);
+    if (centre && rim) onGate({ x: centre.x, y: centre.y, radius: Math.hypot(rim.x - centre.x, rim.y - centre.y) });
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.disable(gl.DEPTH_TEST);
     gl.uniform1f(U.time, t); gl.uniform1f(U.build, reduced ? 9 : t); gl.uniform1f(U.pixel, height);
