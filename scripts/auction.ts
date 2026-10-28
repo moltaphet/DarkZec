@@ -7,16 +7,17 @@ import { devtoolStatus } from './devtool-wallet.ts';
 /**
  * One command for an operator: checks the setup, keeps the vault wallet current in the background, serves DarkZec and opens it.
  *
- *   npm run auction -- --wallet <wallet dir> [--devtool <zcash-devtool binary>] [--port 4173] [--interval 20] [--no-open]
+ *   npm run auction -- --wallet <wallet dir> [--devtool <zcash-devtool binary>] [--port 4173] [--interval 20] [--confirmations 3] [--no-open]
  *
  * The wallet is the zcash-devtool wallet that views the auction's vault account (one fresh account per auction). While this runs,
  * `wallet sync` and `wallet enhance` repeat every few seconds, so the page's Sync button always sees fresh notes; transport errors
  * are logged and retried instead of ending anything. Nothing is sent anywhere except to the light wallet server zcash-devtool uses.
  */
 const run = promisify(execFile);
-const { values } = parseArgs({ options: { wallet: { type: 'string' }, devtool: { type: 'string' }, port: { type: 'string' }, interval: { type: 'string' }, 'no-open': { type: 'boolean', default: false } } });
+const { values } = parseArgs({ options: { wallet: { type: 'string' }, devtool: { type: 'string' }, port: { type: 'string' }, interval: { type: 'string' }, confirmations: { type: 'string' }, 'no-open': { type: 'boolean', default: false } } });
 const wallet = values.wallet ?? process.env.DARKZEC_DEVTOOL_WALLET; const devtool = values.devtool ?? process.env.DARKZEC_DEVTOOL_BIN ?? 'zcash-devtool';
 const port = Number(values.port ?? process.env.PORT ?? 4173); const interval = Math.max(5, Number(values.interval ?? 20)) * 1000;
+const confirmations = Number(values.confirmations ?? process.env.DARKZEC_MIN_CONFIRMATIONS ?? 3);
 const say = (line: string): void => console.log(`${new Date().toISOString().slice(11, 19)} ${line}`);
 const mark = (ok: boolean, text: string, hint = ''): boolean => { console.log(`  ${ok ? '✓' : '✗'} ${text}${ok || !hint ? '' : `\n      → ${hint}`}`); return ok; };
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
@@ -26,6 +27,7 @@ let ready = true;
 const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
 ready = mark(major > 22 || (major === 22 && minor >= 18), `Node ${process.versions.node}`, 'Node 22.18 or newer is required (it runs the TypeScript scripts and node:sqlite).') && ready;
 ready = mark(Number.isInteger(port) && port >= 1024 && port <= 65535, `port ${port}`, 'Choose --port between 1024 and 65535.') && ready;
+ready = mark(Number.isInteger(confirmations) && confirmations >= 1 && confirmations <= 100, `${confirmations} confirmation${confirmations === 1 ? '' : 's'} before a payment counts${confirmations === 1 ? ' (one block is not final: a reorganisation can drop it)' : ''}`, 'Use --confirmations between 1 and 100 (3 is the default).') && ready;
 let devtoolOk = false;
 try { await run(devtool, ['--help']); devtoolOk = true; } catch { /* reported below */ }
 ready = mark(devtoolOk, `zcash-devtool (${devtool})`, 'Build it from https://github.com/zcash/zcash-devtool and pass --devtool <path> or set DARKZEC_DEVTOOL_BIN.') && ready;
@@ -59,7 +61,7 @@ const loop = (async (): Promise<void> => {
   }
 })();
 
-const server = spawn(process.execPath, ['scripts/serve.ts'], { stdio: 'inherit', env: { ...process.env, PORT: String(port), DARKZEC_DEVTOOL_WALLET: wallet as string, DARKZEC_DEVTOOL_BIN: devtool } });
+const server = spawn(process.execPath, ['scripts/serve.ts'], { stdio: 'inherit', env: { ...process.env, PORT: String(port), DARKZEC_DEVTOOL_WALLET: wallet as string, DARKZEC_DEVTOOL_BIN: devtool, DARKZEC_MIN_CONFIRMATIONS: String(confirmations) } });
 const url = `http://127.0.0.1:${port}`;
 say(`DarkZec is running at ${url}`);
 say('Open "Run this auction against a real Zcash testnet vault", fill in the auction, and keep the downloaded operator key file safe. Ctrl+C stops everything.');

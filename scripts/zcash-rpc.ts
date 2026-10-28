@@ -9,6 +9,8 @@ export interface LocalChainStatus {
   readonly synced: boolean;
   readonly blocks?: number;
   readonly headers?: number;
+  /** Unix time of the newest block the local wallet has scanned (devtool wallets only). */
+  readonly tipTime?: number;
   readonly reason?: 'wallet-not-configured' | 'node-unavailable' | 'wrong-network' | 'syncing';
 }
 export type CommitPaymentResult =
@@ -23,6 +25,18 @@ const RPC_ENDPOINT = 'http://127.0.0.1:18232/';
 /** Collateral tiers (0.1, 1, 10 or 100 ZEC). Every bid in one auction posts the same tier, so the amount reveals nothing. */
 export const COLLATERAL_TIERS_ZAT: readonly number[] = Object.freeze([10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000]);
 const DEFAULT_COLLATERAL_ZAT = 1_000_000_000;
+const intFromEnv = (name: string, fallback: number, min: number, max: number): number => {
+  const value = Number(process.env[name]); return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
+};
+/**
+ * Confirmations a payment needs before it counts (default 3). One block is not final: a testnet reorganisation can drop a payment the
+ * ledger already accepted, so a deeper requirement trades a little latency for safety. Set DARKZEC_MIN_CONFIRMATIONS (1 to 100).
+ */
+export const minConfirmations = (): number => intFromEnv('DARKZEC_MIN_CONFIRMATIONS', 3, 1, 100);
+/** A wallet whose newest block is older than this is behind the network (default 300 s, 12 blocks). Set DARKZEC_MAX_TIP_AGE_SECONDS. */
+const maxTipAgeSeconds = (): number => intFromEnv('DARKZEC_MAX_TIP_AGE_SECONDS', 300, 30, 86_400);
+/** Notes scanned, commits and reveals returned per auction: beyond these the answer is an explicit error, never a silent cut. */
+const MAX_NOTES = 8192; const MAX_COMMITS = 512; const MAX_REVEALS = 1024;
 /** Payments to an Orchard receiver settle in the Ironwood pool since NU6.3; older Orchard-pool notes still count. */
 const isShieldedPool = (pool: unknown): boolean => pool === 'orchard' || pool === 'ironwood';
 const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -81,10 +95,13 @@ export async function localChainStatus(): Promise<LocalChainStatus> {
   const devtool = devtoolWalletDir();
   if (devtool) {
     try {
-      const { network, tip } = await devtoolStatus(devtool);
+      const { network, tip, tipTime } = await devtoolStatus(devtool);
       if (network !== 'testnet') return { connected: true, network, synced: false, reason: 'wrong-network' };
       if (tip === undefined) return { connected: true, network, synced: false, reason: 'syncing' };
-      return { connected: true, network, synced: true, blocks: tip, headers: tip };
+      const time = tipTime === undefined ? {} : { tipTime };
+      // The wallet only knows its own height, so freshness is judged by the age of its newest block: an old one means it is behind.
+      if (tipTime !== undefined && Date.now() / 1000 - tipTime > maxTipAgeSeconds()) return { connected: true, network, synced: false, blocks: tip, headers: tip, ...time, reason: 'syncing' };
+      return { connected: true, network, synced: true, blocks: tip, headers: tip, ...time };
     } catch { return { connected: false, network: 'unknown', synced: false, reason: 'node-unavailable' }; }
   }
   if (!configuredCredentials()) return { connected: false, network: 'unknown', synced: false, reason: 'wallet-not-configured' };
@@ -125,7 +142,7 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
     if (!Array.isArray(notes)) throw new Error('node-unavailable');
     const matches = notes.filter((note: unknown) => isRecord(note) && isShieldedPool(note.pool) &&
       note.txid && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
-      Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 &&
+      Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= minConfirmations() &&
       Number.isSafeInteger(note.amountZat) && Number(note.amountZat) === collateralZat &&
       matchesCommitMemo(note, auctionId, commitment));
     if (matches.length === 0) return { status: 'not-found' };
@@ -144,8 +161,8 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
 export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number; readonly height: number }
 export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number; readonly height: number }
 export type VaultMemoResult =
-  | { readonly status: 'ok'; readonly tip: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
-  | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' };
+  | { readonly status: 'ok'; readonly tip: number; readonly minConfirmations: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
+  | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' | 'too-many-notes' };
 
 /**
  * Reads every confirmed Orchard note the local wallet can view at the vault and classifies its memo:
@@ -166,11 +183,13 @@ export async function listVaultMemos(address: string, auctionId: string, collate
   try { notes = await receivedNotes(address); } catch { return { status: 'node-unavailable' }; }
   if (!Array.isArray(notes)) return { status: 'node-unavailable' };
   const confirmed = notes.filter((note: unknown): note is JsonRecord => isRecord(note) && isShieldedPool(note.pool) && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
-    Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 && Number.isSafeInteger(note.amountZat) && Number(note.amountZat) > 0)
+    Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= minConfirmations() && Number.isSafeInteger(note.amountZat) && Number(note.amountZat) > 0)
     .sort((a, b) => Number(b.confirmations) - Number(a.confirmations) || String(a.txid).localeCompare(String(b.txid)));
   const tip = status.blocks; if (!Number.isSafeInteger(tip)) return { status: 'node-unavailable' };
+  // Every note at the vault is read: a silent cut would hide the newest payments (the list is oldest first), so too many is an explicit error.
+  if (confirmed.length > MAX_NOTES) return { status: 'too-many-notes' };
   const commits: VaultCommitNote[] = []; const reveals: VaultRevealNote[] = []; const seen = new Set<string>();
-  for (const note of confirmed.slice(0, 512)) {
+  for (const note of confirmed) {
     const memo = decodeMemoHex(note.memo); if (!memo || seen.has(memo)) continue;
     let value: unknown;
     try { value = JSON.parse(memo); } catch { continue; }
@@ -182,9 +201,9 @@ export async function listVaultMemos(address: string, auctionId: string, collate
     } else if (value.v === 1 && Buffer.byteLength(memo) <= 512) {
       seen.add(memo); reveals.push({ txid, memo, confirmations, height });
     }
-    if (commits.length >= 128 && reveals.length >= 128) break;
   }
-  return { status: 'ok', tip: tip as number, commits: commits.slice(0, 128), reveals: reveals.slice(0, 128) };
+  if (commits.length > MAX_COMMITS || reveals.length > MAX_REVEALS) return { status: 'too-many-notes' };
+  return { status: 'ok', tip: tip as number, minConfirmations: minConfirmations(), commits, reveals };
 }
 
 export function checkSameLocalOrigin(request: import('node:http').IncomingMessage, port: number): boolean {

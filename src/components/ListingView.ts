@@ -156,7 +156,7 @@ export class ListingView implements Disposable {
     this.#result.replaceChildren();
     const passed = report.checks.filter(check => check.ok).length;
     const chain = report.checks.some(check => check.skipped) ? ' (on-chain checks need a Zcash light client; run scripts/verify-chain.ts)' :
-      source === 'live' ? ` (the on-chain checks read live from testnet at height ${tip})` : source === 'recorded' ? ` (the on-chain checks used the chain snapshot recorded at height ${tip})` : '';
+      source === 'live' ? ` (the on-chain checks read live from testnet at height ${tip})` : source === 'recorded' ? ` (its on-chain checks replay a chain snapshot recorded at height ${tip}: a recording, not a live read)` : '';
     this.#result.append(node('p', report.ok ? `AUDIT VERIFIED / ${passed} checks passed${chain}.` :
       `AUDIT FAILED / ${failed.map(check => check.label).join(', ')}. Do not trust this result.`, `tool-status ${report.ok ? 'is-ok' : 'is-bad'}`));
     const { result, auction } = bundle;

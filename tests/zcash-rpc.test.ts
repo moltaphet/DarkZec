@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSameLocalOrigin, listVaultMemos, localChainStatus, verifyLocalCommitPayment } from '../scripts/zcash-rpc';
 
 const address = `utest1${'a'.repeat(40)}`;
@@ -7,6 +7,7 @@ const commitment = 'a'.repeat(64);
 const txid = 'b'.repeat(64);
 const memo = JSON.stringify({ v: 2, t: 'commit', a: auctionId, c: commitment });
 const memoHex = Buffer.concat([Buffer.from(memo), Buffer.alloc(512 - Buffer.byteLength(memo))]).toString('hex');
+const padTo512 = (text: string) => Buffer.concat([Buffer.from(text), Buffer.alloc(512 - Buffer.byteLength(text))]).toString('hex');
 const nodeInfo = { chain: 'test', blocks: 100, headers: 100, initialblockdownload: false };
 const receivedNote = (overrides: Record<string, unknown> = {}) => ({
   pool: 'orchard', txid, confirmations: 2, amountZat: 1_000_000_000, memo: memoHex, ...overrides,
@@ -23,7 +24,10 @@ function mockRpc(notes: unknown[] = [receivedNote()]) {
 }
 
 describe('local Zcash testnet RPC', () => {
+  // The suite's fixtures are one or two blocks deep; the default of three is exercised in its own tests below.
+  beforeEach(() => { process.env.DARKZEC_MIN_CONFIRMATIONS = '1'; });
   afterEach(() => {
+    delete process.env.DARKZEC_MIN_CONFIRMATIONS;
     vi.restoreAllMocks();
     delete process.env.DARKZEC_ZCASH_RPC_USER;
     delete process.env.DARKZEC_ZCASH_RPC_PASSWORD;
@@ -79,7 +83,7 @@ describe('local Zcash testnet RPC', () => {
       receivedNote({ txid: '8'.repeat(64), memo: padded(JSON.stringify({ v: 2, t: 'commit', c: 'a'.repeat(64), a: auctionId })) }),
     ]);
     await expect(listVaultMemos(address, auctionId, 1_000_000_000)).resolves.toEqual({
-      status: 'ok', tip: 100,
+      status: 'ok', tip: 100, minConfirmations: 1,
       commits: [{ txid: '2'.repeat(64), commitment: 'e'.repeat(64), confirmations: 9, height: 92 }, { txid: '1'.repeat(64), commitment: 'd'.repeat(64), confirmations: 3, height: 98 }],
       reveals: [{ txid: '3'.repeat(64), memo: reveal, confirmations: 1, height: 100 }],
     });
@@ -94,5 +98,27 @@ describe('local Zcash testnet RPC', () => {
     expect(checkSameLocalOrigin(request('http://attacker.test:4173'), 4173)).toBe(false);
     expect(checkSameLocalOrigin(request('http://localhost:4173'), 4173)).toBe(false);
     expect(checkSameLocalOrigin(request('http://127.0.0.1:4174'), 4173)).toBe(false);
+  });
+
+  it('requires three confirmations by default, and the requirement is configurable and reported', async () => {
+    process.env.DARKZEC_ZCASH_RPC_USER = 'local-user'; process.env.DARKZEC_ZCASH_RPC_PASSWORD = 'local-password';
+    delete process.env.DARKZEC_MIN_CONFIRMATIONS;
+    const commitOf = (hash: string) => padTo512(JSON.stringify({ v: 2, t: 'commit', a: auctionId, c: hash }));
+    mockRpc([receivedNote({ txid: '1'.repeat(64), confirmations: 2, memo: commitOf('d'.repeat(64)) }), receivedNote({ txid: '2'.repeat(64), confirmations: 3, memo: commitOf('e'.repeat(64)) })]);
+    const shallow = await listVaultMemos(address, auctionId, 1_000_000_000);
+    expect(shallow).toMatchObject({ status: 'ok', minConfirmations: 3 }); if (shallow.status === 'ok') expect(shallow.commits.map(note => note.commitment)).toEqual(['e'.repeat(64)]);
+    await expect(verifyLocalCommitPayment(address, auctionId, commitment, 1_000_000_000)).resolves.toEqual({ status: 'not-found' });
+    process.env.DARKZEC_MIN_CONFIRMATIONS = '2';
+    const deeper = await listVaultMemos(address, auctionId, 1_000_000_000); if (deeper.status === 'ok') expect(deeper).toMatchObject({ minConfirmations: 2 }), expect(deeper.commits).toHaveLength(2);
+    process.env.DARKZEC_MIN_CONFIRMATIONS = 'banana'; expect(await listVaultMemos(address, auctionId, 1_000_000_000)).toMatchObject({ minConfirmations: 3 });
+  });
+
+  it('never cuts the list silently: hundreds of commits all come back, and too many is an explicit error', async () => {
+    process.env.DARKZEC_ZCASH_RPC_USER = 'local-user'; process.env.DARKZEC_ZCASH_RPC_PASSWORD = 'local-password';
+    const commitOf = (index: number) => padTo512(JSON.stringify({ v: 2, t: 'commit', a: auctionId, c: index.toString(16).padStart(64, '0') }));
+    const notes = (count: number) => Array.from({ length: count }, (_, index) => receivedNote({ txid: (index + 1).toString(16).padStart(64, '0'), confirmations: 5000 - index, memo: commitOf(index + 1) }));
+    mockRpc(notes(300)); const many = await listVaultMemos(address, auctionId, 1_000_000_000);
+    expect(many.status).toBe('ok'); if (many.status === 'ok') { expect(many.commits).toHaveLength(300); expect(many.commits[0]?.commitment).toBe((1).toString(16).padStart(64, '0')); expect(many.commits.at(-1)?.commitment).toBe((300).toString(16).padStart(64, '0')); }
+    vi.restoreAllMocks(); mockRpc(notes(600)); await expect(listVaultMemos(address, auctionId, 1_000_000_000)).resolves.toEqual({ status: 'too-many-notes' });
   });
 });

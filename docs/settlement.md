@@ -63,7 +63,7 @@ A unified full viewing key lets a wallet decrypt notes sent to the account (inco
 - **Deposits on chain.** The key sees payments to the auction's vault address, which proves it is the vault's key. Every commitment arrived as exactly one confirmed payment of the collateral with its commit memo, and every accepted reveal arrived as a memo. For an auction run from a listing it also enforces the signed block-height deadlines in both directions: no counted payment is late, and no on-time commit or acceptable on-time reveal was left out ([auction links](auction-links.md#why-the-deadlines-are-block-heights)).
 - **Settlement on chain.** Every refund, the proceeds and the burn were paid with the exact amount, recipient and memo implied by the verified result, and nothing else left the vault.
 
-On the public site there is no light client, so Audit mode re-runs these two checks against the chain snapshot recorded when the run was verified, and says so in its verdict. Without either source the checks are reported as **skipped**, never as passed.
+On the public site there is no light client, so Audit mode re-runs these two checks against the chain snapshot recorded when the run was verified, and says so in its verdict: the on-chain rows read **PASS (RECORDED)** in amber and the verdict calls it "a recording, not an independent live read". Only `npm run verify-chain`, or Audit mode on a local server, reads the chain independently. Without either source the checks are reported as **skipped**, never as passed.
 
 ## What publishing the viewing key reveals
 
@@ -92,5 +92,7 @@ To make theft impossible rather than provable, the vault account's spend authori
 4. Any spend that does not follow the published result then lacks a second signature and cannot be made.
 
 **What is built:** step 3, the co-signer's policy. `src/lib/cosigner.ts` parses a settlement request (ZIP-321, multi-payment), re-verifies the audit bundle, recomputes the exact refunds, proceeds and burn, and approves only an exact match: the same recipients, amounts and memos, and nothing else. It refuses an already settled auction and a bundle that does not verify. `npm run cosign-check -- <bundle> --uri <request> --seller <address>` runs it, and `npm run settle` applies it to its own request before sending. Tests cover short refunds, a diverted burn, an extra payout, a dropped refund, a changed memo and a redirected refund.
+
+**This is not independent custody.** `settle` runs the same policy on its own request, so it catches mistakes, not a dishonest operator who skips the script: the operator's wallet can still sign any spend. The check only becomes a control once someone else holds a required signature.
 
 **What is not built:** the key ceremony, the threshold signing protocol and a signer service. They need their own review, and mainnet stays disabled until they exist.

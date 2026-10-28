@@ -8,7 +8,7 @@ The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Thi
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification (Node 26.10.0): **130 unit/privacy/CLI tests across 19 files, 55 E2E tests and 67 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
+Current observed verification (Node 26.10.0): **133 unit/privacy/CLI tests across 19 files, 59 E2E tests and 67 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -132,9 +132,9 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 130 tests passed across 19 files. |
+| `npm test` | 133 tests passed across 19 files. |
 | `npm run build` | Strict TypeScript passed; 67 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 55 passing E2E tests. |
+| `npm run test:e2e` | Fresh build followed by 59 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |

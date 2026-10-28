@@ -94,17 +94,18 @@ export class AuditView implements Disposable {
     this.#rows.replaceChildren(); this.#verdict.classList.remove('is-ok', 'is-bad');
     if (!report) { this.#verdict.textContent = message; this.#tableWrap.hidden = true; if (message) this.#verdict.classList.add('is-bad'); return; }
     const passed = report.checks.filter(check => check.ok).length; const skipped = report.checks.filter(check => check.skipped).length;
-    const id = report.auctionId ?? 'auction';
+    const id = report.auctionId ?? 'auction'; const chainChecks = report.checks.filter(check => check.id.startsWith('chain-') && check.ok).length;
     this.#verdict.textContent = !report.ok ? `NOT VERIFIED / ${report.checks.length - passed - skipped} of ${report.checks.length} checks failed.` :
       skipped ? `VERIFIED / ${id}: ${passed} checks passed; ${skipped} on-chain checks need a Zcash light client (run scripts/verify-chain.ts).` :
         source?.kind === 'live' ? `VERIFIED / ${id}: all ${passed} checks passed, the on-chain ones read live from testnet at height ${source.tip}.` :
-          source?.kind === 'recorded' ? `VERIFIED / ${id}: all ${passed} checks passed; the on-chain ones used the chain snapshot recorded at height ${source.tip}. For a live read run scripts/verify-chain.ts.` :
+          source?.kind === 'recorded' ? `VERIFIED / ${id}: ${passed - chainChecks} checks verified in this browser; the ${chainChecks} on-chain checks replay a chain snapshot recorded at height ${source.tip}. That is a recording, not an independent live read: run scripts/verify-chain.ts, or open this page on a local server, for one.` :
             `VERIFIED / ${id}: all ${passed} checks passed.`;
     this.#verdict.classList.add(report.ok ? 'is-ok' : 'is-bad');
     for (const check of report.checks) {
-      const state = check.skipped ? 'is-skip' : check.ok ? 'is-ok' : 'is-bad';
+      const recorded = source?.kind === 'recorded' && check.id.startsWith('chain-') && check.ok;
+      const state = check.skipped ? 'is-skip' : recorded ? 'is-recorded' : check.ok ? 'is-ok' : 'is-bad';
       const row = node('tr', '', state); row.dataset.check = check.id;
-      row.append(node('td', check.label), node('td', check.skipped ? 'SKIP' : check.ok ? 'PASS' : 'FAIL', 'state'), node('td', check.detail)); this.#rows.append(row);
+      row.append(node('td', check.label), node('td', check.skipped ? 'SKIP' : recorded ? 'PASS (RECORDED)' : check.ok ? 'PASS' : 'FAIL', 'state'), node('td', recorded ? `${check.detail} Replayed from a recorded snapshot, not read live.` : check.detail)); this.#rows.append(row);
     }
     this.#tableWrap.hidden = false;
   }

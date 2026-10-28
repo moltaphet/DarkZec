@@ -23,6 +23,7 @@
 .audit-checks td.state { white-space: nowrap; font-weight: 700; }
 .audit-checks tr.is-ok td.state { color: #00f058; }
 .audit-checks tr.is-skip td.state { color: #8d8d94; }
+.audit-checks tr.is-recorded td.state { color: #eebc56; }
 .audit-checks tr.is-bad td.state { color: #eebc56; }
 .audit-verdict { font-size: 14px; font-weight: 700; margin: 18px 0 10px; }
 .reveal-chain { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 24px; }

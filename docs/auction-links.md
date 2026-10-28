@@ -20,6 +20,15 @@ It checks Node, zcash-devtool and the wallet (a testnet wallet that views the au
 
 **No wallet?** Open the same panel on darkzec.xyz and press **Practice with a simulated chain**: the full seller flow runs on an in-memory chain, the buttons play three bidders, and the audit at the end is the real one. The practice listing uses the public demo vault, so its bidder page opens with a PRACTICE banner and cannot be paid.
 
+## Reading the chain safely
+
+The page trusts what the local wallet reports, so the server is strict about it:
+
+- **Freshness.** A wallet only knows its own height, so "synced" is judged by the age of its newest scanned block: older than 5 minutes (12 blocks, `DARKZEC_MAX_TIP_AGE_SECONDS`) means it is behind the network and the auction will not start or sync. A wallet a few blocks behind is allowed, and its lag is **added to the deadlines**, so they count from the chain's real height; the listing's anchor is the wallet's own block time.
+- **Confirmations.** A payment counts only after 3 confirmations by default (`--confirmations`, `DARKZEC_MIN_CONFIRMATIONS`), because one block is not final on testnet. Closing and finalizing wait until the last payments before each deadline have that many confirmations.
+- **Reorganisations.** Every sync re-checks that what was imported is still on the chain. If a payment disappears, the page warns, refuses to close or finalize, and points to **Resume**, which rebuilds the ledger from the chain as it is now.
+- **No silent cuts.** Every note at the vault is read. More than 8192 notes, 512 commits or 1024 reveal-shaped memos is an explicit error ("use a fresh vault account"), never a quietly shortened list.
+
 ## The seller flow
 
 1. Create a fresh account in the operator wallet for this auction (its viewing key will be published at the end, so never reuse it).
@@ -71,6 +80,13 @@ The listing (title, description, rules, vault, deadlines), the operator's public
 | **Procurement** | The **lowest** offers (one unit each) | The next-lowest offer, at most the ceiling |
 
 In procurement the collateral is a **bid bond**: it is returned in full to everyone who reveals, burned if a bid is never revealed, and nothing is collected from bidders. The buyer pays the winners outside the vault. Because a bond is not the payment, an offer is not capped by it. The use case is a buyer who wants quotes that competitors cannot copy from each other.
+
+## Running the operator somewhere other than a laptop (next step)
+
+Today the operator runs `npm run auction` on a machine that holds the zcash-devtool wallet. Moving that to a server is deliberately left as a next step, because it changes the trust model rather than just the packaging:
+
+- **Self-hosted (the natural path):** a container (Node, zcash-devtool, the wallet volume) behind a TLS reverse proxy with authentication, reachable from any browser. Custody stays with the seller. It needs a remote mode in `scripts/serve.ts`: an allowed origin instead of loopback only, mandatory authentication, and the page probing the server for operator features instead of assuming loopback.
+- **Hosted by DarkZec for other sellers:** not planned. A relay that reads a seller's vault with its viewing key would see every reveal before clearing, and a service holding spend keys would be custodial. Either adds exactly the kind of trusted party this project tries to remove. If it is ever built, it should be view-only, per-auction, and say so on the page.
 
 ## Limits, honestly
 

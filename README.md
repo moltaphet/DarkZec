@@ -71,6 +71,8 @@ Modes: uniform price, unit demand, Vickrey, and **procurement** (a buyer collect
 
 No funds move in the Judge Sandbox. The build has not had an independent security audit.
 
+> **Not safe for real funds.** The operator's wallet holds the collateral and can spend it alone: the co-signer policy is a building block, not custody, and threshold signing is not implemented. Mainnet stays disabled for this reason. Everything runs on Zcash testnet, whose coins have no value.
+
 ## Why sealed bids
 
 Public orderflow can reveal a trader's limits, size, timing and address relationships before a trade completes, which enables front-running, inventory inference and counterparty profiling. DarkZec keeps bid instructions out of the public book: during the commit phase only an auction ID and a salted hash travel in the shielded memo. Prices, quantities and refund addresses stay with the bidder until the reveal window, and the clearing service publishes only the clearing result plus an inclusion root.
@@ -271,7 +273,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **130 unit/privacy tests (19 files), 55 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **133 unit/privacy tests (19 files), 59 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 

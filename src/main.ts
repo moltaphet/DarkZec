@@ -34,7 +34,7 @@ import type { OperatorSigner } from './lib/operator-journal';
 import { SimulatedChain } from './lib/simulated-chain';
 import type { ChainApi } from './lib/simulated-chain';
 import type { OpenedListing } from './lib/listing';
-import { BLOCK_MS, blocksFor, chainTime, closeTime, commitOnTime, describeBlocks, revealOnTime } from './lib/schedule';
+import { BLOCK_MS, BLOCK_SECONDS, blocksFor, chainTime, closeTime, commitOnTime, describeBlocks, revealOnTime } from './lib/schedule';
 import { SecurityAudit } from './lib/security-events';
 import { monitorSecurityPolicy } from './lib/security-monitor';
 import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, FIXTURE_REFUND_ADDRESS, FIXTURE_REFUND_RECEIVER, SIMULATION_CONFIG } from './fixtures';
@@ -133,6 +133,9 @@ const judgeClock = (): number => Date.now() + judgeTimeOffset;
 // A scheduled auction counts chain time (block height x block time); the clock moves only when notes or a sync say the chain did.
 let chainTimeMs = 0;
 let liveTip = 0;
+/** Confirmations the local wallet demands before a payment counts, and payments already imported that the chain no longer shows. */
+let liveMinConfirmations = 1;
+let liveVanished = 0;
 let listingLink: string | undefined;
 let activeListing: OpenedListing | undefined;
 const chainClock = (): number => chainTimeMs;
@@ -428,6 +431,9 @@ button('close').addEventListener('click', () => {
     if (schedule) {
       // Bidding stays open until its block: syncing after it imports every on-time commit before the root is frozen.
       if (liveTip <= schedule.commitUntil) throw new Error(`Bidding stays open until block ${schedule.commitUntil} (about ${describeBlocks(schedule.commitUntil - liveTip + 1)} left). Sync from the vault after that block, then close.`);
+      const settled = schedule.commitUntil + Math.max(1, liveMinConfirmations - 1);
+      if (liveTip < settled) throw new Error(`The last commit payments need ${liveMinConfirmations} confirmations to count: sync again from block ${settled} (about ${describeBlocks(settled - liveTip)}).`);
+      if (liveVanished > 0) throw new Error(reorgMessage(liveVanished));
       chainTimeMs = closeTime(schedule);
     }
     const root = await currentSession().close(); clearPrepared(); memoPreview.setEnabled(false);
@@ -443,6 +449,12 @@ button('close').addEventListener('click', () => {
 });
 button('clear').addEventListener('click', () => {
   void action(async () => {
+    const schedule = auctionConfig.schedule; const book = vault().publicSnapshot();
+    if (schedule && book.revealed.length < book.commitments.length) {
+      const settled = schedule.revealUntil + Math.max(1, liveMinConfirmations - 1);
+      if (liveTip < settled) throw new Error(`The last reveals need ${liveMinConfirmations} confirmations to count: sync again from block ${settled} (about ${describeBlocks(settled - liveTip)}).`);
+    }
+    if (liveVanished > 0) throw new Error(reorgMessage(liveVanished));
     lastResult = await currentSession().clear();
     telemetry.log('cleared'); text('merkle-root', lastResult.root); visible('audit-panel', true);
     text('clearing-price', `${lastResult.clearingPrice} ZEC`); text('filled-lots', `${lastResult.filled} / ${auctionConfig.supply} LOTS`);
@@ -477,7 +489,7 @@ async function resetSession(config: AuctionConfig = SIMULATION_CONFIG, liveVault
     memoPreview.setEnabled(false); clearPrepared(); eraseWallet(); clearMemoVerification();
     clearTimeout(revealDeadlineTimer);
     judgeTimeOffset = 0; session = await AuctionSession.create(config, config.schedule ? chainClock : judgeClock, signer); auctionConfig = session.sandbox.config; revealPanel.reset();
-    live = liveVault; liveOk = undefined; listingLink = undefined; liveTip = 0;
+    live = liveVault; liveOk = undefined; listingLink = undefined; liveTip = 0; liveVanished = 0; liveMinConfirmations = 1;
     liveSummary = live ? `Live auction ${auctionConfig.auctionId} on vault ${auctionConfig.vault.slice(0, 18)}…: ${auctionConfig.collateral} ZEC collateral tier. Sync after confirmed commit payments arrive.` : 'Demo auction with public fixtures. Open the panel to run against a real testnet vault.';
     demoSeedProgress = 0; lastResult = undefined; renderStrip();
     for (const id of ['bid-form', 'wallet-form', 'audit-form']) element(id, HTMLFormElement).reset();
@@ -501,16 +513,19 @@ function refuseFixtureVault(address: string): void {
 }
 interface LiveRules { readonly auctionId: string; readonly supply: number; readonly reserve: string; readonly vault: string; readonly network: 'testnet'; readonly collateral: string; readonly unitDemand: boolean; readonly procurement?: true }
 /** Starts a block-scheduled auction: turns minutes into heights, signs the listing and shows the link. Shared by real and practice auctions. */
-async function beginScheduled(settings: LiveAuctionSettings, rules: LiveRules, tip: number, signer?: OperatorSigner): Promise<void> {
-  const commitUntil = tip + blocksFor(settings.commitMinutes); const revealUntil = commitUntil + blocksFor(settings.revealMinutes);
+async function beginScheduled(settings: LiveAuctionSettings, rules: LiveRules, tip: number, signer?: OperatorSigner, tipTime?: number): Promise<void> {
+  // The wallet's newest block may be a little old; deadlines count from the chain's real height, so the lag is added, never lost.
+  const nowSeconds = Math.floor(Date.now() / 1000); const anchorTime = tipTime !== undefined && tipTime <= nowSeconds ? tipTime : nowSeconds;
+  const lag = Math.max(0, Math.ceil((nowSeconds - anchorTime) / BLOCK_SECONDS));
+  const commitUntil = tip + lag + blocksFor(settings.commitMinutes); const revealUntil = commitUntil + blocksFor(settings.revealMinutes);
   chainTimeMs = chainTime(tip);
   await resetSession({ ...rules, revealWindowMs: (revealUntil - commitUntil) * BLOCK_MS, schedule: { commitUntil, revealUntil } }, true, signer);
   liveTip = tip;
   const signed = await currentSession().publish({ v: 1, title: settings.title || `Auction ${settings.auctionId}`, description: settings.description,
     auction: { auctionId: rules.auctionId, network: 'testnet', vault: rules.vault, supply: rules.supply, reserve: rules.reserve, collateral: rules.collateral, unitDemand: rules.unitDemand, procurement: rules.procurement === true },
-    schedule: { commitUntil, revealUntil, anchorHeight: tip, anchorTime: Math.floor(Date.now() / 1000) } });
+    schedule: { commitUntil, revealUntil, anchorHeight: tip, anchorTime } });
   listingLink = encodeListingLink(signed);
-  liveSummary = `Live auction ${auctionConfig.auctionId} on vault ${rules.vault.slice(0, 18)}…: bidding closes after block ${commitUntil} (about ${describeBlocks(commitUntil - tip)}), reveals after block ${revealUntil}. Share the auction link, then sync from the vault.`;
+  liveSummary = `Live auction ${auctionConfig.auctionId} on vault ${rules.vault.slice(0, 18)}…: bidding closes after block ${commitUntil} (about ${describeBlocks(commitUntil - tip)}), reveals after block ${revealUntil}. Share the auction link, then sync from the vault.${lag > 1 ? ` The wallet was ${lag} blocks behind, so the deadlines include that lag.` : ''}`;
 }
 async function startLiveAuction(settings: LiveAuctionSettings): Promise<void> {
   if (!COLLATERAL_TIERS.includes(settings.collateral)) throw new Error('Choose a 0.1, 1, 10 or 100 ZEC collateral tier.');
@@ -524,7 +539,7 @@ async function startLiveAuction(settings: LiveAuctionSettings): Promise<void> {
   if (tip === undefined) { await resetSession({ ...rules, revealWindowMs: settings.revealMinutes * 60_000 }, true); return; }
   // The signing key lives only in this tab, so it is created together with an encrypted backup that can resume the auction.
   const backup = await createBackedUpSigner(settings.keyPassphrase);
-  await beginScheduled(settings, rules, tip, backup.signer);
+  await beginScheduled(settings, rules, tip, backup.signer, node?.tipTime);
   downloadText(`darkzec-operator-key-${settings.auctionId}.json`, serializeOperatorKey(backup.file));
   liveSummary += ' The encrypted operator key file was downloaded: keep it, it is the only way to resume this auction if the tab is lost.';
   status(liveSummary);
@@ -575,6 +590,7 @@ async function practiceAdvance(step: PracticeStep): Promise<void> {
     current.revealsPaid = true; status('Two bidders revealed; the third never will and will lose its collateral. Press Sync from vault.');
   }
 }
+const reorgMessage = (count: number): string => `${count} payment${count === 1 ? '' : 's'} already imported ${count === 1 ? 'is' : 'are'} no longer on the chain (a reorganisation?). Resume the auction from its link and key file to rebuild the ledger from the chain as it is now.`;
 function practiceHint(): string {
   const current = practice; const schedule = auctionConfig.schedule; const phase = ledger()?.publicSnapshot().phase;
   if (!current || !schedule || !phase) return '';
@@ -591,13 +607,18 @@ async function syncLiveAuction(): Promise<void> {
   const schedule = config.schedule;
   const notes = await chainApi.memos(config.vault, config.auctionId, Number(parseZec(config.collateral ?? '10')));
   if (notes.status !== 'ok') {
-    const reasons = { 'wrong-network': 'the local wallet is not on Zcash testnet', syncing: 'the local testnet node is still syncing', 'wallet-not-configured': 'no local wallet RPC is configured', 'node-unavailable': 'the local wallet RPC did not answer' } as const;
+    const reasons = { 'wrong-network': 'the local wallet is not on Zcash testnet', syncing: 'the local wallet is behind the network (its newest scanned block is old); let it sync, npm run auction does this for you', 'too-many-notes': 'this vault account holds too many notes for one auction; use a fresh vault account', 'wallet-not-configured': 'no local wallet RPC is configured', 'node-unavailable': 'the local wallet RPC did not answer' } as const;
     liveOk = false; liveSummary = `Sync failed: ${reasons[notes.status]}.`; return;
   }
   let added = 0; let skipped = 0;
   if (schedule) { liveTip = notes.tip; chainTimeMs = chainTime(notes.tip); }
+  liveMinConfirmations = notes.minConfirmations;
+  // A block is not final: payments imported earlier must still be on the chain the wallet sees now, or the ledger would disagree with it.
+  const onChainCommits = new Set(notes.commits.map(note => note.commitment)); const onChainReveals = new Set<string>();
+  for (const note of notes.reveals) { try { onChainReveals.add(await commitment(parseReceiptText(note.memo, 'testnet'))); } catch { /* not a receipt */ } }
+  liveVanished = snapshot.commitments.filter(hash => !onChainCommits.has(hash)).length + snapshot.revealed.filter(hash => !onChainReveals.has(hash)).length;
   const timing = (): string => !schedule ? '' : notes.tip <= schedule.commitUntil ? ` Bidding stays open until block ${schedule.commitUntil} (about ${describeBlocks(schedule.commitUntil - notes.tip + 1)}).` :
-    snapshot.phase === 'open' ? ' Bidding has closed on chain: close the auction now.' : notes.tip <= schedule.revealUntil ? ` Reveals stay open until block ${schedule.revealUntil} (about ${describeBlocks(schedule.revealUntil - notes.tip + 1)}).` : ' The reveal window has closed on chain: finalize to clear.';
+    snapshot.phase === 'open' ? (notes.tip < schedule.commitUntil + Math.max(1, notes.minConfirmations - 1) ? ` Bidding has closed on chain; the last payments need ${notes.minConfirmations} confirmations, so sync again from block ${schedule.commitUntil + Math.max(1, notes.minConfirmations - 1)}.` : ' Bidding has closed on chain: close the auction now.') : notes.tip <= schedule.revealUntil ? ` Reveals stay open until block ${schedule.revealUntil} (about ${describeBlocks(schedule.revealUntil - notes.tip + 1)}).` : (notes.tip < schedule.revealUntil + Math.max(1, notes.minConfirmations - 1) ? ` The reveal window has closed; the last reveals need ${notes.minConfirmations} confirmations, so sync again from block ${schedule.revealUntil + Math.max(1, notes.minConfirmations - 1)}.` : ' The reveal window has closed on chain: finalize to clear.');
   if (snapshot.phase === 'open') {
     for (const note of notes.commits) {
       if (current.sandbox.publicSnapshot().commitments.includes(note.commitment)) continue;
@@ -624,7 +645,8 @@ async function syncLiveAuction(): Promise<void> {
     if (added) telemetry.log('revealed');
     liveSummary = `Synced ${notes.reveals.length} reveal memo${notes.reveals.length === 1 ? '' : 's'}: ${added} newly accepted and signed, ${skipped} refused (late, no matching commitment, wrong auction or invalid receipt).${timing()}`;
   } else { liveSummary = 'The auction is cleared; nothing more to import.'; }
-  liveOk = skipped === 0;
+  liveOk = skipped === 0 && liveVanished === 0;
+  if (liveVanished > 0) liveSummary += ` WARNING: ${reorgMessage(liveVanished)}`;
 }
 button('sandbox-tab').addEventListener('click', () => setView('sandbox'));
 button('wallet-tab').addEventListener('click', () => setView('wallet'));

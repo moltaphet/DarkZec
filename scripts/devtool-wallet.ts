@@ -8,7 +8,8 @@ import { join } from 'node:path';
  * This server only reads the wallet's SQLite data.
  * No key material is read: keys.toml is consulted for the network name only, and the seed stays age-encrypted.
  */
-export interface DevtoolStatus { readonly network: 'testnet' | 'mainnet' | 'unknown'; readonly tip: number | undefined }
+/** `tipTime` is the Unix time of the newest scanned block: a wallet that is behind the network shows an old one. */
+export interface DevtoolStatus { readonly network: 'testnet' | 'mainnet' | 'unknown'; readonly tip: number | undefined; readonly tipTime: number | undefined }
 /** Same shape as a z_listreceivedbyaddress entry, so both sources share one matching path. */
 export interface ReceivedNote { readonly pool: 'orchard' | 'ironwood'; readonly txid: string; readonly confirmations: number; readonly amountZat: number; readonly memo: string }
 
@@ -25,8 +26,8 @@ export async function devtoolStatus(dir: string): Promise<DevtoolStatus> {
   const network = name === 'test' ? 'testnet' : name === 'main' ? 'mainnet' : 'unknown';
   const db = await openReadOnly(dir);
   try {
-    const row = db.prepare('SELECT MAX(height) AS tip FROM blocks').get() as { tip: number | null } | undefined;
-    return { network, tip: typeof row?.tip === 'number' ? row.tip : undefined };
+    const row = db.prepare('SELECT height AS tip, time AS tipTime FROM blocks ORDER BY height DESC LIMIT 1').get() as { tip: number | null; tipTime: number | null } | undefined;
+    return { network, tip: typeof row?.tip === 'number' ? row.tip : undefined, tipTime: typeof row?.tipTime === 'number' ? row.tipTime : undefined };
   } finally { db.close(); }
 }
 

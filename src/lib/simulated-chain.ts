@@ -34,7 +34,7 @@ export class SimulatedChain implements ChainApi {
   async memos(_address: string, auctionId: string, collateralZat: number): Promise<VaultMemoResult> {
     const mine = this.#notes.filter(note => note.auctionId === auctionId);
     const confirmations = (note: SimulatedNote): number => this.#tip - note.height + 1;
-    return Object.freeze({ status: 'ok', tip: this.#tip,
+    return Object.freeze({ status: 'ok', tip: this.#tip, minConfirmations: 1,
       commits: Object.freeze(mine.filter(note => note.kind === 'commit' && note.amountZat === collateralZat).sort((a, b) => a.height - b.height).map(note => Object.freeze({ txid: note.txid, commitment: note.commitment, confirmations: confirmations(note), height: note.height }))),
       reveals: Object.freeze(mine.filter(note => note.kind === 'reveal').sort((a, b) => a.height - b.height).map(note => Object.freeze({ txid: note.txid, memo: note.memo, confirmations: confirmations(note), height: note.height }))) });
   }

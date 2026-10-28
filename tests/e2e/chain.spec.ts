@@ -9,7 +9,9 @@ test('a shipped testnet run verifies all ten checks against its recorded chain s
   await page.route('**/api/chain/view-activity', route => { asked++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"invalid-request"}' }); });
   await page.goto('/'); await page.getByRole('button', { name: 'Audit mode' }).click();
   await page.locator('#audit-run-DZ-TESTNET-1').click();
-  await expect(page.locator('#audit-verdict')).toContainText('VERIFIED / DZ-TESTNET-1: all 10 checks passed; the on-chain ones used the chain snapshot recorded at height');
+  await expect(page.locator('#audit-verdict')).toContainText('VERIFIED / DZ-TESTNET-1: 8 checks verified in this browser; the 2 on-chain checks replay a chain snapshot recorded at height');
+  await expect(page.locator('#audit-verdict')).toContainText('a recording, not an independent live read');
+  await expect(page.locator('[data-check="chain-payouts"] .state')).toHaveText('PASS (RECORDED)');
   expect(asked).toBe(1);
   await expect(page.locator('#audit-check-rows tr')).toHaveCount(10);
   await expect(page.locator('[data-check="chain-payouts"]')).toContainText('2 refunds, the proceeds and no burn paid exactly on chain');

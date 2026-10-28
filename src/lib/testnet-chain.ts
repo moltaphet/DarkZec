@@ -7,6 +7,7 @@ export interface LocalTestnetStatus {
   readonly synced: boolean;
   readonly blocks?: number;
   readonly headers?: number;
+  readonly tipTime?: number;
   readonly reason?: 'wallet-not-configured' | 'node-unavailable' | 'wrong-network' | 'syncing';
 }
 export type CommitPaymentResult =
@@ -44,8 +45,8 @@ export async function verifyTestnetCommit(address: string, auctionId: string, co
 export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number; readonly height: number }
 export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number; readonly height: number }
 export type VaultMemoResult =
-  | { readonly status: 'ok'; readonly tip: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
-  | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' };
+  | { readonly status: 'ok'; readonly tip: number; readonly minConfirmations: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
+  | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' | 'too-many-notes' };
 const TXID = /^[a-f0-9]{64}$/;
 const confirmed = (value: unknown): boolean => Number.isSafeInteger(value) && (value as number) >= 1;
 
@@ -55,10 +56,10 @@ export async function fetchVaultMemos(address: string, auctionId: string, collat
   const invalid = (): never => { throw new Error('The local testnet checker returned invalid vault notes.'); };
   if (typeof value !== 'object' || value === null) return invalid();
   if (value.status !== 'ok') {
-    if (!['wrong-network', 'syncing', 'wallet-not-configured', 'node-unavailable'].includes(value.status)) invalid();
+    if (!['wrong-network', 'syncing', 'wallet-not-configured', 'node-unavailable', 'too-many-notes'].includes(value.status)) invalid();
     return Object.freeze({ status: value.status });
   }
-  if (!Array.isArray(value.commits) || !Array.isArray(value.reveals) || value.commits.length > 128 || value.reveals.length > 128) return invalid();
+  if (!Array.isArray(value.commits) || !Array.isArray(value.reveals) || value.commits.length > 512 || value.reveals.length > 1024) return invalid();
   // Older local servers and fixtures omit heights; an unscheduled auction does not need them.
   const tip = Number.isSafeInteger(value.tip) ? value.tip : 0; const heightOf = (note: { height?: unknown; confirmations: number }): number => Number.isSafeInteger(note.height) ? note.height as number : tip > 0 ? tip - note.confirmations + 1 : 0;
   const commits = value.commits.map(note => {
@@ -69,7 +70,8 @@ export async function fetchVaultMemos(address: string, auctionId: string, collat
     if (typeof note !== 'object' || note === null || !TXID.test(String(note.txid)) || typeof note.memo !== 'string' || note.memo.length > 1024 || !confirmed(note.confirmations)) return invalid();
     return Object.freeze({ txid: note.txid, memo: note.memo, confirmations: note.confirmations, height: heightOf(note) });
   });
-  return Object.freeze({ status: 'ok', tip, commits: Object.freeze(commits), reveals: Object.freeze(reveals) });
+  const minConfirmations = Number.isSafeInteger(value.minConfirmations) && (value.minConfirmations as number) >= 1 && (value.minConfirmations as number) <= 100 ? value.minConfirmations : 1;
+  return Object.freeze({ status: 'ok', tip, minConfirmations, commits: Object.freeze(commits), reveals: Object.freeze(reveals) });
 }
 
 /** What a published viewing key sees on testnet, read by the local server's view-only light wallet. */
