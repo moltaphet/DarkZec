@@ -16,6 +16,8 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 
 ## Judge path (60 seconds)
 
+**Fastest:** open [darkzec.xyz](https://darkzec.xyz), press **Skip intro**, and use the green **TRY IT** bar: one click each for *a whole sandbox auction*, *audit a real testnet auction*, *open a real bidder page*, *be a seller (practice)*, *scan a real vault*, *build a payment request + QR* and *the training vault*. Each button drives the real UI. The numbered steps below do the same by hand.
+
 <p align="center"><img src="docs/media/walkthrough.gif" width="820" alt="DarkZec walkthrough: sealed book, operator view, clearing result and audit mode verifying the real testnet bundle" /></p>
 
 1. Open **[darkzec.xyz](https://darkzec.xyz)** and choose **Skip intro**.
@@ -273,7 +275,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **133 unit/privacy tests (19 files), 60 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **133 unit/privacy tests (19 files), 65 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 

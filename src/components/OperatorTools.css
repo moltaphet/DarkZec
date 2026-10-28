@@ -52,3 +52,10 @@
 .resume-details { margin-top: 18px; }
 .audit-examples { margin: 14px 0 18px; padding: 12px 14px; border: 1px solid #00ff6655; background: rgb(0 255 102 / 5%); }
 .audit-examples p { margin: 0 0 10px; }
+
+/* Try-it bar: one click per part of the product. */
+.judge-bar { margin: 18px 0; padding: 14px 16px; border: 1px solid #00ff6655; background: rgb(0 255 102 / 5%); }
+.judge-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 14px; }
+.judge-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.judge-actions .button { margin-top: 0; }
+.wallet-example-row { padding: 0 28px; align-items: center; margin: 0 0 18px; }

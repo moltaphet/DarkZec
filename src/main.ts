@@ -37,12 +37,12 @@ import type { OpenedListing } from './lib/listing';
 import { BLOCK_MS, BLOCK_SECONDS, blocksFor, chainTime, closeTime, commitOnTime, describeBlocks, revealOnTime } from './lib/schedule';
 import { SecurityAudit } from './lib/security-events';
 import { monitorSecurityPolicy } from './lib/security-monitor';
-import { DEMO_BIDS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, FIXTURE_REFUND_ADDRESS, FIXTURE_REFUND_RECEIVER, SIMULATION_CONFIG } from './fixtures';
+import { DEMO_BIDS, EXAMPLE_REFUND_ADDRESS, EXAMPLE_VAULT_ADDRESS, FIXTURE_ADDRESS, FIXTURE_RECEIVER, FIXTURE_REFUND_ADDRESS, FIXTURE_REFUND_RECEIVER, SIMULATION_CONFIG } from './fixtures';
 import type { Network } from './protocol/address';
 import { assertDistinctRefund, decodeUnifiedAddress, orchardPaymentAddress } from './protocol/address';
 import { formatZec, parseQuantity, parseZec } from './protocol/amount';
 import { commitment, hex } from './protocol/crypto';
-import type { PreparedBid } from './protocol/memo';
+import type { BidMemo, PreparedBid } from './protocol/memo';
 import { buildPaymentUri, COLLATERAL_TIERS, commitSubmission, prepareBid, REVEAL_AMOUNT } from './protocol/memo';
 import { verifyProof } from './protocol/merkle';
 import { settlementBalance } from './simulation';
@@ -313,6 +313,7 @@ function controls(): void {
   button('close').disabled = working || phase !== 'open';
   button('clear').disabled = working || !ledger()?.publicSnapshot().canClear;
   button('testnet-check').disabled = working || !walletPrepared || element('wallet-network', HTMLSelectElement).value !== 'testnet';
+  button('wallet-reveal-use').disabled = working || !walletPrepared; button('memo-verify-fill').disabled = working || !walletPrepared;
   for (const id of ['bid-price', 'bid-quantity']) input(id).disabled = working || phase !== 'open' || live;
   updateWalletLink(); updateRevealLink();
   const current = session;
@@ -738,15 +739,21 @@ button('copy-wallet').addEventListener('click', () => {
 button('wallet-reveal-build').addEventListener('click', () => { const file = input('wallet-reveal-file'); file.value = ''; file.click(); });
 input('wallet-reveal-file').addEventListener('change', () => {
   const file = input('wallet-reveal-file').files?.[0]; input('wallet-reveal-file').value = ''; if (!file) return;
-  void action(async () => {
-    eraseWalletReveal();
-    const bid = await readReceiptFile(file, 'testnet');
-    const vaultAddress = orchardPaymentAddress(area('wallet-vault').value.trim(), 'testnet'); refuseFixtureVault(vaultAddress);
-    assertDistinctRefund(bid.refund, vaultAddress, 'testnet');
-    walletRevealUri = buildPaymentUri({ address: vaultAddress, amount: REVEAL_AMOUNT, memo: receiptText(bid, 'testnet'), network: 'testnet' });
-    area('wallet-reveal-uri').value = walletRevealUri; visible('wallet-reveal-output', true);
-    status(`Reveal request for auction ${bid.auctionId} built: ${REVEAL_AMOUNT} ZEC to the vault with your receipt as the shielded memo. Send it only after the auction closes and before the reveal deadline.`);
-  });
+  void action(async () => { buildRevealRequest(await readReceiptFile(file, 'testnet')); });
+});
+/** The reveal payment for a receipt: a tiny shielded payment to the same vault whose memo is the receipt itself. */
+function buildRevealRequest(bid: BidMemo): void {
+  eraseWalletReveal();
+  const vaultAddress = orchardPaymentAddress(area('wallet-vault').value.trim(), 'testnet'); refuseFixtureVault(vaultAddress);
+  assertDistinctRefund(bid.refund, vaultAddress, 'testnet');
+  walletRevealUri = buildPaymentUri({ address: vaultAddress, amount: REVEAL_AMOUNT, memo: receiptText(bid, 'testnet'), network: 'testnet' });
+  area('wallet-reveal-uri').value = walletRevealUri; visible('wallet-reveal-output', true);
+  status(`Reveal request for auction ${bid.auctionId} built: ${REVEAL_AMOUNT} ZEC to the vault with your receipt as the shielded memo. Send it only after the auction closes and before the reveal deadline.`);
+}
+button('wallet-reveal-use').addEventListener('click', () => { void action(async () => { if (!walletPrepared) throw new Error('Prepare a request first.'); buildRevealRequest(walletPrepared.reveal); }); });
+button('memo-verify-fill').addEventListener('click', () => {
+  if (!walletPrepared) { text('error', 'Prepare a request first.'); visible('error', true); return; }
+  visible('error', false); area('memo-verify-input').value = walletPrepared.memo; status('The memo of your prepared request is filled in. Press Verify received memo: it is what the vault wallet would show after your payment.');
 });
 button('wallet-reveal-copy').addEventListener('click', () => { void action(() => copy(walletRevealUri)); });
 element('wallet-reveal-open', HTMLAnchorElement).addEventListener('click', event => { if (!walletRevealUri || working) event.preventDefault(); });
@@ -754,6 +761,63 @@ button('erase-wallet').addEventListener('click', () => { eraseWallet(); telemetr
 element('open-wallet', HTMLAnchorElement).addEventListener('click', event => {
   if (!walletPrepared || !walletReceiptSaved || !input('wallet-reviewed').checked || working) event.preventDefault();
 });
+
+// ---- Try it in one click: each button drives the real UI, so what a judge sees is what the code does. ----
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+let shortcutBusy = false;
+const judgeButtons = ['judge-sandbox', 'judge-audit', 'judge-bidder', 'judge-seller', 'judge-scan', 'judge-wallet', 'judge-training'].map(id => button(id));
+/** Presses one of the page's own buttons and waits for its operation to finish. */
+async function press(id: string): Promise<void> {
+  const target = button(id); if (target.disabled) throw new Error(`“${target.textContent?.trim() ?? id}” is not available right now.`);
+  target.click(); await sleep(40); while (working) await sleep(40);
+  if (!el('error').hidden) throw new Error(el('error').textContent ?? 'A step failed.');
+}
+async function shortcut(run: () => Promise<void>): Promise<void> {
+  if (working || shortcutBusy || !session) return;
+  shortcutBusy = true; for (const item of judgeButtons) item.disabled = true; visible('error', false);
+  try { await run(); }
+  catch (error: unknown) { text('error', error instanceof Error ? error.message : 'That example could not run.'); visible('error', true); }
+  finally { shortcutBusy = false; for (const item of judgeButtons) item.disabled = false; }
+}
+const scrollTo = (id: string): void => el(id).scrollIntoView({ block: 'center', behavior: 'smooth' });
+/** The bidder link of a shipped real run, rebuilt from its published bundle: the signed listing, the key and the signature. */
+async function shippedBidderLink(id: string): Promise<string> {
+  const bundle = parseAuditBundle(await shipped(`/testnet/${id}-audit-bundle.json`));
+  const signed = bundle.operator.statements.find(item => item.statement.includes('DARKZEC/listing/v1'));
+  if (!bundle.listing || !signed) throw new Error(`${id} was not run from a listing.`);
+  return encodeListingLink({ listing: bundle.listing, publicKey: bundle.operator.publicKey, signature: signed.signature });
+}
+function fillExampleWallet(): void {
+  element('wallet-network', HTMLSelectElement).value = 'testnet'; element('wallet-collateral', HTMLSelectElement).value = '1';
+  area('wallet-vault').value = EXAMPLE_VAULT_ADDRESS; area('wallet-refund').value = EXAMPLE_REFUND_ADDRESS; input('wallet-price').value = '0.5'; input('wallet-quantity').value = '1';
+}
+button('judge-sandbox').addEventListener('click', () => { void shortcut(async () => {
+  setView('sandbox'); await press('reset');
+  for (const id of ['seed', 'prepare', 'commit', 'close', 'reveal-all', 'clear']) await press(id);
+  scrollTo('results-panel'); status('A whole auction ran: three sealed bids, close, reveals, one clearing price. Open Audit mode and Load this session\'s bundle to re-verify it.');
+}); });
+button('judge-audit').addEventListener('click', () => { void shortcut(async () => { setView('audit'); await sleep(60); button('audit-run-DZ-TESTNET-3').click(); scrollTo('audit-view'); }); });
+button('judge-bidder').addEventListener('click', () => { void shortcut(async () => {
+  const link = await shippedBidderLink('DZ-TESTNET-3');
+  if (location.hash === link) await routeFromHash(); else location.hash = link;
+}); });
+button('judge-seller').addEventListener('click', () => { void shortcut(async () => {
+  setView('sandbox'); await press('reset'); const panel = el('live-auction').querySelector('details'); if (panel) panel.open = true;
+  await press('live-practice'); scrollTo('live-auction');
+}); });
+button('judge-scan').addEventListener('click', () => { void shortcut(async () => { setView('scanner'); await sleep(60); button('real-scan-DZ-TESTNET-3').click(); scrollTo('real-scan-view'); }); });
+button('judge-wallet').addEventListener('click', () => { void shortcut(async () => { setView('wallet'); fillExampleWallet(); await press('wallet-prepare'); scrollTo('wallet-output'); }); });
+async function until(done: () => boolean, what: string, timeoutMs = 15_000): Promise<void> {
+  for (let waited = 0; !done(); waited += 60) { if (waited > timeoutMs) throw new Error(`${what} did not finish in time.`); await sleep(60); }
+}
+button('judge-training').addEventListener('click', () => { void shortcut(async () => {
+  setView('scanner'); await sleep(60);
+  // The vault locks when you leave its tab, so each run starts from a locked vault: demo credentials, unlock, load the simulated notes.
+  await press('vault-demo'); await press('vault-save'); await until(() => el('vault-mode').textContent === 'MOCK / UNLOCKED', 'Unlocking the training vault');
+  await press('vault-load-notes'); await until(() => el('vault-accepted').querySelector('dd')?.textContent === '3', 'Loading the demo notes');
+  scrollTo('vault-accepted'); status('Training vault unlocked with demo credentials and 3 simulated notes authenticated (one wrong-key note quarantined, one empty). It never touches the chain.');
+}); });
+button('wallet-example').addEventListener('click', () => { eraseWallet(); fillExampleWallet(); controls(); status('Example addresses filled in. They are valid but never funded: press Prepare to preview the request and its QR, and do not pay them.'); });
 
 // Best-effort clear on page exit; JS strings and browser/OS clipboard cannot be securely erased.
 window.addEventListener('pagehide', () => { clearPrepared(); eraseWallet(); effects.destroy(); session = undefined; lastResult = undefined; });

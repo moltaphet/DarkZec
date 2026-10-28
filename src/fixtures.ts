@@ -8,6 +8,11 @@ export const FIXTURE_RECEIVER = '953f3c78d103c32b60559299462ebb27348964b892acad1
 export const FIXTURE_ADDRESS = encodeOrchardAddress(unhex(FIXTURE_RECEIVER), 'testnet');
 export const FIXTURE_REFUND_RECEIVER = 'cc802699330bc4748e34dd598c7124e72299e6a6d5bcc32e90409c8024868b2705aadfab6068d458f69b0c';
 export const FIXTURE_REFUND_ADDRESS = encodeOrchardAddress(unhex(FIXTURE_REFUND_RECEIVER), 'testnet');
+// PUBLIC example receivers for the wallet tab's "fill with example addresses" button: the demo receiver with another diversifier.
+// They are valid addresses so a request can be previewed, are not the refused demo fixtures, and are never funded.
+const variant = (receiver: string, diversifier: number): string => encodeOrchardAddress(unhex(`${diversifier.toString(16).padStart(2, '0')}${receiver.slice(2)}`), 'testnet');
+export const EXAMPLE_VAULT_ADDRESS = variant(FIXTURE_REFUND_RECEIVER, 21);
+export const EXAMPLE_REFUND_ADDRESS = variant(FIXTURE_REFUND_RECEIVER, 22);
 export const SIMULATION_CONFIG: AuctionConfig = Object.freeze({
   auctionId: 'NODE07-001', supply: 10, reserve: '0.5', vault: FIXTURE_ADDRESS, network: 'testnet', collateral: '10', revealWindowMs: 60_000,
 });

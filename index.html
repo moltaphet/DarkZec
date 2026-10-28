@@ -68,6 +68,18 @@
           <h2 class="deal-title">Run a sealed auction</h2>
         <div id="session-status" class="notice" role="status" aria-live="polite"><span class="notice-tag">SANDBOX</span><span>Session-only simulation. No funds move. Reloading erases all bids.</span></div>
         <div id="error" class="error" role="alert" hidden></div>
+        <section id="judge-bar" class="judge-bar" aria-label="Try each part in one click">
+          <div class="judge-head"><span class="notice-tag">TRY IT</span><span>One click each, nothing to install or paste. Every button runs the real code in your browser.</span></div>
+          <div class="judge-actions">
+            <button id="judge-sandbox" class="button quiet" type="button">▶ Run a whole auction</button>
+            <button id="judge-audit" class="button quiet" type="button">✓ Audit a real testnet auction</button>
+            <button id="judge-bidder" class="button quiet" type="button">◎ Open a real bidder page</button>
+            <button id="judge-seller" class="button quiet" type="button">✎ Be a seller (practice)</button>
+            <button id="judge-scan" class="button quiet" type="button">⌕ Scan a real vault</button>
+            <button id="judge-wallet" class="button quiet" type="button">⇄ Build a payment request + QR</button>
+            <button id="judge-training" class="button quiet" type="button">⚿ Try the training vault</button>
+          </div>
+        </section>
         <section id="protocol-specs" aria-label="Protocol specs and FAQ"></section>
 
         <div id="sandbox-view">
@@ -153,6 +165,7 @@
           <p class="wallet-why"><b>No wallet connect, by design.</b> Shielded Zcash wallets run as their own apps, and DarkZec never asks for your keys, balance or addresses. It builds a ZIP-321 payment request; you scan it or open it in your wallet, review it there and send it yourself.</p>
           <p class="wallet-description">Build a request for an independently verified vault. Wallet UAs with Orchard are accepted; requests use Orchard-only versions of the supplied addresses to prevent fallback. Refund and vault must differ. Review the resulting Orchard destination, amount and memo in your wallet before paying.</p>
           <p id="wallet-listing-note" class="wallet-why" hidden><span id="wallet-listing-text"></span> <button id="wallet-listing-unlock" class="reset" type="button">Use without this auction</button></p>
+          <div class="wallet-buttons wallet-example-row"><button id="wallet-example" class="button quiet" type="button">Fill with example addresses (not funded)</button><span class="small muted">Previews a request and its QR; do not pay these addresses. Use your own vault address for a real testnet payment.</span></div>
           <form id="wallet-form" autocomplete="off">
             <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet" disabled>Mainnet (disabled in prototype)</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div><div><label for="wallet-collateral">Collateral tier</label><select id="wallet-collateral"><option value="0.1">0.1 ZEC</option><option value="1">1 ZEC</option><option value="10" selected>10 ZEC</option><option value="100">100 ZEC</option></select></div></div>
             <label for="wallet-vault">Verified vault address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-vault" required spellcheck="false" placeholder="Paste the vault's u1… or utest1… address"></textarea>
@@ -169,7 +182,7 @@
             <div class="panel-heading"><h2>Reveal on chain</h2><span class="micro">SECOND SHIELDED MEMO</span></div>
             <p class="small muted">After the auction closes, reveal by sending a tiny shielded payment to the same vault whose memo is your receipt. The memo is encrypted to the vault, so only the operator reads it, and the whole commit/reveal flow stays shielded: payments to the Orchard receiver settle in the Ironwood pool. Load the receipt file you saved before paying; the vault address above is used as the destination.</p>
             <input id="wallet-reveal-file" type="file" accept="application/json,.json" hidden aria-label="Receipt file for on-chain reveal" />
-            <div class="wallet-buttons"><button id="wallet-reveal-build" class="button quiet" type="button">Load receipt and build reveal request</button></div>
+            <div class="wallet-buttons"><button id="wallet-reveal-build" class="button quiet" type="button">Load receipt and build reveal request</button><button id="wallet-reveal-use" class="button quiet" type="button">Use the receipt of the request above</button></div>
             <div id="wallet-reveal-output" hidden><label for="wallet-reveal-uri">Sensitive reveal payment URI / contains your private bid</label><textarea id="wallet-reveal-uri" readonly spellcheck="false"></textarea><figure id="wallet-reveal-qr" class="payment-qr" hidden><figcaption>Scan to send the reveal; this code contains your private bid</figcaption></figure><div class="wallet-buttons"><button id="wallet-reveal-copy" class="button quiet" type="button">Copy reveal URI</button><a id="wallet-reveal-open" class="button primary" aria-disabled="true" rel="noreferrer">Open reveal in wallet ↗</a></div></div>
           </form>
           <form id="memo-verify-form" class="memo-verify" autocomplete="off">
@@ -177,7 +190,7 @@
             <p class="small muted">After the vault wallet receives your payment, copy the memo it shows (text, unpadded Base64url or hex) and paste it here. Only a public commit memo is accepted: an auction ID and a commitment hash. If you prepared a request above, the hash is compared with it.</p>
             <label for="memo-verify-input">Memo received by the vault wallet</label>
             <textarea id="memo-verify-input" spellcheck="false" maxlength="1100" placeholder='{"v":2,"t":"commit","a":"NODE07-001","c":"…"}'></textarea>
-            <div class="wallet-buttons"><button id="memo-verify" class="button primary" type="submit">Verify received memo</button><button id="memo-verify-clear" class="reset" type="button">Clear</button></div>
+            <div class="wallet-buttons"><button id="memo-verify" class="button primary" type="submit">Verify received memo</button><button id="memo-verify-fill" class="button quiet" type="button">Use the memo of the request above</button><button id="memo-verify-clear" class="reset" type="button">Clear</button></div>
             <output id="memo-verify-result" class="memo-verify-result" aria-live="polite"></output>
           </form>
         </section>
