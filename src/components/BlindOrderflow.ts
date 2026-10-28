@@ -5,6 +5,9 @@ import { motionLoop } from '../lib/motion';
 import type { MotionLoop } from '../lib/motion';
 import type { Phase } from '../simulation';
 
+/** Below this canvas width the clearing anchor drops its side labels. */
+const COMPACT_WIDTH = 520;
+
 export class BlindOrderflow {
   readonly #canvas: HTMLCanvasElement;
   readonly #context: CanvasRenderingContext2D | null;
@@ -24,6 +27,8 @@ export class BlindOrderflow {
     const resize = new ResizeObserver(entries => {
       const bounds = entries[0]?.contentRect; if (!bounds || bounds.width < 1 || bounds.height < 1) return;
       this.#width = bounds.width; this.#height = bounds.height;
+      // A narrow mesh has no room for the side labels, so the anchor shrinks to the state word alone.
+      canvas.parentElement?.toggleAttribute('data-compact', bounds.width < COMPACT_WIDTH);
       const ratio = Math.min(devicePixelRatio || 1, 2);
       canvas.width = Math.round(bounds.width * ratio); canvas.height = Math.round(bounds.height * ratio);
       this.#context?.setTransform(ratio, 0, 0, ratio, 0, 0); this.#loop.invalidate();
@@ -111,7 +116,9 @@ export class BlindOrderflow {
       ctx.fillText(node?.fixture ? `IDLE_${String(i + 1).padStart(2, '0')}` : (node?.id.slice(0, 6).toUpperCase() ?? ''), point.x + (point.x > cx ? -12 : 12), point.y - 10);
     });
     ctx.fillStyle = '#090909'; ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(cx, cy - 47); ctx.lineTo(cx + 66, cy); ctx.lineTo(cx, cy + 47); ctx.lineTo(cx - 66, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Wide enough that the HTML labels centred on it (CLEARING / state / PRICE ANCHOR, or the state alone when compact) stay inside its edges.
+    const compact = w < COMPACT_WIDTH; const hw = compact ? 64 : 112; const hh = compact ? 32 : 66;
+    ctx.beginPath(); ctx.moveTo(cx, cy - hh); ctx.lineTo(cx + hw, cy); ctx.lineTo(cx, cy + hh); ctx.lineTo(cx - hw, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   destroy(): void { this.#lifetime.destroy(); this.#nodes = []; this.#context?.clearRect(0, 0, this.#width, this.#height); }
 }

@@ -166,8 +166,9 @@ a.button.primary:not([aria-disabled='true']):hover { background: #2c2a2e; }
 #blind-mesh { display: block; width: 100%; height: 100%; touch-action: pan-y; }
 #blind-mesh:focus-visible { outline: 2px solid #00f058; outline-offset: -5px; }
 .clearing-anchor { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
-.clearing-anchor span { display: block; font-size: 12px; letter-spacing: 1px; color: #928e97; line-height: 1.8; }
-.clearing-anchor strong { display: block; color: #c4fad8; font-size: 14px; font-weight: 500; letter-spacing: 1px; line-height: 1.7; text-shadow: 0 0 16px #00f05833; }
+.clearing-anchor span { display: block; font-size: 12px; letter-spacing: 1px; color: #928e97; line-height: 1.5; }
+.clearing-anchor strong { display: block; color: #c4fad8; font-size: 14px; font-weight: 500; letter-spacing: 1px; line-height: 1.5; text-shadow: 0 0 16px #00f05833; }
+.mesh-viewport[data-compact] .clearing-anchor span { display: none; }
 .mesh-caption { margin: 0; padding: 4px 18px 22px; min-height: 54px; text-align: center; font-size: 12px; line-height: 1.8; letter-spacing: .5px; color: #908b95; overflow-wrap: anywhere; }
 .book-thesis { padding: 7px 12px 25px; font-size: 12px; }
 .book-thesis > span { font-size: 12px; }
