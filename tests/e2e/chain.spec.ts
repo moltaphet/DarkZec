@@ -51,3 +51,15 @@ test('the real vault scan lists what the published key saw, labelled as a record
   await expect(page.locator('#real-scan-rows tr[data-direction="OUT"]')).toHaveCount(3);
   await expect(page.locator('#real-scan-rows')).toContainText('PROCEEDS');
 });
+
+test('Audit mode offers ready-made examples up front, and the tampered copy fails on exactly the checks it should', async ({ page }) => {
+  await page.route('**/api/chain/view-activity', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  await page.goto('/'); await page.getByRole('button', { name: 'Audit mode' }).click();
+  await expect(page.locator('.audit-examples')).toContainText('Start here: ready-made examples');
+  for (const id of ['DZ-TESTNET-1', 'DZ-TESTNET-2', 'DZ-TESTNET-3']) await expect(page.locator(`#audit-run-${id}`)).toBeVisible();
+  await page.locator('#audit-session').click(); await expect(page.locator('#audit-verdict')).toContainText('Use one of the ready-made examples above');
+  await page.locator('#audit-tampered').click();
+  await expect(page.locator('#audit-verdict')).toContainText('NOT VERIFIED');
+  await expect(page.locator('[data-check="clearing"] .state')).toHaveText('FAIL'); await expect(page.locator('[data-check="result"] .state')).toHaveText('FAIL');
+  await expect(page.locator('[data-check="root"] .state')).toHaveText('PASS'); await expect(page.locator('[data-check="reveals"] .state')).toHaveText('PASS');
+});

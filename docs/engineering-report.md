@@ -134,7 +134,7 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 | --- | --- |
 | `npm test` | 133 tests passed across 19 files. |
 | `npm run build` | Strict TypeScript passed; 67 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 59 passing E2E tests. |
+| `npm run test:e2e` | Fresh build followed by 60 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |

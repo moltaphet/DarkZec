@@ -43,22 +43,39 @@ export class AuditView implements Disposable {
     this.#file.type = 'file'; this.#file.accept = 'application/json,.json'; this.#file.id = 'audit-bundle-file'; this.#file.hidden = true; this.#file.setAttribute('aria-label', 'Audit bundle file');
     const actions = node('div', '', 'tool-actions');
     for (const [button, id] of [[this.#verify, 'audit-verify'], [this.#import, 'audit-import'], [this.#session, 'audit-session'], [this.#clear, 'audit-clear']] as const) { button.type = 'button'; button.id = id; actions.append(button); }
-    for (const run of sources.runs ?? []) {
-      const button = node('button', `Load ${run.id} (real testnet)`, 'button quiet'); button.type = 'button'; button.id = `audit-run-${run.id}`; this.#runs.push(button);
-      button.addEventListener('click', () => { void this.#run(async () => { const text = await run.bundle(); this.#input.value = text; return text; }, run.snapshot); }, { signal: this.#life.signal });
-      actions.insertBefore(button, this.#clear);
+    // Ready-made examples sit above the input, so nobody has to find or run anything to see the audit work.
+    const examples = node('div', '', 'audit-examples');
+    if ((sources.runs ?? []).length > 0) {
+      examples.append(node('p', 'Start here: ready-made examples, nothing to run or paste. Three are real auctions that ran on Zcash testnet; the last one is a copy with the clearing price edited, and must fail.', 'small'));
+      const exampleActions = node('div', '', 'tool-actions');
+      for (const run of sources.runs ?? []) {
+        const button = node('button', `Load ${run.id} (real testnet)`, 'button quiet'); button.type = 'button'; button.id = `audit-run-${run.id}`; this.#runs.push(button);
+        button.addEventListener('click', () => { void this.#run(async () => { const text = await run.bundle(); this.#input.value = text; return text; }, run.snapshot); }, { signal: this.#life.signal });
+        exampleActions.append(button);
+      }
+      const first = (sources.runs ?? [])[0];
+      if (first) {
+        const tampered = node('button', 'Load a TAMPERED copy (must fail)', 'button quiet'); tampered.type = 'button'; tampered.id = 'audit-tampered'; this.#runs.push(tampered);
+        tampered.addEventListener('click', () => { void this.#run(async () => {
+          // The same real bundle with the winning price lowered: the clearing re-run and the signed result no longer match it.
+          const value = JSON.parse(await first.bundle()) as { result: { clearingPrice: string } }; value.result.clearingPrice = '0.01';
+          const text = JSON.stringify(value, null, 2); this.#input.value = text; return text;
+        }, first.snapshot); }, { signal: this.#life.signal });
+        exampleActions.append(tampered);
+      }
+      examples.append(exampleActions);
     }
     this.#verdict.id = 'audit-verdict'; this.#verdict.setAttribute('role', 'status');
     const table = node('table', '', 'audit-checks'); table.setAttribute('aria-label', 'Audit checks');
     const head = node('thead'); const row = node('tr'); for (const title of ['Check', 'Result', 'Detail']) { const th = node('th', title); th.scope = 'col'; row.append(th); }
     head.append(row); this.#rows.id = 'audit-check-rows'; table.append(head, this.#rows); this.#tableWrap.append(table); this.#tableWrap.hidden = true; this.#tableWrap.tabIndex = 0;
     this.#tableWrap.setAttribute('role', 'region'); this.#tableWrap.setAttribute('aria-label', 'Audit check results');
-    content.append(help, label, this.#input, actions, this.#file, this.#verdict, this.#tableWrap); host.append(heading, content);
+    content.append(help, examples, label, this.#input, actions, this.#file, this.#verdict, this.#tableWrap); host.append(heading, content);
     const signal = this.#life.signal;
     this.#verify.addEventListener('click', () => { void this.#run(() => this.#input.value); }, { signal });
     this.#session.addEventListener('click', () => {
       const bundle = this.#current();
-      if (!bundle) { this.#show(undefined, 'No cleared auction in this session yet. Finalize an auction first.'); return; }
+      if (!bundle) { this.#show(undefined, 'No cleared auction in this session yet. Use one of the ready-made examples above, or finalize an auction first.'); return; }
       this.#input.value = bundle; void this.#run(() => bundle);
     }, { signal });
     this.#import.addEventListener('click', () => { this.#file.value = ''; this.#file.click(); }, { signal });

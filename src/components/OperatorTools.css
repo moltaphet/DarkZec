@@ -50,3 +50,5 @@
 .practice-box { margin-top: 16px; padding: 12px 14px; border: 1px dashed #eebc56; }
 .practice-box h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #eebc56; }
 .resume-details { margin-top: 18px; }
+.audit-examples { margin: 14px 0 18px; padding: 12px 14px; border: 1px solid #00ff6655; background: rgb(0 255 102 / 5%); }
+.audit-examples p { margin: 0 0 10px; }
