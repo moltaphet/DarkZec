@@ -85,7 +85,7 @@ describe('audit bundle verification', () => {
 
 describe('recorded Zcash testnet auctions', () => {
   // Each shipped run is a settled real auction with its recorded chain snapshot; the checks beyond the base eight depend on what the run used.
-  const runs = [['DZ-TESTNET-1', 10], ['DZ-TESTNET-2', 10]] as const;
+  const runs = [['DZ-TESTNET-1', 10], ['DZ-TESTNET-2', 10], ['DZ-TESTNET-3', 12]] as const;
   for (const [id, checks] of runs) {
     it(`keeps verifying the settled ${id} bundle, on chain through its recorded snapshot`, async () => {
       const { readFile } = await import('node:fs/promises');

@@ -95,3 +95,17 @@ test('a damaged or forged auction link is refused, and the wallet is not locked 
   await expect(page.locator('#listing-error')).toContainText('damaged or was not issued by a DarkZec operator');
   await page.locator('#wallet-tab').click(); await expect(page.locator('#wallet-listing-note')).toBeHidden(); await expect(page.locator('#wallet-vault')).not.toHaveAttribute('readonly');
 });
+
+test('the shipped DZ-TESTNET-3 link opens its bidder page and one click shows the published result and the winner\'s outcome', async ({ page }) => {
+  const readme = await readFile('docs/testnet-run/README.md', 'utf8');
+  const hash = /https:\/\/darkzec\.xyz\/(#\/a\/[A-Za-z0-9_-]+)/.exec(readme)?.[1]; if (!hash) throw new Error('The DZ-TESTNET-3 link is missing from docs/testnet-run/README.md.');
+  await page.route('**/api/chain/view-activity', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  await page.goto(`/${hash}`);
+  await expect(page.locator('#listing-title')).toHaveText('One design review slot');
+  await expect(page.locator('#listing-rules')).toContainText('Second-price (Vickrey) auction for 1 lot');
+  await expect(page.locator('#listing-phase')).toHaveAttribute('data-phase', 'ENDED');
+  await page.locator('#listing-load-published').click();
+  await expect(page.locator('#listing-result')).toContainText('AUDIT VERIFIED / 12 checks passed (the on-chain checks used the chain snapshot recorded at height');
+  await expect(page.locator('#listing-clearing')).toHaveText('0.05 ZEC');
+  await expect(page.locator('#listing-mine')).toHaveText('WON 1 of 1 at 0.05 ZEC'); await expect(page.locator('#listing-refund')).toHaveText('0.05 ZEC');
+});

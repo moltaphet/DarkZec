@@ -79,7 +79,7 @@ export async function fetchViewKeyActivity(viewingKey: string, birthday: number)
 
 /** A file of a real testnet run shipped with the site (same origin, static). */
 export async function shipped(path: string): Promise<string> {
-  if (!/^\/testnet\/DZ-TESTNET-\d+-(?:audit-bundle|chain-activity|sample-receipt)\.json$/.test(path)) throw new Error('Unknown testnet run file.');
+  if (!/^\/testnet\/DZ-TESTNET-\d+-(?:audit-bundle|chain-activity)\.json$/.test(path)) throw new Error('Unknown testnet run file.');
   const response = await fetch(new URL(path, location.origin), { cache: 'no-store' });
   if (!response.ok) throw new Error('The shipped testnet run could not be loaded.');
   return response.text();

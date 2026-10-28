@@ -1,11 +1,12 @@
 # Real DarkZec auctions on Zcash testnet
 
-Two complete auctions ran on the public Zcash testnet with real shielded payments and were settled on chain. Each is a shipped, re-verified test fixture (`public/testnet/`), and the site's Audit mode loads them with one click.
+Three complete auctions ran on the public Zcash testnet with real shielded payments and were settled on chain. Each is a shipped, re-verified test fixture (`public/testnet/`), and the site's Audit mode loads them with one click.
 
 | Run | What it shows |
 | --- | --- |
 | [DZ-TESTNET-1](#dz-testnet-1-a-full-darkzec-auction-on-zcash-testnet) | Real commits and reveals, cleared at the Vickrey price, then **settled on chain** (two refunds and the proceeds) |
 | [DZ-TESTNET-2](#dz-testnet-2-settlement-with-a-burned-forfeit) | The same, plus a bid that never revealed: its collateral **burned** to a provably unspendable address |
+| [DZ-TESTNET-3](#dz-testnet-3-a-real-auction-run-from-its-link) | A whole auction run **through an auction link**: signed listing, block-height deadlines enforced on chain, bidders using the public page, then settled |
 
 ## DZ-TESTNET-1: a full DarkZec auction on Zcash testnet
 
@@ -75,7 +76,36 @@ Three bidders committed 0.1 TAZ each into a dedicated vault account; two reveale
 
 The settlement paid four outputs in one transaction: refund 0.05 and refund 0.1 (shielded, with memos), proceeds 0.05 (shielded) and **0.1 to `t2CYfLDri6rrH4WSuXtHiu1WMWus6kFY2Ea`**, the P2SH address of the one-byte script `OP_RETURN`, which no one can ever spend. The two reveals paid only 0.0002 TAZ, not enough for the larger transaction's fee, so the operator topped the vault up with a tagged payment; the verifier ignores it because it is neither a commit nor a reveal. All 10 audit checks pass on chain; `tests/audit-bundle.test.ts` re-verifies the bundle and its recorded snapshot on every run, and checks that diverting the burn to another address fails the audit.
 
-## A lesson from an attempted third run: testnet inclusion is slow
+## DZ-TESTNET-3: a real auction run from its link
 
-An attempt to run a third auction entirely through an auction link (6-minute commit window, 14 blocks) was abandoned: the three commit payments were broadcast at once but mined only after the signed commit deadline. The operator's sync did exactly what the rules require, **refusing all three as late** ("0 new, 3 refused"), and the auction could not proceed. This is the schedule working, not a bug, but it shows what a seller must plan for: on this testnet a payment can take many blocks to confirm, so give bidders **at least 15–30 minutes** (the panel defaults to 30). The block-height flow is covered end to end by `tests/e2e/listing.spec.ts` with a mocked chain, and the real chain is covered by the two runs above; a real link-driven run with generous windows is the next demonstration to record.
+This is the flagship run: nobody touched the vault or the ledger by hand. The seller described the auction in the operator panel and got a link; three bidders opened the link, used the bidder page and the wallet tab locked to the listing, paid collateral by the QR request, revealed, and the operator synced, closed, cleared and settled. The audit then verified **12 of 12 checks**, including the signed listing, the block-height schedule and every deposit and payout on chain.
+
+**The auction link** (open it on darkzec.xyz; it is a signed listing, so nothing on the server is needed):
+
+```text
+https://darkzec.xyz/#/a/eyJsIjp7InYiOjEsInRpdGxlIjoiT25lIGRlc2lnbiByZXZpZXcgc2xvdCIsImRlc2NyaXB0aW9uIjoiQSByZWFsIFpjYXNoIHRlc3RuZXQgYXVjdGlvbiwgcnVuIGVudGlyZWx5IGZyb20gaXRzIGxpbmsuIFNlY29uZC1wcmljZSBzZWFsZWQgYmlkIGZvciBhIDMwLW1pbnV0ZSBkZXNpZ24gcmV2aWV3LiBUZXN0bmV0IGNvaW5zIG9ubHkuIiwiYXVjdGlvbiI6eyJhdWN0aW9uSWQiOiJEWi1URVNUTkVULTMiLCJuZXR3b3JrIjoidGVzdG5ldCIsInZhdWx0IjoidXRlc3QxajR6cHB3endlMGs0Y2R1N2wzNzdkd2NhanBqdGY2YzZkbnBmdmhtdHBnNnlkNXB2cW5ndnI4bndqdmxoMGw1MzI5cWo4YTR2aHF4NDBwcnB5d2pjaDBtcDU3bnV0dnQzZnFxNXNjcDgiLCJzdXBwbHkiOjEsInJlc2VydmUiOiIwLjAxIiwiY29sbGF0ZXJhbCI6IjAuMSIsInVuaXREZW1hbmQiOnRydWUsInByb2N1cmVtZW50IjpmYWxzZX0sInNjaGVkdWxlIjp7ImNvbW1pdFVudGlsIjo0NTUwOTE3LCJyZXZlYWxVbnRpbCI6NDU1MDk1MywiYW5jaG9ySGVpZ2h0Ijo0NTUwODY5LCJhbmNob3JUaW1lIjoxNzkzMTg5ODQyfX0sImsiOiIwNGUyZTEyNjNjNTgzYzAwMTY4ZDdjYzNiOGM3MGVkNWUyNTc5MzQ0YjRkYjhkNmMzYjA2NmNmNjYwN2QxNjdmYTljMWI1ZTlhMTczN2QwNDk3OTkyNThhNTMyODgyNjYzOGE0MGM5MDFlMzM2ZjBjZjg4NTM4M2I2M2MwZDhkMDEyIiwicyI6ImY5MjYzOThkODFmOTcwMzQwMDQyZjhiNjIzY2RjZTQyZDNhNjE0YmUwNjY4YjQ1NWRhMzYxZGI5M2M4ZTRmYjE4NDA4ZmMzMDQ1MjRlZWE1NzcyMjE5NjZhZDYyNDVhMjExNDdiYjZhMTVlZGQ1MWQyZTY2ZWFiZGJiNTJhOTNmIn0
+```
+
+| | |
+| --- | --- |
+| Listing | “One design review slot”, Vickrey, 1 lot, reserve 0.01 TAZ, 0.1 TAZ collateral |
+| Deadlines | commits mined up to block **4,550,917**, reveals up to block **4,550,953** (20 and 15 minutes of blocks at signing) |
+| Bids | 0.08 (revealed), 0.05 (revealed), 0.07 (**never revealed**, collateral burned) |
+| Result | the 0.08 bid won at the second price among revealed bids, **0.05 TAZ**; the 0.05 bid was refunded in full |
+
+| Step | Txid | Block | Value |
+| --- | --- | --- | --- |
+| Commit A (0.08) | `403a151f76e2cd4faa1110431b1c2c3d3ad14a6e30a1396ec656c7b5185b1686` | 4,550,874 | 0.1 TAZ |
+| Commit B (0.05) | `7b1ddbd55badfbcde94de9711ccf49d65ae0e2b70223c3a34b7acf8d8a6d761d` | 4,550,874 | 0.1 TAZ |
+| Commit C (0.07, never revealed) | `0f828b1170cdf48ecac1fd3c4ee4fed1ed314eb2024846f1fa48836d2ffe5927` | 4,550,874 | 0.1 TAZ |
+| Reveal A | `1d826e4b02717b72b1c3e04777b8115d5d75ea09160cf2c138c99a7717772bc6` | 4,550,920 | 0.0001 TAZ |
+| Reveal B | `9d67a392b7cae08501537349475cbd1875f541a9748108397f15115c1511e9bf` | 4,550,920 | 0.0001 TAZ |
+| Fee top-up (`fee` memo) | `9fc6d31988e506b77c235de3f48a0d948a26ff2a432e7214015dd14217b1ab6b` | 4,550,959 | 0.0005 TAZ |
+| **Settlement** | `197d1dd4b8fbf5423fc1d15735fb068be33f8fddd752c49aae0281de45243115` | 4,550,970 | 0.3 TAZ out |
+
+The settlement paid the two refunds (0.05 and 0.1), the proceeds (0.05) and burned 0.1 to the unspendable address. On the bidder page, **Load the published result and the winner's receipt** runs the whole audit in the browser and shows the winning bid and its refund. `tests/e2e/listing.spec.ts` opens this very link on every test run.
+
+## Lessons from getting there
+
+Two earlier attempts at the link-driven run failed. In the first, a short 6-minute commit window (14 blocks) was too tight: the three commit payments were broadcast at once but mined only after the signed commit deadline. The operator's sync did exactly what the rules require, **refusing all three as late** ("0 new, 3 refused"), and the auction could not proceed. This is the schedule working, not a bug, but it shows what a seller must plan for: on this testnet a payment can take many blocks to confirm, so give bidders **at least 15–30 minutes** (the panel defaults to 30). The block-height flow is covered end to end by `tests/e2e/listing.spec.ts` with a mocked chain, and the real chain is covered by the two runs above; the successful run above used 20 and 15 minutes. In the second failed attempt a light wallet server dropped the connection mid-run and ended the operator's browser session, which holds the signing key; the driver now retries transport errors instead of exiting.
 

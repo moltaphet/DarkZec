@@ -16,12 +16,15 @@ const fact = (label: string, value: string, id?: string): HTMLElement => {
   const row = node('div'); const term = node('dt', label, 'micro'); const detail = node('dd', value); if (id) detail.id = id; row.append(term, detail); return row;
 };
 
+/** An audit report and where its on-chain checks, if present, got their chain data. */
+export interface VerifiedBundle { readonly report: AuditReport; readonly source: 'live' | 'recorded' | 'none'; readonly tip?: number }
+
 export interface ListingHandlers {
   /** Opens the wallet tab prefilled and locked to this auction. */
   bid(opened: OpenedListing): void;
   /** Runs the full audit on a bundle text (off-chain checks plus on-chain ones where a light client answers). */
-  verify(text: string): Promise<AuditReport>;
-  /** Shipped real runs only: the published audit bundle and a sample winner's receipt for this auction, so the result check works in one click. */
+  verify(text: string): Promise<VerifiedBundle>;
+  /** Shipped real runs only: the published audit bundle and the winner's receipt (taken from that bundle), so the result check works in one click. */
   published?(auctionId: string): { readonly bundle: () => Promise<string>; readonly receipt: () => Promise<string> } | undefined;
 }
 
@@ -100,8 +103,8 @@ export class ListingView implements Disposable {
 
     const check = node('section', '', 'listing-check'); check.setAttribute('aria-label', 'Check your result');
     check.append(node('h3', 'Check your result'), node('p', 'After clearing, import the audit bundle the operator published and, optionally, your receipt. DarkZec re-verifies the whole auction here and shows what happened to your bid.', 'small'));
-    this.#bundleFile.type = 'file'; this.#bundleFile.accept = 'application/json,.json'; this.#bundleFile.id = 'listing-bundle-file'; this.#bundleFile.setAttribute('aria-label', 'Audit bundle file');
-    this.#receiptFile.type = 'file'; this.#receiptFile.accept = 'application/json,.json,text/plain,.txt'; this.#receiptFile.id = 'listing-receipt-file'; this.#receiptFile.setAttribute('aria-label', 'Your receipt file');
+    this.#bundleFile.type = 'file'; this.#bundleFile.accept = 'application/json,.json'; this.#bundleFile.hidden = true; this.#bundleFile.id = 'listing-bundle-file'; this.#bundleFile.setAttribute('aria-label', 'Audit bundle file');
+    this.#receiptFile.type = 'file'; this.#receiptFile.accept = 'application/json,.json,text/plain,.txt'; this.#receiptFile.hidden = true; this.#receiptFile.id = 'listing-receipt-file'; this.#receiptFile.setAttribute('aria-label', 'Your receipt file');
     const actions = node('div', '', 'tool-actions');
     const importBundle = node('button', 'Import audit bundle', 'button quiet'); importBundle.type = 'button'; importBundle.id = 'listing-import-bundle';
     const importReceipt = node('button', 'Import my receipt', 'button quiet'); importReceipt.type = 'button'; importReceipt.id = 'listing-import-receipt';
@@ -139,10 +142,13 @@ export class ListingView implements Disposable {
     try { bundle = parseAuditBundle(this.#bundle); } catch { this.#say('That file is not a DarkZec audit bundle.', false); return; }
     // The bundle must be the auction this link promised, not merely some valid auction.
     if (!bundle.listing || await listingDigest(bundle.listing) !== opened.digest) { this.#say('This bundle is not for this auction: its signed listing differs from the one in your link.', false); return; }
-    const report = await this.#handlers.verify(this.#bundle);
+    const { report, source, tip } = await this.#handlers.verify(this.#bundle);
     const failed = report.checks.filter(check => !check.ok && check.skipped !== true);
     this.#result.replaceChildren();
-    this.#result.append(node('p', report.ok ? `AUDIT VERIFIED / ${report.checks.filter(check => check.ok).length} checks passed${report.checks.some(check => check.skipped) ? ' (on-chain checks need a Zcash light client; run scripts/verify-chain.ts)' : ''}.` :
+    const passed = report.checks.filter(check => check.ok).length;
+    const chain = report.checks.some(check => check.skipped) ? ' (on-chain checks need a Zcash light client; run scripts/verify-chain.ts)' :
+      source === 'live' ? ` (the on-chain checks read live from testnet at height ${tip})` : source === 'recorded' ? ` (the on-chain checks used the chain snapshot recorded at height ${tip})` : '';
+    this.#result.append(node('p', report.ok ? `AUDIT VERIFIED / ${passed} checks passed${chain}.` :
       `AUDIT FAILED / ${failed.map(check => check.label).join(', ')}. Do not trust this result.`, `tool-status ${report.ok ? 'is-ok' : 'is-bad'}`));
     const { result, auction } = bundle;
     const lines = node('dl', '', 'receipt listing-outcome');

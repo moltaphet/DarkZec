@@ -26,8 +26,8 @@ import { PaymentQr } from './components/PaymentQr';
 import { RealVaultScan } from './components/RealVaultScan';
 import { AuctionSession } from './lib/auction-session';
 import { parseAuditBundle, serializeAuditBundle, verifyAuditBundle } from './lib/audit-bundle';
-import type { AuditReport } from './lib/audit-bundle';
 import { ListingView } from './components/ListingView';
+import type { VerifiedBundle } from './components/ListingView';
 import { encodeListingLink, isListingLink, openListingLink } from './lib/listing';
 import type { OpenedListing } from './lib/listing';
 import { BLOCK_MS, blocksFor, chainTime, closeTime, commitOnTime, describeBlocks, revealOnTime } from './lib/schedule';
@@ -155,7 +155,7 @@ effects.own(() => operatorPanel.destroy());
 /** The testnet checker only answers same-origin loopback requests, so a public deployment never probes it. */
 const loopbackHost = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 /** Real testnet auctions shipped with the site: each settled bundle with the chain snapshot recorded when it was verified. */
-const TESTNET_RUNS = ['DZ-TESTNET-1', 'DZ-TESTNET-2'] as const;
+const TESTNET_RUNS = ['DZ-TESTNET-1', 'DZ-TESTNET-2', 'DZ-TESTNET-3'] as const;
 const auditView = new AuditView(el('audit-view'), () => { const bundle = session?.bundle(); return bundle ? serializeAuditBundle(bundle) : undefined; }, {
   ...(loopbackHost ? { live: fetchViewKeyActivity } : {}),
   runs: TESTNET_RUNS.map(id => ({ id, bundle: () => shipped(`/testnet/${id}-audit-bundle.json`), snapshot: async () => parseChainActivity(JSON.parse(await shipped(`/testnet/${id}-chain-activity.json`))) })),
@@ -167,13 +167,27 @@ const walletQr = new PaymentQr(el('wallet-qr'), 'QR code of the ZIP-321 commit p
 const revealQr = new PaymentQr(el('wallet-reveal-qr'), 'QR code of the ZIP-321 reveal payment request');
 effects.own(() => auditView.destroy()); effects.own(() => realScan.destroy());
 const listingView = new ListingView(el('listing-view'), { bid: opened => openBid(opened), verify: text => verifyBundleText(text),
-  published: id => (TESTNET_RUNS as readonly string[]).includes(id) ? { bundle: () => shipped(`/testnet/${id}-audit-bundle.json`), receipt: () => shipped(`/testnet/${id}-sample-receipt.json`) } : undefined });
+  published: id => (TESTNET_RUNS as readonly string[]).includes(id) ? { bundle: () => shipped(`/testnet/${id}-audit-bundle.json`), receipt: () => winnerReceipt(id) } : undefined });
 effects.own(() => listingView.destroy());
+/** The winner's reveal receipt, taken from the published bundle itself: every revealed bid is public after clearing, so no receipt file is shipped. */
+async function winnerReceipt(id: string): Promise<string> {
+  const bundle = parseAuditBundle(await shipped(`/testnet/${id}-audit-bundle.json`));
+  const winner = bundle.result.allocations.find(row => row.filled > 0); if (!winner) throw new Error('This auction has no winner.');
+  for (const receipt of bundle.reveals) { if (await commitment(parseReceiptText(receipt, bundle.auction.network)) === winner.commitment) return receipt; }
+  throw new Error('The winner\'s reveal is not in the bundle.');
+}
 /** Full audit of a bundle a bidder imported; on a local server a settled bundle's on-chain checks read live. */
-async function verifyBundleText(textValue: string): Promise<AuditReport> {
-  let activity;
-  try { const settlement = parseAuditBundle(textValue).settlement; if (settlement && loopbackHost) activity = await fetchViewKeyActivity(settlement.viewingKey, settlement.birthday); } catch { activity = undefined; }
-  return verifyAuditBundle(textValue, activity);
+async function verifyBundleText(textValue: string): Promise<VerifiedBundle> {
+  let activity; let source: VerifiedBundle['source'] = 'none';
+  try {
+    const bundle = parseAuditBundle(textValue); const settlement = bundle.settlement;
+    if (settlement && loopbackHost) { try { activity = await fetchViewKeyActivity(settlement.viewingKey, settlement.birthday); source = 'live'; } catch { activity = undefined; } }
+    // A shipped real run falls back to the chain snapshot recorded when it was verified, and says so.
+    const id = bundle.auction.auctionId;
+    if (settlement && !activity && (TESTNET_RUNS as readonly string[]).includes(id)) { try { activity = parseChainActivity(JSON.parse(await shipped(`/testnet/${id}-chain-activity.json`))); source = 'recorded'; } catch { activity = undefined; } }
+  } catch { activity = undefined; }
+  const report = await verifyAuditBundle(textValue, activity);
+  return activity ? { report, source, tip: activity.tip } : { report, source: 'none' };
 }
 /** Sends a bidder from the listing page to the wallet tab, prefilled with the listing's rules and locked to them. */
 function openBid(opened: OpenedListing): void {

@@ -1,0 +1,108 @@
+{
+  "v": 1,
+  "kind": "darkzec-audit-bundle",
+  "auction": {
+    "auctionId": "DZ-TESTNET-3",
+    "network": "testnet",
+    "vault": "utest1j4zppwzwe0k4cdu7l377dwcajpjtf6c6dnpfvhmtpg6yd5pvqngvr8nwjvlh0l5329qj8a4vhqx40prpywjch0mp57nutvt3fqq5scp8",
+    "supply": 1,
+    "reserve": "0.01",
+    "collateral": "0.1",
+    "unitDemand": true,
+    "schedule": {
+      "commitUntil": 4550917,
+      "revealUntil": 4550953
+    }
+  },
+  "commitments": [
+    "8db8b36dfd6ecb3dde934efd2e71b35b104991ac04ae53e3e1637bc7fc3e5f64",
+    "205be760849688b3fed7f4dda44568042bf219d51d5b81c868e59a8f26afd056",
+    "7e9e99596720ab8fa626befc8b197102ebe9b7110f90bf6aa5c2bdad334fc3f4"
+  ],
+  "root": "5682913493a0916b92ad16089ff9e806075876a1164476dbeb7d7bde696f2d61",
+  "reveals": [
+    "{\"v\":1,\"a\":\"DZ-TESTNET-3\",\"p\":\"0.08\",\"q\":1,\"s\":\"33bdb069e96c22c56ce8edc0bfe2aea23f0153e35633c548b528d4a7bf58b6b8\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}",
+    "{\"v\":1,\"a\":\"DZ-TESTNET-3\",\"p\":\"0.05\",\"q\":1,\"s\":\"77c09d40fbeccd97183b87bf6146059085b0b3692863235f4acd0356109b72b6\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}"
+  ],
+  "result": {
+    "clearingPrice": "0.05",
+    "filled": 1,
+    "excluded": 1,
+    "forfeitedCollateral": "0.1",
+    "postedCollateral": "0.3",
+    "allocations": [
+      {
+        "commitment": "205be760849688b3fed7f4dda44568042bf219d51d5b81c868e59a8f26afd056",
+        "price": "0.08",
+        "requested": 1,
+        "filled": 1,
+        "paid": "0.05",
+        "refundAmount": "0.05",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      },
+      {
+        "commitment": "7e9e99596720ab8fa626befc8b197102ebe9b7110f90bf6aa5c2bdad334fc3f4",
+        "price": "0.05",
+        "requested": 1,
+        "filled": 0,
+        "paid": "0",
+        "refundAmount": "0.1",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      }
+    ]
+  },
+  "operator": {
+    "publicKey": "04e2e1263c583c00168d7cc3b8c70ed5e2579344b4db8d6c3b066cf6607d167fa9c1b5e9a1737d049799258a5328826638a40c901e336f0cf885383b63c0d8d012",
+    "statements": [
+      {
+        "statement": "[\"DARKZEC/listing/v1\",\"DZ-TESTNET-3\",\"d5fb12fd0859dc851727e3035164384c8595ee763117da160ced51a2083b7118\"]",
+        "signature": "f926398d81f970340042f8b623cdce42d3a614be0668b455da361db93c8e4fb18408fc304524eea577221966ad6245a21147bb6a15edd51d2e66eabdbb52a93f"
+      },
+      {
+        "statement": "[\"DARKZEC/close/v1\",\"DZ-TESTNET-3\",\"5682913493a0916b92ad16089ff9e806075876a1164476dbeb7d7bde696f2d61\",3,113772950000,113773850000]",
+        "signature": "733dba888fc0bac042309d681184acfac2fd21bbf3e3df5fe9f0295d41cdd9ce8141a05fd90dcc4d6fa50273ed759393b4a7eefdf1cf5b3037b17efb2172ae19"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-3\",\"5682913493a0916b92ad16089ff9e806075876a1164476dbeb7d7bde696f2d61\",\"205be760849688b3fed7f4dda44568042bf219d51d5b81c868e59a8f26afd056\",1,113773000000]",
+        "signature": "a57b8fd167486842bafc62c5fb030c9febd26f5344947f43fca3c5e314cb06e8a12029999e19e721322886c96ad7e549d057f83a8b59e4511d92cdd284b2842c"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-3\",\"5682913493a0916b92ad16089ff9e806075876a1164476dbeb7d7bde696f2d61\",\"7e9e99596720ab8fa626befc8b197102ebe9b7110f90bf6aa5c2bdad334fc3f4\",2,113773000000]",
+        "signature": "27f6ed9180285ab441a18e39fb45f79f8133260121b1e5bd0451cafa217597ea8f1f2d9f55b3a21cf2a1415b9816f3cb144b90b4f757350554b519e7f235d145"
+      },
+      {
+        "statement": "[\"DARKZEC/result/v1\",\"DZ-TESTNET-3\",\"5682913493a0916b92ad16089ff9e806075876a1164476dbeb7d7bde696f2d61\",\"04a0d849b05fe7ef3636dc2786e4cc78d40e7167d380594f94dac54a7673dad9\"]",
+        "signature": "6984929626fa1f90cddb3a049259dd5fc7752efe1610153af936651e8c9b8fd294d37d51de362f08c1a35504d337b1a143a476f433aa7a8f0dcf9c1a610176b8"
+      }
+    ]
+  },
+  "listing": {
+    "v": 1,
+    "title": "One design review slot",
+    "description": "A real Zcash testnet auction, run entirely from its link. Second-price sealed bid for a 30-minute design review. Testnet coins only.",
+    "auction": {
+      "auctionId": "DZ-TESTNET-3",
+      "network": "testnet",
+      "vault": "utest1j4zppwzwe0k4cdu7l377dwcajpjtf6c6dnpfvhmtpg6yd5pvqngvr8nwjvlh0l5329qj8a4vhqx40prpywjch0mp57nutvt3fqq5scp8",
+      "supply": 1,
+      "reserve": "0.01",
+      "collateral": "0.1",
+      "unitDemand": true,
+      "procurement": false
+    },
+    "schedule": {
+      "commitUntil": 4550917,
+      "revealUntil": 4550953,
+      "anchorHeight": 4550869,
+      "anchorTime": 1793189842
+    }
+  },
+  "settlement": {
+    "viewingKey": "uviewtest1f2825dpcp53aum2fnvc57fmgge3yydr2npdmsrh4j5ca9kc46zv793495s0ueln66vdazv2t95cp6ruhvsj0fft2hg4mnz75t47d0lresfzhlflc9q8ahgyyf4xdpl2yyzcq9wx6tjz6t9cj9v7qpnx9xhzwzp5s4rx27n786md3g0z52puawjhrcpuw7gwtk5sz7q8h3qvy9l9an4ear0q9r9cpuw9nxjf4mk64gkqypkng4h547gjca54fpu024qgqh3kk4chtu6gkswpca7mtefgej2hdtyclwy366kez2d5ahkqtxkwuurrucqww4gwgxffs7rhuyy0dxfc93r7cu2vtpd8x25z2yra7s7ecus4sek6gxrdre6ahcfq3pksyxryml65znj7g7qhve08y5npry8qryptv85gepd8w4h9qjwvu47sucq6mfj2x0uhjqahq4r7pqu0n30wjhpan93lgh72zmwzzpzgp9d796dv8ycwt5aeh",
+    "birthday": 4550769,
+    "seller": "utest1deatr2fc2lqv6psjqaz5mavgxrh30w3c4ghmypg749rr6a67m97rsxpmvpn6uvypv4sjuw97gfapqgstdvvly6ux7x6dhu6rcg035ahr",
+    "txids": [
+      "197d1dd4b8fbf5423fc1d15735fb068be33f8fddd752c49aae0281de45243115"
+    ]
+  }
+}
