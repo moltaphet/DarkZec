@@ -16,6 +16,7 @@ export type ParsedStatement =
   | { readonly type: 'result'; readonly auctionId: string; readonly root: string; readonly digest: string };
 
 const KEY = { name: 'ECDSA', namedCurve: 'P-256' } as const;
+export const KEY_ALGORITHM = KEY;
 const SIGNATURE = { name: 'ECDSA', hash: 'SHA-256' } as const;
 const HASH = /^[a-f0-9]{64}$/;
 const isTime = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
@@ -25,9 +26,13 @@ const isIndex = (value: unknown): value is number => Number.isSafeInteger(value)
 export async function createOperatorSigner(): Promise<OperatorSigner> {
   const pair = await crypto.subtle.generateKey(KEY, false, ['sign', 'verify']);
   const publicKey = hex(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey)));
+  return signerFromKey(pair.privateKey, publicKey);
+}
+/** A signer over an existing private key (for example one restored from an encrypted backup). */
+export function signerFromKey(privateKey: CryptoKey, publicKey: string): OperatorSigner {
   return Object.freeze({
     publicKey,
-    async sign(statement: string): Promise<string> { return hex(new Uint8Array(await crypto.subtle.sign(SIGNATURE, pair.privateKey, utf8(statement)))); },
+    async sign(statement: string): Promise<string> { return hex(new Uint8Array(await crypto.subtle.sign(SIGNATURE, privateKey, utf8(statement)))); },
   });
 }
 
@@ -125,6 +130,13 @@ export class OperatorJournal {
   async recordListing(digest: string): Promise<SignedStatement> {
     if (this.#root !== undefined || this.#statements.some(item => item.statement.startsWith('["DARKZEC/listing/'))) throw new Error('The listing can be signed once, before close.');
     return this.#append(listingStatement(this.#auctionId, digest));
+  }
+  /** Re-adopts a listing signed earlier (it travels in the auction link), so a resumed session keeps the original signature. */
+  async adoptListing(signed: SignedStatement): Promise<void> {
+    if (this.#root !== undefined || this.#statements.length > 0) throw new Error('A listing can only be adopted by a fresh session.');
+    const parsed = parseStatement(signed.statement);
+    if (parsed.type !== 'listing' || parsed.auctionId !== this.#auctionId || !await verifyStatement(this.#signer.publicKey, signed)) throw new Error('This key does not match the listing\'s signature.');
+    this.#statements.push(Object.freeze({ statement: signed.statement, signature: signed.signature }));
   }
   async recordClose(root: string, count: number, closedAt: number, revealDeadline: number): Promise<SignedStatement> {
     if (this.#root !== undefined) throw new Error('The close statement is already signed.');

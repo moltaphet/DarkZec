@@ -8,7 +8,7 @@ The repository is [moltaphet/DarkZec](https://github.com/moltaphet/DarkZec). Thi
 
 This is a Vite application with strict TypeScript, modular typed DOM components and bundled CSS. `.tsx` component paths do not introduce React. The Judge Sandbox and mock scanner run entirely locally. Real Orchard note scanning, custody, transaction submission, decentralized sequencing and cross-chain settlement remain integration work.
 
-Current observed verification (Node 26.10.0): **116 unit/privacy/CLI tests across 16 files, 52 E2E tests and 64 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
+Current observed verification (Node 26.10.0): **130 unit/privacy/CLI tests across 19 files, 55 E2E tests and 67 transformed production modules**. The commit/reveal rewrite replaced the earlier AES-GCM sandbox envelopes; E2E specs were updated for the frozen-at-close Merkle root, hash-only commit memos and the shield indicator semantics.
 
 ## Runtime and dependency compatibility
 
@@ -50,6 +50,7 @@ The project `.npmrc` selects official npm. The regenerated lockfile contains **8
 | `src/components/LiveTerminalStream.tsx`, `LiveTerminalStream.css`, `TelemetryRail.ts` | Bounded typewriter views and synchronized payload/security counters. |
 | `src/lib/security-events.ts`, `security-monitor.ts` | Typed fixed metadata, truthful encryption status and passive CSP observation. |
 | `src/lib/dom.ts`, `motion.ts`, `blind-mesh.ts` | Cleanup ownership, visibility/reduced-motion scheduling and public-commitment-only geometry. |
+| `src/lib/operator-key.ts`, `simulated-chain.ts`, `reminder.ts`, `cosigner.ts`, `scripts/auction.ts`, `scripts/cosign-check.ts`, `scripts/capture-video.ts` | Encrypted operator key backup and resume, the in-memory practice chain, bidder calendar reminders, the co-signer settlement policy, the one-command operator launcher and the 4K still capture. |
 | `src/lib/schedule.ts`, `listing.ts`, `settlement.ts`, `src/components/ListingView.ts`, `RealVaultScan.ts`, `PaymentQr.ts`, `scripts/settle.ts`, `verify-chain.ts`, `view-wallet.ts`, `resolve-ts.ts` | Block-height deadlines, signed auction links, on-chain settlement and its verification, the bidder and scanner pages, QR rendering and the zcash-devtool tooling. |
 | `tests/*.test.ts`, `tests/fixtures.ts`, `tests/e2e/*.spec.ts` | Unit/privacy/CLI invariants, synthetic/public encodings and complete browser flows. |
 | `LICENSE`, `.github/workflows/ci.yml` | MIT licensing and SHA-pinned, read-only push/PR clean-install/build/unit/E2E CI on Node 22/24. |
@@ -131,9 +132,9 @@ Install Chromium once with `npx playwright install chromium`, or set `PLAYWRIGHT
 
 | Check | Observed current result |
 | --- | --- |
-| `npm test` | 116 tests passed across 16 files. |
-| `npm run build` | Strict TypeScript passed; 64 transformed modules. |
-| `npm run test:e2e` | Fresh build followed by 52 passing E2E tests. |
+| `npm test` | 130 tests passed across 19 files. |
+| `npm run build` | Strict TypeScript passed; 67 transformed modules. |
+| `npm run test:e2e` | Fresh build followed by 55 passing E2E tests. |
 | Node 22 / 24 | Exercised by the CI workflow; not re-run locally after the commit/reveal integration. |
 | Production bundle | See `npm run build` output (JavaScript and CSS gzip sizes are reported by Vite). |
 | `npm ci` | Clean installation succeeded; 45 platform packages installed and lockfile unchanged. |

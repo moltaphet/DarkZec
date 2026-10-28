@@ -4,7 +4,9 @@ import { AUDIT_BUNDLE_MAX_BYTES, parseAuditBundle } from '../lib/audit-bundle';
 import type { AuditReport } from '../lib/audit-bundle';
 import { listingDigest } from '../lib/listing';
 import type { OpenedListing } from '../lib/listing';
-import { parseReceiptText } from '../lib/receipt-file';
+import { downloadText, parseReceiptText } from '../lib/receipt-file';
+import { buildReminders } from '../lib/reminder';
+import { FIXTURE_ADDRESS } from '../fixtures';
 import { describeBlocks, estimateHeight } from '../lib/schedule';
 import { commitment } from '../protocol/crypto';
 import { formatZec, parseZec } from '../protocol/amount';
@@ -99,6 +101,12 @@ export class ListingView implements Disposable {
       'When the operator publishes the audit bundle, check your result below. Refunds go to your refund address.']) steps.append(node('li', step));
     const bid = node('button', 'Bid on this auction', 'button primary'); bid.type = 'button'; bid.id = 'listing-bid';
     bid.addEventListener('click', () => this.#handlers.bid(opened), { signal: this.#life.signal });
+    const reminders = node('button', 'Download calendar reminders (.ics)', 'button quiet'); reminders.type = 'button'; reminders.id = 'listing-reminders';
+    reminders.addEventListener('click', () => downloadText(`darkzec-${auction.auctionId}-reminders.ics`, buildReminders(listing), 'text/calendar'), { signal: this.#life.signal });
+    // A practice auction uses the public demo vault: it can be read but never paid.
+    const practice = auction.vault === FIXTURE_ADDRESS;
+    if (practice) { bid.disabled = true; reminders.disabled = true; }
+    const practiceNote = node('p', 'PRACTICE AUCTION: the seller is rehearsing on a simulated chain and the vault is the public demo vault, so nothing here can be paid. This is what your bidders would see.', 'tool-status is-bad'); practiceNote.id = 'listing-practice'; practiceNote.hidden = !practice;
     const bidNote = node('p', 'Testnet only. Zcash testnet coins have no value; this is a prototype.', 'small muted');
 
     const check = node('section', '', 'listing-check'); check.setAttribute('aria-label', 'Check your result');
@@ -123,7 +131,8 @@ export class ListingView implements Disposable {
     this.#receiptFile.addEventListener('change', () => { void this.#read(this.#receiptFile, 4096, text => { this.#receipt = text.trim(); }); }, { signal });
     this.#result.id = 'listing-result'; this.#result.setAttribute('role', 'status');
     check.append(this.#bundleFile, this.#receiptFile, actions, this.#result);
-    body.append(rules, timeline, facts, note, trust, node('p', 'Vault address', 'micro'), vault, node('h3', 'How to bid'), steps, bid, bidNote, check);
+    const buttons = node('div', '', 'tool-actions'); buttons.append(bid, reminders);
+    body.append(practiceNote, rules, timeline, facts, note, trust, node('p', 'Vault address', 'micro'), vault, node('h3', 'How to bid'), steps, buttons, bidNote, check);
     this.#host.append(heading, body);
   }
 

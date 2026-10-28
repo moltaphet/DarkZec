@@ -11,7 +11,9 @@
     "test:e2e": "npm run build && playwright test",
     "verify": "npm test && npm run test:e2e",
     "settle": "node --import ./scripts/resolve-ts.ts scripts/settle.ts",
-    "verify-chain": "node --import ./scripts/resolve-ts.ts scripts/verify-chain.ts"
+    "verify-chain": "node --import ./scripts/resolve-ts.ts scripts/verify-chain.ts",
+    "cosign-check": "node --import ./scripts/resolve-ts.ts scripts/cosign-check.ts",
+    "auction": "node --import ./scripts/resolve-ts.ts scripts/auction.ts"
   },
   "engines": {
     "node": "^22.18.0 || ^24.0.0 || >=26.0.0"

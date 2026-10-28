@@ -5,7 +5,8 @@ import type { AuctionConfig, SettlementResult } from '../simulation';
 import { buildAuditBundle } from './audit-bundle';
 import type { AuditBundle } from './audit-bundle';
 import { listingDigest, parseListing } from './listing';
-import type { Listing, SignedListing } from './listing';
+import type { Listing, OpenedListing, SignedListing } from './listing';
+import { listingStatement } from './operator-journal';
 import { OperatorJournal } from './operator-journal';
 import type { OperatorSigner, SignedStatement } from './operator-journal';
 
@@ -27,15 +28,29 @@ export class AuctionSession {
    * Signs the public listing before the first bid arrives. The listing must describe exactly this session's rules, so what bidders
    * read in the link is what the audit later checks.
    */
-  async publish(input: Listing): Promise<SignedListing> {
-    const listing = parseListing(input); const config = this.sandbox.config; const a = listing.auction;
+  #assertMatches(listing: Listing): void {
+    const config = this.sandbox.config; const a = listing.auction;
     if (a.auctionId !== config.auctionId || a.vault !== config.vault || a.supply !== config.supply || a.reserve !== config.reserve || a.collateral !== config.collateral ||
       a.unitDemand !== (config.unitDemand === true) || a.procurement !== (config.procurement === true) ||
       listing.schedule.commitUntil !== config.schedule?.commitUntil || listing.schedule.revealUntil !== config.schedule?.revealUntil) throw new Error('The listing does not match this auction\'s rules.');
     if (this.sandbox.publicSnapshot().phase !== 'open') throw new Error('A listing is published before the commit phase closes.');
+  }
+  async publish(input: Listing): Promise<SignedListing> {
+    const listing = parseListing(input); this.#assertMatches(listing);
     const signed = await this.journal.recordListing(await listingDigest(listing));
     this.#listing = listing;
     return Object.freeze({ listing, publicKey: this.journal.publicKey, signature: signed.signature });
+  }
+  /**
+   * Resumes an auction from its link after a crash: the original listing signature is adopted (not re-signed) and must verify
+   * under this session's restored key. Everything else (commits, close, reveals) is replayed from the chain, with fresh signatures
+   * over the same deterministic statements.
+   */
+  async adoptListing(opened: OpenedListing): Promise<void> {
+    this.#assertMatches(opened.listing);
+    if (opened.publicKey !== this.journal.publicKey) throw new Error('This key file does not belong to that auction link.');
+    await this.journal.adoptListing({ statement: listingStatement(opened.listing.auction.auctionId, opened.digest), signature: opened.signature });
+    this.#listing = opened.listing;
   }
   /** Freezes the commitment set and signs its root, count and reveal window. */
   async close(): Promise<string> {

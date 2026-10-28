@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="t d">
+  <title id="t">DarkZec trust model: what is proven today and what threshold custody adds</title>
+  <desc id="d">Three columns. Left: what the operator can do. Middle: how it is made public today (built). Right: how threshold custody would prevent it (next step).</desc>
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #e8ece9; }
+    .h { font-size: 20px; font-weight: 700; letter-spacing: .06em; fill: #00ff66; }
+    .s { font-size: 13px; fill: #8d8d94; letter-spacing: .08em; }
+    .b { font-size: 15px; }
+    .ok { fill: #00f058; font-weight: 700; }
+    .no { fill: #eebc56; font-weight: 700; }
+  </style>
+  <rect width="1200" height="600" fill="#060707"/>
+  <text x="40" y="48" class="h">TRUST MODEL: THE OPERATOR HOLDS THE COLLATERAL</text>
+  <text x="40" y="74" class="s">Zcash has no escrow contract, so the honest question is: what happens if the operator misbehaves?</text>
+  <g stroke="#2a2d2c" fill="none"><rect x="40" y="100" width="340" height="440"/><rect x="430" y="100" width="340" height="440"/><rect x="820" y="100" width="340" height="440"/></g>
+  <text x="60" y="132" class="h" font-size="16">OPERATOR COULD…</text>
+  <text x="450" y="132" class="h" font-size="16">TODAY: PROVEN PUBLICLY</text>
+  <text x="840" y="132" class="h" font-size="16">NEXT: PREVENTED</text>
+  <text x="450" y="154" class="s">built and verified on testnet</text>
+  <text x="840" y="154" class="s">designed, not implemented</text>
+  <g class="b">
+    <text x="60" y="196">change the result</text>
+    <text x="60" y="246">drop a commit or reveal</text>
+    <text x="60" y="296">admit a late payment</text>
+    <text x="60" y="346">refund wrongly or short</text>
+    <text x="60" y="396">keep the forfeited bond</text>
+    <text x="60" y="446">advertise one auction, run another</text>
+    <text x="60" y="496" class="no">run away with the collateral</text>
+    <text x="450" y="196"><tspan class="ok">✓ </tspan>audit re-runs clearing</text>
+    <text x="450" y="246"><tspan class="ok">✓ </tspan>on-chain completeness check</text>
+    <text x="450" y="296"><tspan class="ok">✓ </tspan>block-height deadlines</text>
+    <text x="450" y="346"><tspan class="ok">✓ </tspan>refunds read from the chain</text>
+    <text x="450" y="396"><tspan class="ok">✓ </tspan>burned to an unspendable address</text>
+    <text x="450" y="446"><tspan class="ok">✓ </tspan>signed listing in the bundle</text>
+    <text x="450" y="496"><tspan class="no">! </tspan>provable, not preventable</text>
+    <text x="840" y="196">co-signer recomputes the result</text>
+    <text x="840" y="246">from the public audit bundle</text>
+    <text x="840" y="296">and signs only a settlement</text>
+    <text x="840" y="346">that matches it exactly:</text>
+    <text x="840" y="396" class="ok">cosign-check (built)</text>
+    <text x="840" y="446">2-of-3 FROST spend key:</text>
+    <text x="840" y="496" class="no">operator + co-signer + bidder</text>
+  </g>
+  <text x="40" y="580" class="s">Built: audit, listing, schedule, on-chain checks, cosign-check policy.   Next: FROST key ceremony and signer service.</text>
+</svg>

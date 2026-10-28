@@ -45,3 +45,7 @@
 .listing-check { margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--line); }
 .listing-result { margin-top: 14px; }
 .listing-facts, .listing-outcome { margin: 12px 0; }
+.live-auction .button:disabled, .listing-view .button:disabled { opacity: .4; cursor: not-allowed; filter: saturate(.2); box-shadow: none; }
+.practice-box { margin-top: 16px; padding: 12px 14px; border: 1px dashed #eebc56; }
+.practice-box h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #eebc56; }
+.resume-details { margin-top: 18px; }

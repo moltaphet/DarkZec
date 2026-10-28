@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs, promisify } from 'node:util';
 import { parseAuditBundle, serializeAuditBundle, verifyAuditBundle, withSettlement } from '../src/lib/audit-bundle.ts';
 import { settlementPayouts, settlementUri } from '../src/lib/settlement.ts';
+import { checkSettlementRequest } from '../src/lib/cosigner.ts';
 
 /**
  * Settles a cleared auction on Zcash testnet in one transaction from its own vault account:
@@ -36,6 +37,9 @@ const payouts = settlementPayouts({ auctionId: bundle.auction.auctionId, network
 process.stdout.write(`\nPayouts for ${bundle.auction.auctionId}:\n`);
 for (const payout of payouts) process.stdout.write(`  ${payout.kind.padEnd(8)} ${payout.amount.padStart(12)} ZEC -> ${payout.address.slice(0, 24)}…${payout.commitment ? ` (entry ${payout.commitment.slice(0, 12)}…)` : ''}\n`);
 const uri = settlementUri(payouts);
+// The same policy a co-signer would apply: the request must pay exactly what the verified bundle implies.
+const verdict = await checkSettlementRequest(text, uri, seller as string);
+if (!verdict.approve) fail(`the settlement request fails the co-signer policy: ${verdict.problems.join(' ')}`);
 
 // The viewing key and birthday come from the wallet itself, never from the operator's say-so.
 const accounts = (await promisify(execFile)(devtool, ['wallet', '-w', wallet as string, 'list-accounts'], { maxBuffer: 4 * 1024 * 1024 })).stdout;

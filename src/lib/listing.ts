@@ -4,7 +4,8 @@ import { formatZec, parseQuantity, parseZec, validateAuctionId } from '../protoc
 import { sha256, utf8 } from '../protocol/crypto';
 import { COLLATERAL_TIERS } from '../protocol/memo';
 import { listingStatement, verifyStatement } from './operator-journal';
-import { validateSchedule } from './schedule';
+import { BLOCK_MS, validateSchedule } from './schedule';
+import type { AuctionConfig } from './darkpool';
 import type { Schedule } from './schedule';
 
 /**
@@ -86,4 +87,12 @@ export async function openListingLink(hash: string): Promise<OpenedListing> {
   const statement = listingStatement(listing.auction.auctionId, digest);
   if (!await verifyStatement(decoded.k, { statement, signature: decoded.s })) return bad();
   return Object.freeze({ listing, publicKey: decoded.k, signature: decoded.s, digest });
+}
+
+/** The ledger configuration a listing promises; resuming an auction rebuilds its session from this. */
+export function listingConfig(listing: Listing): AuctionConfig {
+  const { auction, schedule } = listing;
+  return Object.freeze({ auctionId: auction.auctionId, supply: auction.supply, reserve: auction.reserve, vault: auction.vault, network: auction.network, collateral: auction.collateral,
+    unitDemand: auction.unitDemand, ...(auction.procurement ? { procurement: true } : {}), revealWindowMs: (schedule.revealUntil - schedule.commitUntil) * BLOCK_MS,
+    schedule: Object.freeze({ commitUntil: schedule.commitUntil, revealUntil: schedule.revealUntil }) });
 }

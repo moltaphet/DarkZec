@@ -60,7 +60,7 @@ test('a live testnet auction imports confirmed commit and reveal memos, signs th
       { txid: txid(20), memo: '{"v":1,"a":"LIVE-E2E","p":"9"}', confirmations: 1 }] : [{ txid: txid(10), memo: receiptText(bids[0]!.reveal, 'testnet'), confirmations: 1 }],
   }));
 
-  await page.locator('#live-auction summary').click();
+  await page.locator('#live-auction > .tool-content > details > summary').click();
   await page.locator('#live-vault').fill(WALLET_VAULT); await page.locator('#live-auction-id').fill(LIVE_AUCTION);
   await page.locator('#live-collateral').selectOption('1'); await page.locator('#live-mode').selectOption('vickrey');
   await page.locator('#live-start').click();
@@ -92,7 +92,7 @@ test('a live testnet auction imports confirmed commit and reveal memos, signs th
 test('a live auction reports an unavailable wallet and refuses demo fixtures as its vault', async ({ page }) => {
   await page.goto('/');
   await routeVault(page, () => ({ status: 'wallet-not-configured' }));
-  await page.locator('#live-auction summary').click();
+  await page.locator('#live-auction > .tool-content > details > summary').click();
   await page.locator('#live-vault').fill((await import('../../src/fixtures')).FIXTURE_ADDRESS); await page.locator('#live-start').click();
   await expect(page.locator('#error')).toContainText('Public demo fixtures cannot be used as a real vault');
   await page.locator('#live-vault').fill(WALLET_VAULT); await page.locator('#live-start').click();

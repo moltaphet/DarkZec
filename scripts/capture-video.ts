@@ -51,6 +51,22 @@ await shot(page, demo, '10-wallet-request-and-qr', '#wallet-output');
 await shot(page, demo, '11-wallet-qr-close-up', '#wallet-qr');
 await page.close();
 
+// 05: the seller's practice mode (simulated chain), one still per step.
+const practiceDir = '05-seller-practice-mode'; await mkdir(`${root}/${practiceDir}`, { recursive: true });
+page = await context.newPage(); await page.goto(base); await click(page, '.skip-intro'); await wait(1200);
+await page.locator('#live-auction > .tool-content > details > summary').click();
+await page.locator('#live-title').fill('Two design review slots'); await page.locator('#live-auction-id').fill('PRACTICE-1'); await page.locator('#live-mode').selectOption('vickrey');
+await shot(page, practiceDir, '01-seller-panel', '#live-auction');
+await click(page, '#live-practice'); await shot(page, practiceDir, '02-practice-started-link-created', '#live-auction');
+const preview = await page.locator('#live-open-link').getAttribute('href') ?? '';
+await click(page, '#practice-pay-commits'); await click(page, '#practice-advance'); await click(page, '#live-sync'); await shot(page, practiceDir, '03-commits-synced', '#live-auction');
+await click(page, '#close'); await click(page, '#practice-pay-reveals'); await click(page, '#live-sync'); await shot(page, practiceDir, '04-reveals-imported', '#operator-view');
+await click(page, '#practice-advance'); await click(page, '#live-sync'); await click(page, '#clear'); await shot(page, practiceDir, '05-cleared', '#results-panel');
+await tab(page, 'Audit mode'); await click(page, '#audit-session'); await wait(1500); await shot(page, practiceDir, '06-audit-verified-with-listing-and-schedule', '#audit-view');
+const practiceBidder = await context.newPage(); await practiceBidder.goto(preview); await practiceBidder.locator('#listing-practice').waitFor(); await wait(1200);
+await shot(practiceBidder, practiceDir, '07-bidder-page-practice-banner', '#listing-view');
+await practiceBidder.close(); await page.close();
+
 // 02: each shipped real testnet run: its audit (with the on-chain checks) and what the vault's viewing key sees.
 const real = '02-real-runs'; await mkdir(`${root}/${real}`, { recursive: true });
 const runs: string[] = [];

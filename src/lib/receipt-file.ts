@@ -22,8 +22,8 @@ export async function readReceiptFile(file: File, network: Network): Promise<Bid
 }
 
 /** Starts a browser download of text the user already holds; nothing leaves the device. */
-export function downloadText(filename: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+export function downloadText(filename: string, text: string, type = 'application/json'): void {
+  const url = URL.createObjectURL(new Blob([text], { type }));
   const link = document.createElement('a');
   link.href = url; link.download = filename; link.rel = 'noreferrer'; link.hidden = true;
   document.body.append(link); link.click(); link.remove();

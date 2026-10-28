@@ -19,7 +19,7 @@ import { mountProtocolSpecs } from './components/ProtocolSpecs';
 import { ViewingKeyVault } from './components/ViewingKeyVault';
 import { LiveTerminalStream } from './components/LiveTerminalStream';
 import { LiveAuctionPanel } from './components/LiveAuctionPanel';
-import type { LiveAuctionSettings } from './components/LiveAuctionPanel';
+import type { LiveAuctionSettings, PracticeStep, ResumeInput } from './components/LiveAuctionPanel';
 import { OperatorPanel } from './components/OperatorPanel';
 import { AuditView } from './components/AuditView';
 import { PaymentQr } from './components/PaymentQr';
@@ -28,7 +28,11 @@ import { AuctionSession } from './lib/auction-session';
 import { parseAuditBundle, serializeAuditBundle, verifyAuditBundle } from './lib/audit-bundle';
 import { ListingView } from './components/ListingView';
 import type { VerifiedBundle } from './components/ListingView';
-import { encodeListingLink, isListingLink, openListingLink } from './lib/listing';
+import { encodeListingLink, isListingLink, listingConfig, openListingLink } from './lib/listing';
+import { createBackedUpSigner, parseOperatorKeyFile, restoreSigner, serializeOperatorKey } from './lib/operator-key';
+import type { OperatorSigner } from './lib/operator-journal';
+import { SimulatedChain } from './lib/simulated-chain';
+import type { ChainApi } from './lib/simulated-chain';
 import type { OpenedListing } from './lib/listing';
 import { BLOCK_MS, blocksFor, chainTime, closeTime, commitOnTime, describeBlocks, revealOnTime } from './lib/schedule';
 import { SecurityAudit } from './lib/security-events';
@@ -132,6 +136,10 @@ let liveTip = 0;
 let listingLink: string | undefined;
 let activeListing: OpenedListing | undefined;
 const chainClock = (): number => chainTimeMs;
+const realChain: ChainApi = { status: localTestnetStatus, memos: fetchVaultMemos };
+/** The chain the operator panel reads: the real local wallet, or an in-memory one while practising. */
+let chainApi: ChainApi = realChain;
+let practice: { readonly chain: SimulatedChain; readonly bids: readonly PreparedBid[]; commitsPaid: boolean; revealsPaid: boolean } | undefined;
 /** Links are shared on the public site even when the operator runs this page locally. Only link text: this page never requests it (the privacy test keeps URL literals out of src). */
 const PUBLIC_ORIGIN = ['https', 'darkzec.xyz'].join('://');
 const revealPanel = new RevealPanel(el('reveal-workspace'), operation => { void action(operation); }, async bid => {
@@ -144,7 +152,8 @@ const revealPanel = new RevealPanel(el('reveal-workspace'), operation => { void 
 }, SIMULATION_CONFIG.network);
 effects.own(() => revealPanel.destroy());
 const liveAuction = new LiveAuctionPanel(el('live-auction'), operation => { void action(operation); }, { start: startLiveAuction, sync: syncLiveAuction, leave: () => resetSession(),
-  copy: async value => { await copy(value); status('Auction link copied. Share it with bidders; everything they need is inside it, signed by this session\'s key.'); } });
+  copy: async value => { await copy(value); status('Auction link copied. Share it with bidders; everything they need is inside it, signed by this session\'s key.'); },
+  resume: input => resumeLiveAuction(input), practice: settings => startPractice(settings), practiceStep: step => practiceAdvance(step) });
 effects.own(() => liveAuction.destroy());
 const operatorPanel = new OperatorPanel(el('operator-view'), () => { void action(async () => {
   const bundle = currentSession().bundle(); if (!bundle) throw new Error('Finalize the auction before exporting its audit bundle.');
@@ -310,6 +319,7 @@ function controls(): void {
       statements: current.journal.statements().length, bundleReady: current.bundle() !== undefined, busy: working });
   }
   liveAuction.update({ live, phase, busy: working || !session, summary: liveSummary, ...(liveOk === undefined ? {} : { ok: liveOk }),
+    ...(practice ? { practice: true, practiceHint: practiceHint() } : {}),
     ...(listingLink ? { link: `${loopbackHost ? PUBLIC_ORIGIN : location.origin}/${listingLink}`, preview: `${location.origin}/${listingLink}` } : {}) });
   applyListingLock();
 }
@@ -462,10 +472,11 @@ element('audit-form', HTMLFormElement).addEventListener('submit', event => {
   });
 });
 /** Starts a fresh auction session; without a configuration it returns to the demo auction. */
-async function resetSession(config: AuctionConfig = SIMULATION_CONFIG, liveVault = false): Promise<void> {
+async function resetSession(config: AuctionConfig = SIMULATION_CONFIG, liveVault = false, signer?: OperatorSigner): Promise<void> {
+    practice = undefined; chainApi = realChain;
     memoPreview.setEnabled(false); clearPrepared(); eraseWallet(); clearMemoVerification();
     clearTimeout(revealDeadlineTimer);
-    judgeTimeOffset = 0; session = await AuctionSession.create(config, config.schedule ? chainClock : judgeClock); auctionConfig = session.sandbox.config; revealPanel.reset();
+    judgeTimeOffset = 0; session = await AuctionSession.create(config, config.schedule ? chainClock : judgeClock, signer); auctionConfig = session.sandbox.config; revealPanel.reset();
     live = liveVault; liveOk = undefined; listingLink = undefined; liveTip = 0;
     liveSummary = live ? `Live auction ${auctionConfig.auctionId} on vault ${auctionConfig.vault.slice(0, 18)}…: ${auctionConfig.collateral} ZEC collateral tier. Sync after confirmed commit payments arrive.` : 'Demo auction with public fixtures. Open the panel to run against a real testnet vault.';
     demoSeedProgress = 0; lastResult = undefined; renderStrip();
@@ -488,33 +499,97 @@ function refuseFixtureVault(address: string): void {
     throw new Error('Public demo fixtures cannot be used as a real vault. Use a testnet address your wallet can view.');
   }
 }
+interface LiveRules { readonly auctionId: string; readonly supply: number; readonly reserve: string; readonly vault: string; readonly network: 'testnet'; readonly collateral: string; readonly unitDemand: boolean; readonly procurement?: true }
+/** Starts a block-scheduled auction: turns minutes into heights, signs the listing and shows the link. Shared by real and practice auctions. */
+async function beginScheduled(settings: LiveAuctionSettings, rules: LiveRules, tip: number, signer?: OperatorSigner): Promise<void> {
+  const commitUntil = tip + blocksFor(settings.commitMinutes); const revealUntil = commitUntil + blocksFor(settings.revealMinutes);
+  chainTimeMs = chainTime(tip);
+  await resetSession({ ...rules, revealWindowMs: (revealUntil - commitUntil) * BLOCK_MS, schedule: { commitUntil, revealUntil } }, true, signer);
+  liveTip = tip;
+  const signed = await currentSession().publish({ v: 1, title: settings.title || `Auction ${settings.auctionId}`, description: settings.description,
+    auction: { auctionId: rules.auctionId, network: 'testnet', vault: rules.vault, supply: rules.supply, reserve: rules.reserve, collateral: rules.collateral, unitDemand: rules.unitDemand, procurement: rules.procurement === true },
+    schedule: { commitUntil, revealUntil, anchorHeight: tip, anchorTime: Math.floor(Date.now() / 1000) } });
+  listingLink = encodeListingLink(signed);
+  liveSummary = `Live auction ${auctionConfig.auctionId} on vault ${rules.vault.slice(0, 18)}…: bidding closes after block ${commitUntil} (about ${describeBlocks(commitUntil - tip)}), reveals after block ${revealUntil}. Share the auction link, then sync from the vault.`;
+}
 async function startLiveAuction(settings: LiveAuctionSettings): Promise<void> {
   if (!COLLATERAL_TIERS.includes(settings.collateral)) throw new Error('Choose a 0.1, 1, 10 or 100 ZEC collateral tier.');
   const vaultAddress = orchardPaymentAddress(settings.vault, 'testnet'); refuseFixtureVault(vaultAddress);
   const reserve = formatZec(parseZec(settings.reserve)); const supply = settings.mode === 'vickrey' ? 1 : settings.lots;
-  const rules = { auctionId: settings.auctionId, supply, reserve, vault: vaultAddress, network: 'testnet' as const, collateral: settings.collateral,
-    unitDemand: settings.mode !== 'uniform', ...(settings.mode === 'procurement' ? { procurement: true } : {}) };
+  const rules: LiveRules = { auctionId: settings.auctionId, supply, reserve, vault: vaultAddress, network: 'testnet', collateral: settings.collateral,
+    unitDemand: settings.mode !== 'uniform', ...(settings.mode === 'procurement' ? { procurement: true as const } : {}) };
   // Deadlines are block heights, so they need the wallet's tip; without a synced local wallet the auction runs on the clock, with no shareable link.
-  const node = await localTestnetStatus().catch(() => undefined);
+  const node = await realChain.status().catch(() => undefined);
   const tip = node?.connected && node.network === 'testnet' && node.synced && Number.isSafeInteger(node.blocks) ? node.blocks : undefined;
   if (tip === undefined) { await resetSession({ ...rules, revealWindowMs: settings.revealMinutes * 60_000 }, true); return; }
-  const commitUntil = tip + blocksFor(settings.commitMinutes); const revealUntil = commitUntil + blocksFor(settings.revealMinutes);
-  chainTimeMs = chainTime(tip);
-  await resetSession({ ...rules, revealWindowMs: (revealUntil - commitUntil) * BLOCK_MS, schedule: { commitUntil, revealUntil } }, true);
-  liveTip = tip;
-  const signed = await currentSession().publish({ v: 1, title: settings.title || `Auction ${settings.auctionId}`, description: settings.description,
-    auction: { auctionId: rules.auctionId, network: 'testnet', vault: vaultAddress, supply, reserve, collateral: settings.collateral, unitDemand: rules.unitDemand, procurement: settings.mode === 'procurement' },
-    schedule: { commitUntil, revealUntil, anchorHeight: tip, anchorTime: Math.floor(Date.now() / 1000) } });
-  listingLink = encodeListingLink(signed);
-  liveSummary = `Live auction ${auctionConfig.auctionId} on vault ${vaultAddress.slice(0, 18)}…: bidding closes after block ${commitUntil} (about ${describeBlocks(commitUntil - tip)}), reveals after block ${revealUntil}. Share the auction link, then sync from the vault.`;
+  // The signing key lives only in this tab, so it is created together with an encrypted backup that can resume the auction.
+  const backup = await createBackedUpSigner(settings.keyPassphrase);
+  await beginScheduled(settings, rules, tip, backup.signer);
+  downloadText(`darkzec-operator-key-${settings.auctionId}.json`, serializeOperatorKey(backup.file));
+  liveSummary += ' The encrypted operator key file was downloaded: keep it, it is the only way to resume this auction if the tab is lost.';
   status(liveSummary);
+}
+/** Rebuilds a lost operator session from the auction link and the encrypted key file; the ledger is then replayed from the chain by Sync, Close and Finalize. */
+async function resumeLiveAuction(input: ResumeInput): Promise<void> {
+  const hash = /#\/a\/[A-Za-z0-9_-]+/.exec(input.link)?.[0]; if (!hash) throw new Error('Paste the auction link you shared with bidders.');
+  const opened = await openListingLink(hash);
+  if (!input.keyFile) throw new Error('Choose the operator key file that was downloaded when this auction started.');
+  const signer = await restoreSigner(parseOperatorKeyFile(input.keyFile), input.passphrase);
+  if (signer.publicKey !== opened.publicKey) throw new Error('This key file does not belong to that auction link.');
+  const node = await realChain.status().catch(() => undefined);
+  if (!node?.connected || node.network !== 'testnet' || !node.synced || !Number.isSafeInteger(node.blocks)) throw new Error('Connect the local synced testnet wallet first: the auction is rebuilt from the chain.');
+  chainTimeMs = chainTime(node.blocks as number);
+  await resetSession(listingConfig(opened.listing), true, signer);
+  await currentSession().adoptListing(opened);
+  listingLink = hash; liveTip = 0;
+  liveSummary = `Resumed auction ${auctionConfig.auctionId} with its original signed listing. Press Sync from vault to replay the commits, then Close, sync reveals and Finalize as usual.`;
+  status(liveSummary);
+}
+/** Practice auction: the real flow on an in-memory chain, with the buttons playing the bidders. The listing uses the public demo vault, so bidders cannot pay it. */
+async function startPractice(settings: LiveAuctionSettings): Promise<void> {
+  const chain = new SimulatedChain(); const procurement = settings.mode === 'procurement'; const auctionId = settings.auctionId || 'PRACTICE-1';
+  const vaultAddress = orchardPaymentAddress(FIXTURE_ADDRESS, 'testnet');
+  const rules: LiveRules = { auctionId, supply: settings.mode === 'vickrey' ? 1 : settings.lots, reserve: procurement ? '1' : '0.1', vault: vaultAddress, network: 'testnet', collateral: '1',
+    unitDemand: settings.mode !== 'uniform', ...(procurement ? { procurement: true as const } : {}) };
+  const bids = await Promise.all(['0.9', '0.7', '0.5'].map(price => prepareBid({ auctionId, price, quantity: 1, vault: vaultAddress, refund: FIXTURE_REFUND_ADDRESS, network: 'testnet', collateral: '1', ...(procurement ? { procurement: true } : {}) })));
+  await beginScheduled({ ...settings, title: settings.title || 'Practice auction' }, rules, chain.tip);
+  chainApi = chain; practice = { chain, bids, commitsPaid: false, revealsPaid: false };
+  liveSummary = `Practice auction ${auctionId} on a simulated chain (tip ${chain.tip}). Bidding closes after block ${auctionConfig.schedule?.commitUntil}. Follow the practice steps below.`;
+  status(liveSummary);
+}
+async function practiceAdvance(step: PracticeStep): Promise<void> {
+  const current = practice; const schedule = auctionConfig.schedule; if (!current || !schedule) throw new Error('Start a practice auction first.');
+  const { chain } = current;
+  if (step === 'commits') {
+    if (current.commitsPaid) throw new Error('The three simulated bidders already paid.');
+    if (chain.tip + current.bids.length > schedule.commitUntil) throw new Error('The commit deadline has passed on the simulated chain.');
+    for (const bid of current.bids) chain.payCommit(bid.memo, Number(parseZec(bid.amount)));
+    current.commitsPaid = true; status('Three simulated bidders paid the collateral. Advance the chain past the commit deadline, then sync.');
+  } else if (step === 'advance') {
+    const target = chain.tip <= schedule.commitUntil ? schedule.commitUntil + 1 : chain.tip <= schedule.revealUntil ? schedule.revealUntil + 1 : chain.tip + 1;
+    chain.advance(target - chain.tip); status(`The simulated chain is now at block ${chain.tip}. Press Sync from vault.`);
+  } else {
+    if (current.revealsPaid) throw new Error('The simulated reveals were already paid.');
+    if (chain.tip <= schedule.commitUntil || chain.tip + 2 > schedule.revealUntil) throw new Error('Reveals can be sent only inside the reveal window, after the auction is closed.');
+    for (const bid of current.bids.slice(0, 2)) chain.payReveal(auctionConfig.auctionId, receiptText(bid.reveal, 'testnet'));
+    current.revealsPaid = true; status('Two bidders revealed; the third never will and will lose its collateral. Press Sync from vault.');
+  }
+}
+function practiceHint(): string {
+  const current = practice; const schedule = auctionConfig.schedule; const phase = ledger()?.publicSnapshot().phase;
+  if (!current || !schedule || !phase) return '';
+  const tip = current.chain.tip;
+  if (phase === 'cleared') return 'Done. Open Audit mode and Load this session\'s bundle, or open the bidder page from the auction link.';
+  if (phase === 'open') return !current.commitsPaid ? 'Step 1: Simulate 3 bidder payments.' : tip <= schedule.commitUntil ? 'Step 2: Advance the chain past the commit deadline.' : 'Step 3: Sync from vault, then Close auction.';
+  if (!current.revealsPaid) return 'Step 4: Simulate 2 reveals, then Sync from vault.';
+  return tip <= schedule.revealUntil ? 'Step 5: Advance the chain past the reveal deadline, then Sync from vault.' : 'Step 6: Sync from vault, then Finalize & clear. The third bidder never revealed and loses its collateral.';
 }
 /** Imports confirmed commit memos while bidding is open, and reveal memos during the reveal window. */
 async function syncLiveAuction(): Promise<void> {
   if (!live) throw new Error('Start a live testnet auction first.');
   const current = currentSession(); const config = current.sandbox.config; const snapshot = current.sandbox.publicSnapshot();
   const schedule = config.schedule;
-  const notes = await fetchVaultMemos(config.vault, config.auctionId, Number(parseZec(config.collateral ?? '10')));
+  const notes = await chainApi.memos(config.vault, config.auctionId, Number(parseZec(config.collateral ?? '10')));
   if (notes.status !== 'ok') {
     const reasons = { 'wrong-network': 'the local wallet is not on Zcash testnet', syncing: 'the local testnet node is still syncing', 'wallet-not-configured': 'no local wallet RPC is configured', 'node-unavailable': 'the local wallet RPC did not answer' } as const;
     liveOk = false; liveSummary = `Sync failed: ${reasons[notes.status]}.`; return;

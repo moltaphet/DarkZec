@@ -82,11 +82,15 @@ Because each auction has its own account, anything sent to that account later wo
 
 ## Next step: threshold custody with FROST
 
-To make theft impossible rather than provable, the vault account's spend authority would be split with [FROST](https://frost.zfnd.org/) (re-randomized RedPallas, which Orchard and Ironwood spends use), for example 2-of-3 between the operator, an independent auditor and a bidder-appointed party:
+![Trust model: what is proven today and what threshold custody adds](assets/trust-model.svg)
+
+To make theft impossible rather than provable, the vault account's spend authority would be split with [FROST](https://frost.zfnd.org/) (re-randomized RedPallas, which Orchard and Ironwood spends use), for example 2-of-3 between the operator, an independent co-signer and a bidder-appointed party:
 
 1. The participants generate the spend key with distributed key generation. Each of them, and the public, can hold the full viewing key.
 2. After clearing, the operator builds the settlement as a partially created Zcash transaction (PCZT, supported by `zcash-devtool pczt`).
-3. A co-signer signs only after recomputing `settlementPayouts` from the verified audit bundle and checking that the PCZT's outputs match it exactly.
+3. A co-signer signs only after recomputing the allowed payments from the verified audit bundle and checking that the proposal's outputs match them exactly.
 4. Any spend that does not follow the published result then lacks a second signature and cannot be made.
 
-This is not implemented in this prototype. It needs its own key ceremony, signer service and security review.
+**What is built:** step 3, the co-signer's policy. `src/lib/cosigner.ts` parses a settlement request (ZIP-321, multi-payment), re-verifies the audit bundle, recomputes the exact refunds, proceeds and burn, and approves only an exact match: the same recipients, amounts and memos, and nothing else. It refuses an already settled auction and a bundle that does not verify. `npm run cosign-check -- <bundle> --uri <request> --seller <address>` runs it, and `npm run settle` applies it to its own request before sending. Tests cover short refunds, a diverted burn, an extra payout, a dropped refund, a changed memo and a redirected refund.
+
+**What is not built:** the key ceremony, the threshold signing protocol and a signer service. They need their own review, and mainnet stays disabled until they exist.

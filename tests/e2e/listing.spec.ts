@@ -25,12 +25,16 @@ test('an operator signs a block-scheduled listing, bidders open it, and the audi
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
 
   // Seller: describe the auction and start it; the link carries a signed listing with block-height deadlines.
-  await page.locator('#live-auction summary').click();
+  await page.locator('#live-auction > .tool-content > details > summary').click();
   await page.locator('#live-title').fill('Two design review slots'); await page.locator('#live-description').fill('Sealed bids, second price.\nDelivered by video call.');
   await page.locator('#live-vault').fill(WALLET_VAULT); await page.locator('#live-auction-id').fill(AUCTION);
   await page.locator('#live-collateral').selectOption('1'); await page.locator('#live-mode').selectOption('vickrey');
   await page.locator('#live-commit-minutes').fill('1'); await page.locator('#live-minutes').fill('1');
-  await page.locator('#live-start').click();
+  await page.locator('#live-start').click(); await expect(page.locator('#error')).toContainText('passphrase of at least 8 characters');
+  await page.locator('#live-key-passphrase').fill('correct horse battery');
+  const [keyDownload] = await Promise.all([page.waitForEvent('download'), page.locator('#live-start').click()]);
+  expect(keyDownload.suggestedFilename()).toBe(`darkzec-operator-key-${AUCTION}.json`);
+  expect(await readFile(await keyDownload.path(), 'utf8')).not.toMatch(/"d"/);
   await expect(page.locator('#live-status')).toContainText(`bidding closes after block ${TIP + 3}`);
   const shared = await page.locator('#live-link').inputValue();
   expect(shared.startsWith('https://darkzec.xyz/#/a/')).toBe(true);
@@ -108,4 +112,19 @@ test('the shipped DZ-TESTNET-3 link opens its bidder page and one click shows th
   await expect(page.locator('#listing-result')).toContainText('AUDIT VERIFIED / 12 checks passed (the on-chain checks used the chain snapshot recorded at height');
   await expect(page.locator('#listing-clearing')).toHaveText('0.05 ZEC');
   await expect(page.locator('#listing-mine')).toHaveText('WON 1 of 1 at 0.05 ZEC'); await expect(page.locator('#listing-refund')).toHaveText('0.05 ZEC');
+});
+
+test('a bidder can set calendar reminders for the deadlines, and the shipped link reads well on a phone', async ({ page }) => {
+  const readme = await readFile('docs/testnet-run/README.md', 'utf8');
+  const hash = /https:\/\/darkzec\.xyz\/(#\/a\/[A-Za-z0-9_-]+)/.exec(readme)?.[1]; if (!hash) throw new Error('The DZ-TESTNET-3 link is missing.');
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`/${hash}`);
+  await expect(page.locator('#listing-title')).toHaveText('One design review slot');
+  const [ics] = await Promise.all([page.waitForEvent('download'), page.locator('#listing-reminders').click()]);
+  expect(ics.suggestedFilename()).toBe('darkzec-DZ-TESTNET-3-reminders.ics');
+  const calendar = await readFile(await ics.path(), 'utf8');
+  expect(calendar).toContain('BEGIN:VCALENDAR'); expect(calendar).toContain('REVEAL YOUR BID before it closes'); expect(calendar.match(/BEGIN:VALARM/g)).toHaveLength(5);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator('#listing-bid')).toBeVisible(); await page.locator('#listing-bid').click();
+  await expect(page.locator('#wallet-vault')).toHaveAttribute('readonly', '');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

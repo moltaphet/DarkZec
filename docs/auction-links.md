@@ -10,14 +10,28 @@ DarkZec turns a sealed-bid auction into something a seller can run and a buyer c
 | **Bidder** | darkzec.xyz, any browser | Opens the link, prepares a bid, pays the collateral by QR, reveals, checks the result |
 | **Anyone** | darkzec.xyz or `npm run verify-chain` | Audits the finished auction, including every payment on chain |
 
+## Quick start for an operator
+
+```bash
+npm run auction -- --wallet <wallet dir> --devtool <path to zcash-devtool>
+```
+
+It checks Node, zcash-devtool and the wallet (a testnet wallet that views the auction's vault account), builds if needed, keeps the wallet in sync in the background (`sync` and `enhance` every 20 seconds, retrying dropped connections), serves DarkZec and opens it. The page's **Sync from vault** button then always reads fresh notes.
+
+**No wallet?** Open the same panel on darkzec.xyz and press **Practice with a simulated chain**: the full seller flow runs on an in-memory chain, the buttons play three bidders, and the audit at the end is the real one. The practice listing uses the public demo vault, so its bidder page opens with a PRACTICE banner and cannot be paid.
+
 ## The seller flow
 
 1. Create a fresh account in the operator wallet for this auction (its viewing key will be published at the end, so never reuse it).
 2. In the sandbox tab open **Run this auction against a real Zcash testnet vault** and fill in the title, a short description, the vault address, the clearing mode, the lots, the reserve (or ceiling), the collateral tier, how long bidding stays open and how long the reveal window lasts.
 3. **Start live testnet auction.** The page reads the wallet's block height, turns the durations into **block heights**, signs the listing with this session's key and shows the **auction link**.
-4. Share the link. Keep this tab open: the signing key exists only in this browser session and is never stored.
+4. Share the link. **Keep the downloaded operator key file** (`darkzec-operator-key-<auction>.json`, encrypted with the passphrase you entered, at least 8 characters). The signing key itself exists only in this tab and is never stored in the browser.
 5. After the commit deadline block, **Sync from vault**, then **Close auction**. Sync again during the reveal window, and once the reveal deadline block has passed, sync one last time and **Finalize & clear**.
 6. Publish the audit bundle and settle (`npm run settle`, see [settlement](settlement.md)).
+
+### If the tab is lost
+
+A closed tab, a crash or a dropped connection does not end the auction, because everything it knew is on the chain. Open **Resume an auction** in the same panel, paste the auction link, choose the key file and enter the passphrase. The page restores the same signing key (the file is PBKDF2-SHA256, 600,000 rounds, AES-256-GCM, and bound to its public key), adopts the **original signed listing** from the link instead of re-signing it, and then **Sync, Close, sync reveals and Finalize** replay the commits and reveals from the chain. Close and reveal statements are signed again over the same deterministic content (the close statement's times are the schedule's block times), so the audit verifies exactly as if nothing had happened.
 
 ## The bidder flow
 
@@ -25,7 +39,8 @@ DarkZec turns a sealed-bid auction into something a seller can run and a buyer c
 2. **Bid on this auction** opens the wallet tab already filled in and locked to the listing: vault, auction ID, collateral and, for unit-demand auctions, one lot. Enter a price and a refund address.
 3. Download the receipt (it is the only way to reveal), tick the review box, and scan the QR code with a shielded Orchard-capable wallet to pay the collateral.
 4. After the commit deadline, load the receipt under **Reveal on chain** and pay the small reveal memo before the reveal deadline.
-5. When the operator publishes the bundle, import it on the same page (**Check your result**) with your receipt to see whether you won, what you paid and what was refunded.
+5. **Download calendar reminders (.ics)** on the listing page puts both deadlines in your calendar with alarms, because a bid that is not revealed loses its collateral. The times are estimates from the listing's anchor; the blocks decide.
+6. When the operator publishes the bundle, import it on the same page (**Check your result**) with your receipt to see whether you won, what you paid and what was refunded.
 
 ## Why the deadlines are block heights
 
@@ -60,6 +75,6 @@ In procurement the collateral is a **bid bond**: it is returned in full to every
 ## Limits, honestly
 
 - Testnet only. Mainnet stays disabled until custody is threshold-signed and the build is reviewed.
-- The operator's session key lives in one browser tab. Closing it before the audit bundle is exported ends the auction; there is no recovery. A shared, persistent operator service is future work.
+- The operator's signing key lives only in one tab. The encrypted key file is the recovery path: lose both the tab and the file (or the passphrase) and the auction cannot be resumed or settled by DarkZec, though its commits and reveals stay on the chain.
 - The listing proves the operator signed these rules, not that the item exists or will be delivered.
 - Bidders on the public site cannot run the on-chain audit checks themselves (no light client there); they see them as skipped, or checked against a recorded snapshot for the shipped runs. `npm run verify-chain` runs them live.
