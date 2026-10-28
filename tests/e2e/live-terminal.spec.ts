@@ -69,11 +69,13 @@ test('mobile history remains bounded during repeated scans and normal motion typ
   await page.locator('#vault-load-notes').click(); await expect(page.locator('#vault-accepted dd')).toHaveText('3');
   for (let i = 0; i < 8; i++) { await page.locator('#vault-scan').click(); await expect(page.locator('#vault-scan')).toBeEnabled(); }
   const log = page.locator('#live-terminal-log'); await log.scrollIntoViewIfNeeded();
-  await expect(log.locator('.terminal-event')).toHaveCount(128); await expect(log).toContainText('Mock scan complete:');
+  // Lines type in only while the log is on screen, so the typed-text checks keep it in view and allow for a loaded machine.
+  const typed = { timeout: 15_000 };
+  await expect(log.locator('.terminal-event')).toHaveCount(128); await expect(log).toContainText('Mock scan complete:', typed);
   await expect(page.locator('#stream-retention')).not.toHaveText(/· 0 EVICTED/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(log.locator('.terminal-event').last()).toContainText('3 accepted / 1 quarantined / 1 empty');
+  await log.scrollIntoViewIfNeeded(); await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(log.locator('.terminal-event').last()).toContainText('3 accepted / 1 quarantined / 1 empty', typed);
   await page.screenshot({ path: 'test-results/live-terminal-mobile.png', fullPage: true });
   await page.locator('.live-terminal').screenshot({ path: 'test-results/live-terminal-mobile-detail.png' });
 });
