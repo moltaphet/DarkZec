@@ -182,7 +182,8 @@ export function mountScene(canvas: HTMLCanvasElement, onUnavailable: () => void,
   let width = 1; let height = 1; let pointerX = 0; let pointerY = 0; let smoothX = 0; let smoothY = 0; let frames = 0; let raf = 0; let disposed = false; let start = performance.now();
   const preference = matchMedia('(prefers-reduced-motion: reduce)');
   const journey = document.getElementById('journey');
-  const progress = (): number => journey ? Math.min(1, Math.max(0, scrollY / Math.max(1, journey.offsetHeight - innerHeight))) : 0;
+  // Scroll position and the journey's rectangle are both visual pixels, so the mapping holds under the desktop page zoom too.
+  const progress = (): number => journey ? Math.min(1, Math.max(0, scrollY / Math.max(1, journey.getBoundingClientRect().height - innerHeight))) : 0;
   const resize = (): void => {
     const ratio = Math.min(devicePixelRatio || 1, 1.25);
     width = Math.max(1, Math.round(canvas.clientWidth * ratio)); height = Math.max(1, Math.round(canvas.clientHeight * ratio));

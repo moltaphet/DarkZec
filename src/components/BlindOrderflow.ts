@@ -38,8 +38,9 @@ export class BlindOrderflow {
     });
     resize.observe(canvas);
     canvas.addEventListener('pointermove', event => {
-      // The canvas has no child targets; pointer offsets avoid layout reads on every move.
-      const x = event.offsetX; const y = event.offsetY;
+      // Pointer and layout rectangles are in visual pixels, the canvas model in CSS pixels; they differ under the desktop page zoom.
+      const rect = canvas.getBoundingClientRect(); const scale = rect.width > 0 ? canvas.clientWidth / rect.width : 1;
+      const x = (event.clientX - rect.left) * scale; const y = (event.clientY - rect.top) * scale;
       this.#select(this.#nodes.findIndex(node => {
         const point = nodePosition(node, this.#width, this.#height, this.#lastTime);
         return Math.hypot(point.x - x, point.y - y) <= 20;
