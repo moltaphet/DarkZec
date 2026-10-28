@@ -5,6 +5,8 @@ import { motionLoop } from '../lib/motion';
 import type { MotionLoop } from '../lib/motion';
 import type { Phase } from '../simulation';
 
+interface Box { x: number; y: number; w: number; h: number }
+
 /** Below this canvas width the clearing anchor drops its side labels. */
 const COMPACT_WIDTH = 520;
 
@@ -19,6 +21,7 @@ export class BlindOrderflow {
   #width = 640;
   #height = 280;
   #selected = -1;
+  readonly #labelSpots = new Map<number, number>();
   #lastTime = 0;
 
   constructor(canvas: HTMLCanvasElement, caption: HTMLElement, state: HTMLElement) {
@@ -63,7 +66,7 @@ export class BlindOrderflow {
 
   update(commitments: readonly string[], phase: Phase): void {
     const ids = commitments.slice(0, 24);
-    if (ids.join() !== this.#nodes.filter(node => !node.fixture).map(node => node.id).join()) this.#nodes = meshNodes(ids);
+    if (ids.join() !== this.#nodes.filter(node => !node.fixture).map(node => node.id).join()) { this.#nodes = meshNodes(ids); this.#labelSpots.clear(); }
     this.#selected = -1;
     this.#canvas.dataset.activeNode = '-1';
     this.#state.textContent = phase === 'cleared' ? 'RESOLVED' : 'BLINDED';
@@ -111,14 +114,41 @@ export class BlindOrderflow {
       ctx.beginPath(); ctx.arc(point.x, point.y, selected ? 12 : 7 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = selected ? '#7dffae' : '#00ff66'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = selected ? 18 : 10;
       ctx.fillRect(point.x - 2.5, point.y - 2.5, 5, 5); ctx.shadowBlur = 0;
-      ctx.fillStyle = selected ? '#7dffae' : '#85808a'; ctx.font = '12px Consolas, monospace'; ctx.textAlign = point.x > cx ? 'right' : 'left';
-      const node = this.#nodes[i];
-      ctx.fillText(node?.fixture ? `IDLE_${String(i + 1).padStart(2, '0')}` : (node?.id.slice(0, 6).toUpperCase() ?? ''), point.x + (point.x > cx ? -12 : 12), point.y - 10);
     });
     ctx.fillStyle = '#090909'; ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1;
     // Wide enough that the HTML labels centred on it (CLEARING / state / PRICE ANCHOR, or the state alone when compact) stay inside its edges.
     const compact = w < COMPACT_WIDTH; const hw = compact ? 64 : 112; const hh = compact ? 32 : 66;
     ctx.beginPath(); ctx.moveTo(cx, cy - hh); ctx.lineTo(cx + hw, cy); ctx.lineTo(cx, cy + hh); ctx.lineTo(cx - hw, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
+    this.#drawLabels(ctx, points, { cx, cy, hw, hh, w, h });
+  }
+
+  /**
+   * Labels go last and never overlap: each tries a few spots around its node and is skipped if every spot
+   * collides with another label, the clearing anchor or the canvas edge. The selected node is placed first.
+   */
+  #drawLabels(ctx: CanvasRenderingContext2D, points: readonly { x: number; y: number }[], area: { cx: number; cy: number; hw: number; hh: number; w: number; h: number }): void {
+    const placed: Box[] = []; const { cx, cy, hw, hh, w, h } = area;
+    const inAnchor = (x: number, y: number): boolean => Math.abs(x - cx) / (hw + 4) + Math.abs(y - cy) / (hh + 4) <= 1;
+    const free = (box: Box): boolean => box.x >= 2 && box.y >= 2 && box.x + box.w <= w - 2 && box.y + box.h <= h - 2 &&
+      !placed.some(other => box.x < other.x + other.w + 4 && other.x < box.x + box.w + 4 && box.y < other.y + other.h + 2 && other.y < box.y + box.h + 2) &&
+      ![[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h], [box.x + box.w / 2, box.y], [box.x + box.w / 2, box.y + box.h]].some(([x, y]) => inAnchor(x ?? 0, y ?? 0)) &&
+      !points.some(dot => dot.x > box.x - 9 && dot.x < box.x + box.w + 9 && dot.y > box.y - 9 && dot.y < box.y + box.h + 9);
+    ctx.font = '12px Consolas, monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const order = points.map((_, i) => i).sort((a, b) => Number(b === this.#selected) - Number(a === this.#selected));
+    for (const i of order) {
+      const point = points[i]; const node = this.#nodes[i]; if (!point || !node) continue;
+      const label = node.fixture ? `IDLE_${String(i + 1).padStart(2, '0')}` : node.id.slice(0, 6).toUpperCase();
+      const width = ctx.measureText(label).width; const height = 12; const outward = point.x > cx ? 1 : -1;
+      const side = (direction: number): number => direction > 0 ? point.x + 12 : point.x - 12 - width;
+      const spots: Box[] = [
+        { x: side(outward), y: point.y - 10 - height, w: width, h: height }, { x: side(-outward), y: point.y - 10 - height, w: width, h: height },
+        { x: side(outward), y: point.y + 10, w: width, h: height }, { x: side(-outward), y: point.y + 10, w: width, h: height },
+        { x: point.x - width / 2, y: point.y - 16 - height, w: width, h: height }, { x: point.x - width / 2, y: point.y + 16, w: width, h: height }];
+      // Keep last frame's spot while it stays free, so drifting nodes do not make labels hop.
+      const previous = spots[this.#labelSpots.get(i) ?? -1]; const spot = previous && free(previous) ? previous : spots.find(free);
+      if (!spot) { this.#labelSpots.delete(i); continue; }
+      this.#labelSpots.set(i, spots.indexOf(spot)); placed.push(spot); ctx.fillStyle = i === this.#selected ? '#7dffae' : '#85808a'; ctx.fillText(label, spot.x, spot.y + height - 2);
+    }
   }
   destroy(): void { this.#lifetime.destroy(); this.#nodes = []; this.#context?.clearRect(0, 0, this.#width, this.#height); }
 }
