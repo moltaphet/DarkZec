@@ -9,6 +9,12 @@ import type { AuctionConfig, Allocation, VerifiedBid } from './darkpool';
 import { canonicalResult, parseStatement, resultDigest, verifyStatement } from './operator-journal';
 import type { ParsedStatement, ResultSummary, SignedStatement } from './operator-journal';
 import { parseReceiptText, receiptText } from './receipt-file';
+import { verifyChainDeposits, verifyChainPayouts } from './settlement';
+import type { ChainActivity, SettlementRecord } from './settlement';
+import { closeTime, revealEndTime, validateSchedule } from './schedule';
+import type { Schedule } from './schedule';
+import { listingDigest, parseListing } from './listing';
+import type { Listing } from './listing';
 
 /**
  * Everything needed to re-run an auction without trusting the operator: the frozen commitment list, every accepted
@@ -18,39 +24,65 @@ import { parseReceiptText, receiptText } from './receipt-file';
 export interface AuditBundle {
   readonly v: 1;
   readonly kind: 'darkzec-audit-bundle';
-  readonly auction: { readonly auctionId: string; readonly network: Network; readonly vault: string; readonly supply: number; readonly reserve: string; readonly collateral: string; readonly unitDemand: boolean };
+  readonly auction: {
+    readonly auctionId: string; readonly network: Network; readonly vault: string; readonly supply: number; readonly reserve: string; readonly collateral: string; readonly unitDemand: boolean;
+    /** Reverse auction: lowest offers win and collateral is a bond refunded in full. */
+    readonly procurement?: boolean;
+    /** Block-height deadlines; present for auctions run from a listing. */
+    readonly schedule?: Schedule;
+  };
   readonly commitments: readonly string[];
   readonly root: string;
   readonly reveals: readonly string[];
   readonly result: ResultSummary;
   readonly operator: { readonly publicKey: string; readonly statements: readonly SignedStatement[] };
+  /** The operator-signed public listing this auction was run from. */
+  readonly listing?: Listing;
+  /** Added after on-chain settlement: the vault account's viewing key and the payout transactions. */
+  readonly settlement?: SettlementRecord;
 }
-export interface AuditCheck { readonly id: string; readonly label: string; readonly ok: boolean; readonly detail: string }
+/** A skipped check could not run here (it needs a Zcash light client); it neither passes nor fails the bundle. */
+export interface AuditCheck { readonly id: string; readonly label: string; readonly ok: boolean; readonly detail: string; readonly skipped?: boolean }
 export interface AuditReport { readonly ok: boolean; readonly auctionId: string | null; readonly checks: readonly AuditCheck[] }
 
 export const AUDIT_BUNDLE_MAX_BYTES = 262_144;
 const HASH = /^[a-f0-9]{64}$/;
 const keysAre = (value: object, expected: string): boolean => Object.keys(value).sort().join(',') === expected;
+/** Every required key present and no key outside the required and optional sets. */
+const keysWithin = (value: object, required: string, optional: readonly string[]): boolean => {
+  const keys = Object.keys(value); const need = required.split(',');
+  return need.every(key => keys.includes(key)) && keys.every(key => need.includes(key) || optional.includes(key));
+};
 const lots = (count: number): string => `${count} lot${count === 1 ? '' : 's'}`;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export function buildAuditBundle(input: {
   readonly config: AuctionConfig; readonly commitments: readonly string[]; readonly root: string; readonly reveals: readonly BidMemo[];
-  readonly result: ResultSummary; readonly publicKey: string; readonly statements: readonly SignedStatement[];
+  readonly result: ResultSummary; readonly publicKey: string; readonly statements: readonly SignedStatement[]; readonly listing?: Listing;
 }): AuditBundle {
   const { config } = input;
   return Object.freeze({
     v: 1, kind: 'darkzec-audit-bundle',
     auction: Object.freeze({ auctionId: config.auctionId, network: config.network, vault: config.vault, supply: config.supply, reserve: config.reserve,
-      collateral: config.collateral ?? '', unitDemand: config.unitDemand === true }),
+      collateral: config.collateral ?? '', unitDemand: config.unitDemand === true,
+      ...(config.procurement ? { procurement: true } : {}), ...(config.schedule ? { schedule: Object.freeze({ commitUntil: config.schedule.commitUntil, revealUntil: config.schedule.revealUntil }) } : {}) }),
     commitments: Object.freeze([...input.commitments]), root: input.root,
     reveals: Object.freeze(input.reveals.map(bid => receiptText(bid, config.network))),
     result: Object.freeze({ clearingPrice: input.result.clearingPrice, filled: input.result.filled, excluded: input.result.excluded,
       forfeitedCollateral: input.result.forfeitedCollateral, postedCollateral: input.result.postedCollateral, allocations: Object.freeze(input.result.allocations.map(row => Object.freeze({ ...row }))) }),
     operator: Object.freeze({ publicKey: input.publicKey, statements: Object.freeze(input.statements.map(item => Object.freeze({ statement: item.statement, signature: item.signature }))) }),
+    ...(input.listing ? { listing: input.listing } : {}),
   });
 }
 export const serializeAuditBundle = (bundle: AuditBundle): string => `${JSON.stringify(bundle, null, 2)}\n`;
+/** The bundle with its on-chain settlement record attached; the signed parts are unchanged. */
+export const withSettlement = (bundle: AuditBundle, settlement: SettlementRecord): AuditBundle => Object.freeze({ ...bundle, settlement: Object.freeze({ ...settlement, txids: Object.freeze([...settlement.txids]) }) });
+
+function parseSettlement(value: unknown): SettlementRecord {
+  if (!isRecord(value) || !keysAre(value, 'birthday,seller,txids,viewingKey') || typeof value.viewingKey !== 'string' || value.viewingKey.length > 1300 ||
+    !Number.isSafeInteger(value.birthday) || typeof value.seller !== 'string' || !Array.isArray(value.txids) || value.txids.length > 16 || !value.txids.every(item => typeof item === 'string' && HASH.test(item))) throw new Error('settlement');
+  return Object.freeze({ viewingKey: value.viewingKey, birthday: value.birthday as number, seller: value.seller, txids: Object.freeze([...value.txids as string[]]) });
+}
 
 function parseAllocation(value: unknown): Allocation {
   if (!isRecord(value) || !keysAre(value, 'commitment,filled,paid,price,refundAddress,refundAmount,requested')) throw new Error('allocation');
@@ -66,10 +98,10 @@ export function parseAuditBundle(text: string): AuditBundle {
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new Error('The audit bundle is not valid JSON.'); }
   const fail = (): never => { throw new Error('This is not a DarkZec audit bundle (v1).'); };
-  if (!isRecord(value) || !keysAre(value, 'auction,commitments,kind,operator,result,reveals,root,v') || value.v !== 1 || value.kind !== 'darkzec-audit-bundle') fail();
+  if (!isRecord(value) || !keysWithin(value, 'auction,commitments,kind,operator,result,reveals,root,v', ['listing', 'settlement']) || value.v !== 1 || value.kind !== 'darkzec-audit-bundle') fail();
   const record = value as Record<string, unknown>;
   const { auction, commitments, root, reveals, result, operator } = record;
-  if (!isRecord(auction) || !keysAre(auction, 'auctionId,collateral,network,reserve,supply,unitDemand,vault')) return fail();
+  if (!isRecord(auction) || !keysWithin(auction, 'auctionId,collateral,network,reserve,supply,unitDemand,vault', ['procurement', 'schedule'])) return fail();
   if (typeof auction.auctionId !== 'string' || (auction.network !== 'testnet' && auction.network !== 'mainnet') || typeof auction.vault !== 'string' ||
     typeof auction.supply !== 'number' || typeof auction.reserve !== 'string' || typeof auction.collateral !== 'string' || typeof auction.unitDemand !== 'boolean') return fail();
   if (!Array.isArray(commitments) || commitments.length > 128 || !commitments.every(item => typeof item === 'string')) return fail();
@@ -84,21 +116,34 @@ export function parseAuditBundle(text: string): AuditBundle {
   });
   let allocations: Allocation[];
   try { allocations = result.allocations.map(parseAllocation); } catch { return fail(); }
+  let schedule: Schedule | undefined; let listing: Listing | undefined;
+  try {
+    schedule = auction.schedule === undefined ? undefined : validateSchedule(auction.schedule);
+    listing = record.listing === undefined ? undefined : parseListing(record.listing);
+  } catch { return fail(); }
+  if (auction.procurement !== undefined && typeof auction.procurement !== 'boolean') return fail();
+  let settlement: SettlementRecord | undefined;
+  try { settlement = record.settlement === undefined ? undefined : parseSettlement(record.settlement); } catch { return fail(); }
   return Object.freeze({
     v: 1, kind: 'darkzec-audit-bundle',
-    auction: Object.freeze({ auctionId: auction.auctionId, network: auction.network, vault: auction.vault, supply: auction.supply, reserve: auction.reserve, collateral: auction.collateral, unitDemand: auction.unitDemand }),
+    auction: Object.freeze({ auctionId: auction.auctionId, network: auction.network, vault: auction.vault, supply: auction.supply, reserve: auction.reserve, collateral: auction.collateral, unitDemand: auction.unitDemand,
+      ...(auction.procurement === true ? { procurement: true } : {}), ...(schedule ? { schedule } : {}) }),
     commitments: Object.freeze([...commitments as string[]]), root, reveals: Object.freeze([...reveals as string[]]),
     result: Object.freeze({ clearingPrice: result.clearingPrice, filled: result.filled, excluded: result.excluded, forfeitedCollateral: result.forfeitedCollateral,
       postedCollateral: result.postedCollateral, allocations: Object.freeze(allocations) }),
     operator: Object.freeze({ publicKey: operator.publicKey, statements: Object.freeze(statements) }),
+    ...(listing ? { listing } : {}),
+    ...(settlement ? { settlement } : {}),
   });
 }
 
 /**
  * Re-derives an auction from its bundle using only public rules: Merkle root, commitment openings, clearing,
  * conservation and the operator's signatures. Every check runs and is reported, so one failure never hides another.
+ * A settled bundle adds two on-chain checks; they run when `activity` (what the published viewing key sees on chain)
+ * is supplied and are reported as skipped otherwise.
  */
-export async function verifyAuditBundle(text: string): Promise<AuditReport> {
+export async function verifyAuditBundle(text: string, activity?: ChainActivity): Promise<AuditReport> {
   const checks: AuditCheck[] = [];
   const add = (id: string, label: string, ok: boolean, detail: string): void => { checks.push(Object.freeze({ id, label, ok, detail })); };
   let bundle: AuditBundle;
@@ -114,8 +159,10 @@ export async function verifyAuditBundle(text: string): Promise<AuditReport> {
     validateAuctionId(auction.auctionId); parseQuantity(String(auction.supply));
     if (parseZec(auction.reserve) === 0n || parseZec(auction.collateral) === 0n || formatZec(parseZec(auction.collateral)) !== auction.collateral) throw new Error('Reserve and collateral must be positive canonical ZEC amounts.');
     if (orchardPaymentAddress(auction.vault, auction.network) !== auction.vault) throw new Error('The vault must be an Orchard-only Unified Address.');
-    config = Object.freeze({ auctionId: auction.auctionId, supply: auction.supply, reserve: auction.reserve, vault: auction.vault, network: auction.network, collateral: auction.collateral, unitDemand: auction.unitDemand });
-    add('rules', 'Auction rules', true, `${auction.auctionId} / ${lots(auction.supply)} / reserve ${auction.reserve} ZEC / ${auction.collateral} ZEC collateral${auction.unitDemand ? ' / unit demand' : ''}.`);
+    if (auction.procurement && !auction.unitDemand) throw new Error('A procurement auction is always unit demand.');
+    config = Object.freeze({ auctionId: auction.auctionId, supply: auction.supply, reserve: auction.reserve, vault: auction.vault, network: auction.network, collateral: auction.collateral, unitDemand: auction.unitDemand,
+      ...(auction.procurement ? { procurement: true } : {}), ...(auction.schedule ? { schedule: auction.schedule } : {}) });
+    add('rules', 'Auction rules', true, `${auction.auctionId} / ${lots(auction.supply)} / ${auction.procurement ? 'ceiling' : 'reserve'} ${auction.reserve} ZEC / ${auction.collateral} ZEC ${auction.procurement ? 'bid bond' : 'collateral'}${auction.procurement ? ' / procurement (lowest offers win)' : auction.unitDemand ? ' / unit demand' : ''}.`);
   } catch (error: unknown) { add('rules', 'Auction rules', false, error instanceof Error ? error.message : 'Invalid auction rules.'); }
 
   // 2. Frozen Merkle root over every commitment, revealed or not.
@@ -136,8 +183,8 @@ export async function verifyAuditBundle(text: string): Promise<AuditReport> {
       const index = commitments.indexOf(await commitment(bid));
       if (index < 0) throw new Error('does not open a recorded commitment');
       if (opened.has(index)) throw new Error('opens a commitment twice');
-      if (config && parseZec(bid.price) * BigInt(bid.quantity) > parseZec(auction.collateral)) throw new Error('exceeds the posted collateral');
-      if (auction.unitDemand && bid.quantity !== 1) throw new Error('asks for more than one lot in a unit-demand auction');
+      if (config && !auction.procurement && parseZec(bid.price) * BigInt(bid.quantity) > parseZec(auction.collateral)) throw new Error('exceeds the posted collateral');
+      if ((auction.unitDemand || auction.procurement) && bid.quantity !== 1) throw new Error('asks for more than one lot in a unit-demand auction');
       opened.set(index, bid);
     } catch (error: unknown) { revealProblems.push(`reveal ${position + 1} ${error instanceof Error ? error.message : 'is invalid'}`); }
   }
@@ -208,5 +255,40 @@ export async function verifyAuditBundle(text: string): Promise<AuditReport> {
     results.length !== 1 ? `Expected one signed result, found ${results.length}.` :
       signedResult?.type === 'result' && signedResult.digest !== publishedDigest ? 'The published result is not the result the operator signed.' : 'The signed result does not match the recomputed result.');
 
-  return Object.freeze({ ok: checks.every(check => check.ok), auctionId: auction.auctionId, checks: Object.freeze(checks) });
+  // Public listing and block schedule, when the auction was run from a shareable link.
+  if (bundle.listing) {
+    const published = bundle.listing; const a = published.auction; const digest = await listingDigest(published);
+    const signedListing = verified.filter(item => item.type === 'listing');
+    const same = a.auctionId === auction.auctionId && a.vault === auction.vault && a.supply === auction.supply && a.reserve === auction.reserve && a.collateral === auction.collateral &&
+      a.unitDemand === auction.unitDemand && a.procurement === (auction.procurement === true) && auction.schedule?.commitUntil === published.schedule.commitUntil && auction.schedule?.revealUntil === published.schedule.revealUntil;
+    const signedOk = signedListing.length === 1 && signedListing[0]?.type === 'listing' && signedListing[0].digest === digest;
+    add('listing', 'Published listing', same && signedOk, !signedOk ? `Expected one operator-signed listing for “${published.title}” that matches the published text; found ${signedListing.length}.` :
+      !same ? 'The audited auction differs from the listing bidders were shown (vault, lots, reserve, collateral, mode or deadlines).' :
+        `The operator signed the listing “${published.title}” before bidding, and the audited rules and deadlines are exactly what it promised.`);
+  }
+  if (auction.schedule) {
+    const window = auction.schedule; const closed = close?.type === 'close' ? close : undefined;
+    const ok = closed !== undefined && closed.closedAt === closeTime(window) && closed.revealDeadline === revealEndTime(window);
+    add('schedule', 'Block-height schedule', ok, ok ? `Commits close after block ${window.commitUntil} and reveals after block ${window.revealUntil}; the signed close statement uses exactly these deadlines.` :
+      'The signed close statement does not use the listing\'s block-height deadlines.');
+  }
+
+  // 9–10. On-chain settlement, read through the vault's published viewing key.
+  const { settlement } = bundle;
+  if (settlement) {
+    if (!activity) {
+      const skipped = 'Not run here: it reads the chain through a Zcash light client. Run node scripts/verify-chain.ts on this bundle, or open it on a local DarkZec server.';
+      checks.push(Object.freeze({ id: 'chain-deposits', label: 'Deposits on chain', ok: false, skipped: true, detail: skipped }));
+      checks.push(Object.freeze({ id: 'chain-payouts', label: 'Settlement on chain', ok: false, skipped: true, detail: skipped }));
+    } else {
+      const deposits = await verifyChainDeposits({ auctionId: auction.auctionId, network: auction.network, vault: auction.vault, collateral: auction.collateral, commitments, reveals: bundle.reveals,
+        unitDemand: auction.unitDemand, procurement: auction.procurement === true, ...(auction.schedule ? { schedule: auction.schedule } : {}) }, activity);
+      add('chain-deposits', 'Deposits on chain', deposits.ok, deposits.detail);
+      const payouts = deposits.ok ? verifyChainPayouts({ auctionId: auction.auctionId, network: auction.network, forfeitedCollateral: result.forfeitedCollateral, allocations: result.allocations, settlement }, activity) :
+        { ok: false, detail: 'Skipped: the viewing key must first be shown to belong to this vault.' };
+      add('chain-payouts', 'Settlement on chain', payouts.ok, `${payouts.detail} Read at height ${activity.tip}.`);
+    }
+  }
+
+  return Object.freeze({ ok: checks.every(check => check.ok || check.skipped === true), auctionId: auction.auctionId, checks: Object.freeze(checks) });
 }

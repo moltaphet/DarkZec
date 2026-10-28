@@ -1,3 +1,6 @@
+import { parseChainActivity } from './settlement';
+import type { ChainActivity } from './settlement';
+
 export interface LocalTestnetStatus {
   readonly connected: boolean;
   readonly network: 'testnet' | 'mainnet' | 'unknown';
@@ -38,10 +41,10 @@ export async function verifyTestnetCommit(address: string, auctionId: string, co
   return Object.freeze(value);
 }
 
-export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number }
-export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number }
+export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number; readonly height: number }
+export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number; readonly height: number }
 export type VaultMemoResult =
-  | { readonly status: 'ok'; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
+  | { readonly status: 'ok'; readonly tip: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
   | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' };
 const TXID = /^[a-f0-9]{64}$/;
 const confirmed = (value: unknown): boolean => Number.isSafeInteger(value) && (value as number) >= 1;
@@ -56,13 +59,28 @@ export async function fetchVaultMemos(address: string, auctionId: string, collat
     return Object.freeze({ status: value.status });
   }
   if (!Array.isArray(value.commits) || !Array.isArray(value.reveals) || value.commits.length > 128 || value.reveals.length > 128) return invalid();
+  // Older local servers and fixtures omit heights; an unscheduled auction does not need them.
+  const tip = Number.isSafeInteger(value.tip) ? value.tip : 0; const heightOf = (note: { height?: unknown; confirmations: number }): number => Number.isSafeInteger(note.height) ? note.height as number : tip > 0 ? tip - note.confirmations + 1 : 0;
   const commits = value.commits.map(note => {
     if (typeof note !== 'object' || note === null || !TXID.test(String(note.txid)) || !/^[a-f0-9]{64}$/.test(String(note.commitment)) || !confirmed(note.confirmations)) return invalid();
-    return Object.freeze({ txid: note.txid, commitment: note.commitment, confirmations: note.confirmations });
+    return Object.freeze({ txid: note.txid, commitment: note.commitment, confirmations: note.confirmations, height: heightOf(note) });
   });
   const reveals = value.reveals.map(note => {
     if (typeof note !== 'object' || note === null || !TXID.test(String(note.txid)) || typeof note.memo !== 'string' || note.memo.length > 1024 || !confirmed(note.confirmations)) return invalid();
-    return Object.freeze({ txid: note.txid, memo: note.memo, confirmations: note.confirmations });
+    return Object.freeze({ txid: note.txid, memo: note.memo, confirmations: note.confirmations, height: heightOf(note) });
   });
-  return Object.freeze({ status: 'ok', commits: Object.freeze(commits), reveals: Object.freeze(reveals) });
+  return Object.freeze({ status: 'ok', tip, commits: Object.freeze(commits), reveals: Object.freeze(reveals) });
+}
+
+/** What a published viewing key sees on testnet, read by the local server's view-only light wallet. */
+export async function fetchViewKeyActivity(viewingKey: string, birthday: number): Promise<ChainActivity> {
+  return parseChainActivity(await post<unknown>('/api/chain/view-activity', { viewingKey, birthday }));
+}
+
+/** A file of a real testnet run shipped with the site (same origin, static). */
+export async function shipped(path: string): Promise<string> {
+  if (!/^\/testnet\/DZ-TESTNET-\d+-(?:audit-bundle|chain-activity|sample-receipt)\.json$/.test(path)) throw new Error('Unknown testnet run file.');
+  const response = await fetch(new URL(path, location.origin), { cache: 'no-store' });
+  if (!response.ok) throw new Error('The shipped testnet run could not be loaded.');
+  return response.text();
 }

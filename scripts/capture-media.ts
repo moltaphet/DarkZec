@@ -48,9 +48,9 @@ await click('#clear');
 await still(page.locator('#results-panel'));
 await snap('clearing-result', page.locator('#results-panel'));
 
-// Audit mode on the bundle recorded from the real Zcash testnet auction DZ-TESTNET-1.
+// Audit mode on the settled real Zcash testnet auction DZ-TESTNET-2 (its on-chain checks use the recorded snapshot here).
 await click('#audit-tab');
-await page.locator('#audit-bundle-file').setInputFiles('docs/testnet-run/DZ-TESTNET-1-audit-bundle.json');
+await page.locator('#audit-run-DZ-TESTNET-2').click();
 await page.locator('#audit-verdict').filter({ hasText: 'VERIFIED' }).waitFor();
 await still(page.locator('#audit-view'));
 await snap('audit-mode-testnet', page.locator('#audit-view'));

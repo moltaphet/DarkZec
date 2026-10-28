@@ -22,7 +22,26 @@
 .operator-view td, .audit-view td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; text-align: left; white-space: normal; }
 .audit-checks td.state { white-space: nowrap; font-weight: 700; }
 .audit-checks tr.is-ok td.state { color: #00f058; }
+.audit-checks tr.is-skip td.state { color: #8d8d94; }
 .audit-checks tr.is-bad td.state { color: #eebc56; }
 .audit-verdict { font-size: 14px; font-weight: 700; margin: 18px 0 10px; }
 .reveal-chain { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 24px; }
 .reveal-chain textarea { font-size: 14px; min-height: 96px; }
+
+/* Auction link: seller panel and the bidder's listing page. */
+.live-link { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.live-link textarea { min-height: 96px; width: 100%; font-size: 12px; word-break: break-all; }
+.listing-view { margin-top: 22px; }
+.listing-view .panel-heading { flex-wrap: wrap; gap: 10px; }
+.listing-view .panel-heading > span { font-size: 12px; color: #00ff66; }
+.listing-view h3 { margin: 22px 0 10px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.listing-description { white-space: pre-wrap; font-size: 15px; line-height: 1.7; }
+.listing-rules { margin: 14px 0; padding: 12px 16px; border-left: 2px solid #00ff66; background: rgb(0 255 102 / 6%); font-size: 14px; line-height: 1.7; }
+.listing-timeline { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); font-size: 14px; }
+.listing-timeline strong { color: #00f058; letter-spacing: .12em; }
+.listing-timeline[data-phase="ENDED"] strong { color: #eebc56; }
+.listing-vault { display: block; margin: 6px 0 14px; padding: 10px 12px; border: 1px solid var(--line); font-size: 12px; overflow-wrap: anywhere; }
+.listing-steps { margin: 0 0 18px; padding-left: 22px; font-size: 14px; line-height: 1.8; }
+.listing-check { margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--line); }
+.listing-result { margin-top: 14px; }
+.listing-facts, .listing-outcome { margin: 12px 0; }

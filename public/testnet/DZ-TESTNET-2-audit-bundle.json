@@ -1,0 +1,79 @@
+{
+  "v": 1,
+  "kind": "darkzec-audit-bundle",
+  "auction": {
+    "auctionId": "DZ-TESTNET-2",
+    "network": "testnet",
+    "vault": "utest1wg2uy0waj3vqjkg6xjazazpmcc9tt7wqvv4wpmugmw45qhy3rfu409xgxtjf6h09gqlrz24v5j77dmqcxzllqvynkzh7gkgunqg69dpt",
+    "supply": 1,
+    "reserve": "0.01",
+    "collateral": "0.1",
+    "unitDemand": true
+  },
+  "commitments": [
+    "3b74b7ff29d8ee7b870c1dfdfa6c93d634cf4cc440844dec8fcb01a12fa97746",
+    "367c6c5253000d724467488361ed94301acb90088140e5911c79f05d420e9123",
+    "2d683284bfbe1c5cec8dd273987ad055996ed5a1c69f40026f6166cec051eb46"
+  ],
+  "root": "403063afe973ff70a7b7e8c20bb0bfacd3402bdc24d4a58910bca8f44825a5d3",
+  "reveals": [
+    "{\"v\":1,\"a\":\"DZ-TESTNET-2\",\"p\":\"0.05\",\"q\":1,\"s\":\"a07cbbd545da6a36e8d20d81deaaf4d500be0de91b2679ab2c59180cbec595ca\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}",
+    "{\"v\":1,\"a\":\"DZ-TESTNET-2\",\"p\":\"0.08\",\"q\":1,\"s\":\"a97458110ebb54793092d1061f2885158d6df75d516bd25fc3621fb0ae3df71a\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}"
+  ],
+  "result": {
+    "clearingPrice": "0.05",
+    "filled": 1,
+    "excluded": 1,
+    "forfeitedCollateral": "0.1",
+    "postedCollateral": "0.3",
+    "allocations": [
+      {
+        "commitment": "367c6c5253000d724467488361ed94301acb90088140e5911c79f05d420e9123",
+        "price": "0.08",
+        "requested": 1,
+        "filled": 1,
+        "paid": "0.05",
+        "refundAmount": "0.05",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      },
+      {
+        "commitment": "3b74b7ff29d8ee7b870c1dfdfa6c93d634cf4cc440844dec8fcb01a12fa97746",
+        "price": "0.05",
+        "requested": 1,
+        "filled": 0,
+        "paid": "0",
+        "refundAmount": "0.1",
+        "refundAddress": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq"
+      }
+    ]
+  },
+  "operator": {
+    "publicKey": "04f3f924ad6284f0e7249bc2a6246058efe5e10e63ccc847059875c3351a679032e30742ab4cdb93e6acf47f23dd38590a327494f4753f5c7dc4215cf1eddd2a0c",
+    "statements": [
+      {
+        "statement": "[\"DARKZEC/close/v1\",\"DZ-TESTNET-2\",\"403063afe973ff70a7b7e8c20bb0bfacd3402bdc24d4a58910bca8f44825a5d3\",3,1793179269410,1793180469410]",
+        "signature": "9c5a344c371b172159b7267e93370b5b31da87d3b53af52c523d2d37e2b0b6990b547d00e5e351154ec65af4767bf52b9012bed86b2a55bd80b1c9b8343b791d"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-2\",\"403063afe973ff70a7b7e8c20bb0bfacd3402bdc24d4a58910bca8f44825a5d3\",\"367c6c5253000d724467488361ed94301acb90088140e5911c79f05d420e9123\",1,1793179417723]",
+        "signature": "16b921c101b269e4ccd6f4712c501e9acba7166812f701d49f3c9a1428120b4afab5fd4fd3bc080d416ef2f1d403aa7f25f5f6868364d715bb0c5f4d063c8c27"
+      },
+      {
+        "statement": "[\"DARKZEC/reveal-ack/v1\",\"DZ-TESTNET-2\",\"403063afe973ff70a7b7e8c20bb0bfacd3402bdc24d4a58910bca8f44825a5d3\",\"3b74b7ff29d8ee7b870c1dfdfa6c93d634cf4cc440844dec8fcb01a12fa97746\",0,1793179417724]",
+        "signature": "9481f511470059e845a9f510c532103c3548c4fb36aa4e9c868b4a313efa23d1fe6acad946959e59cf2a05ef2e8b728d0707705214c35c1a0ef59d04496f60f0"
+      },
+      {
+        "statement": "[\"DARKZEC/result/v1\",\"DZ-TESTNET-2\",\"403063afe973ff70a7b7e8c20bb0bfacd3402bdc24d4a58910bca8f44825a5d3\",\"a752c9eb5446c9d1ae1b8e7c88bf1b4360d8dd9ffe40ff55cac10f4a13fc0043\"]",
+        "signature": "572c9f19d6dee57ded159bd95bf6a16c7b37f9a857a3ec2b87a9272ab40beff1e822fd70b715c6040bec823835b6f7baa7e6d3750efa46776ff33e063e70e046"
+      }
+    ]
+  },
+  "settlement": {
+    "viewingKey": "uviewtest1pfp76933ruzr92xul8s0a26qg3mu0c0vjchn58ru4zzxylahrsnk47gjmakvg6n63meudm40mx2my7hzw3hlm3zwk877tlul8apqxld8h6pk295vsx0fsacleryex0g30vcx3fct77d5ynkllncru7zajnplz6ukp0nja5fm9j7z33c5dq6puyqt7pnqyegw7kt2qd6lkw3mqz5fa27qz6faulwddrfwz932aqxdt4kln3cc02rda4llyeufnygyrehcnt77g0ley4frusm4yqczdujl3pzjv6ut84m0q0k7p6uqfuq8d5spcuxugedslhgyc06v7feqx2ry8s9uvgrjqpl49a0xlkt9jcra8lzlpztw8tj3k6q32u8znk4v62yry3vlaguag0h7aenwnumu95rd60mq8zd3wk95qxp2kage4qlyzv8xswp6px7zfjkdlr60parvl022y7yep028cs8m2ujd2jluv3mt7xfea3r7cv4yvvl5",
+    "birthday": 4550312,
+    "seller": "utest1deatr2fc2lqv6psjqaz5mavgxrh30w3c4ghmypg749rr6a67m97rsxpmvpn6uvypv4sjuw97gfapqgstdvvly6ux7x6dhu6rcg035ahr",
+    "txids": [
+      "34a2b4879a76b7f6a02d1271f485605d6b91d8861d26a4b18b29ccf5aed7069f"
+    ]
+  }
+}

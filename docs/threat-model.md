@@ -44,13 +44,16 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 | Bidder changes price, quantity, salt or refund after committing | Prevented | Reveal must recompute to a recorded commitment; tests cover each substitution. |
 | Attacker copies a victim's commitment hash | Prevented | Duplicate commitments are refused and the copier cannot produce the preimage. |
 | Reveal on another auction | Prevented | The commitment is `["DARKZEC/bid/v2", auction_id, ...]`, so it is auction-bound. |
-| Free option / griefing by never revealing | **Mitigated by forfeiture** | Unrevealed commitments forfeit the whole collateral, which is burned; they still appear in the frozen root. Not enforced on-chain in the prototype. |
+| Free option / griefing by never revealing | **Mitigated by forfeiture** | Unrevealed commitments forfeit the whole collateral, which is burned; they still appear in the frozen root. On testnet the settlement transaction sends every forfeit to a provably unspendable P2SH(OP_RETURN) address, checked by *Settlement on chain* ([settlement](settlement.md)). |
 | Operator ignores honest reveals to keep their collateral | **Incentive removed, censorship provable** | Forfeited collateral is burned, never credited to the operator, so rejecting a valid reveal earns it nothing. Every accepted reveal gets a signed acknowledgement; a published result that omits an acknowledged bid fails the audit-mode acknowledgement check. A reveal the operator never acknowledges is still deniable unless it was sent as an on-chain reveal memo the bidder can point to. |
 | Operator places shill bids and withholds their reveal after seeing others | **Made costly** | A withheld shill reveal burns the operator's own collateral instead of returning it to the operator's vault. The operator still sees revealed bids before clearing. |
 | Bidder inflates the price with lots it cannot win | Not solved in multi-lot mode; **prevented in unit-demand mode** | A partially filled marginal bid sets the uniform price, so extra requested quantity can raise what every winner pays (`0.8 x 1` vs `0.8 x 2` in the README example). Unit-demand auctions accept one lot per bid and charge the truthful (k+1)-th price (Vickrey for one lot). |
 | Refund redirected to the vault | Prevented | Refund and vault must resolve to different Orchard receivers, even across different UA strings. |
 | Transparent fallback leaks the payer | Mitigated | Every instruction is projected to an Orchard-only UA; bare transparent addresses are refused. |
-| Operator drops a commitment | **Partly mitigated** | The operator signs the frozen root and commitment count at close, and a bidder can prove inclusion against it. In a live auction a dropped commitment is also an on-chain commit payment the bidder can point to. Without an external timestamp the close statement itself is not anchored. |
+| Operator drops a commitment | **Detected publicly** (auctions with a block schedule) | The operator signs the frozen root and commitment count at close. With a listing, the audit also reads the chain through the vault's published viewing key and fails if any commit payment mined by the signed commit deadline is missing from the root (*Deposits on chain*). Earlier or unscheduled auctions still rely on the bidder pointing at their own payment, and the close statement is not anchored externally. |
+| Operator admits a late commit or reveal, or moves a deadline | **Detected publicly** | Deadlines are block heights signed in the listing before the first bid; the audit checks every counted payment's mined height against them and that the signed close statement uses exactly these deadlines (*Block-height schedule*). |
+| Operator omits an acceptable on-time reveal | **Detected publicly** | Every on-time reveal memo that opens a recorded commitment and passes the ledger's own rules must appear in the result; one that does not fails *Deposits on chain*. A reveal the ledger rightly refuses is not counted as censorship. |
+| Operator advertises one auction and runs another | **Detected** | The listing the operator signed is published in the audit bundle; *Published listing* fails if the audited vault, lots, reserve, collateral, mode or deadlines differ from what the link promised. |
 | Operator clears incorrectly | **Detectable** | The audit bundle publishes the reveal set; audit mode re-runs the deterministic clearing and checks the signed result digest, so an incorrect or edited result fails. There is still no zero-knowledge proof, and publishing reveals discloses bids. |
 | Salt grinding or ordering games | Limited | Ties follow accepted commit order, never the hash. In a live auction commits are imported oldest first by confirmations, so order follows the chain; within one block it falls back to transaction ID. This is not Sybil resistance. |
 | Wallet or browser compromise | Out of scope | A compromised device can read receipts. Secrets cannot be reliably zeroized in JavaScript. |
@@ -60,7 +63,11 @@ DarkZec does not claim to remove the operator. It narrows what the operator can 
 
 ## Trust assumptions in this build
 
-The vault operator is trusted to: not leak revealed bids, run the announced clearing rule, publish the true root, return refunds, accept every valid reveal and burn forfeited collateral honestly. The sandbox hosts bidder and operator in one browser, so it demonstrates the rules and data flow, not the separation.
+The vault operator is trusted to: not leak revealed bids, publish the true root, accept every valid reveal, and actually send the settlement. Each of these is now checkable: clearing is re-run by the audit, reveals are acknowledged by signature, and after settlement the published viewing key lets anyone check every deposit, refund, proceeds payment and burn on chain ([settlement](settlement.md)).
+
+What remains is custody. Zcash has no escrow contract, so the operator's wallet holds the collateral until settlement. An operator that never settles cannot be stopped, only proven to have kept the funds: anyone holding the published key can show the refunds never left the vault. Preventing it needs threshold custody (FROST, roadmap item 5).
+
+The sandbox hosts bidder and operator in one browser, so it demonstrates the rules and data flow, not the separation. The live testnet runs use separate wallets.
 
 ## Roadmap to reduce operator trust
 
@@ -68,10 +75,10 @@ The vault operator is trusted to: not leak revealed bids, run the announced clea
 2. Encrypt reveals to a **threshold key**, or run the operator in a **TEE** with attestation, so no single party reads bids before clearing.
 3. **Anchor the root** at close in an external timestamped record, so omission becomes provable.
 4. ~~Publish the full reveal set after clearing so anyone can re-run the clearing~~ **Done** as the audit bundle and audit mode. Proving clearing in zero knowledge without publishing bids remains open.
-5. Real Orchard scanning through an audited adapter in place of the mock vault, and on-chain handling of refunds and the forfeiture burn.
+5. ~~On-chain refunds and forfeiture burn, real scanning~~ **Done:** one settlement transaction per auction, a per-auction vault account whose viewing key is published, and on-chain audit checks; the vault scanner reads testnet with a real viewing key. **Next:** 2-of-3 FROST custody of the vault account so a settlement that does not match the verified result cannot be signed ([design](settlement.md#next-step-threshold-custody-with-frost)).
 6. ~~Signed reveal acknowledgements~~ **Done:** close, every accepted reveal and the result are signed. Next: publish the operator key before the auction opens and anchor the close statement externally.
 7. Replace the zcashd RPC adapter with Zallet or Zebra-based scanning, since zcashd reached end of support.
 
 ## What the prototype demonstrates
 
-Real: ZIP-316 address validation with Orchard-only projection, ZIP-302 byte audit, ZIP-321 URIs, commit/reveal rules, uniform-price clearing, integer-zatoshi accounting with a visible balance check, forfeiture, a frozen Merkle root with proofs, and a round-trip check of a memo copied from a real wallet. Mock: the viewing-key vault and its notes, and every transaction path from the sandbox to a chain.
+Real: ZIP-316 address validation with Orchard-only projection, ZIP-302 byte audit, ZIP-321 URIs, commit/reveal rules, uniform-price clearing, integer-zatoshi accounting with a visible balance check, forfeiture, a frozen Merkle root with proofs, and a round-trip check of a memo copied from a real wallet. Real on testnet: commit and reveal ingestion, settlement (refunds, proceeds, burn) and its public verification through the published viewing key. Mock: the training vault and its notes, and the in-browser sandbox, which moves no funds.

@@ -12,10 +12,10 @@ interface ProtocolEntry {
 
 const ENTRIES: readonly ProtocolEntry[] = [
   {
-    id: 'overview', title: 'Overview', question: 'Why trade in the dark?', tag: 'PRIVATE MARKETS',
+    id: 'overview', title: 'Overview', question: 'Why bid sealed?', tag: 'SEALED-BID AUCTIONS',
     paragraphs: [
-      'A dark pool keeps trading intentions off a public orderbook before execution. DarkZec’s design is commit/reveal: a bidder first pays a fixed collateral to the vault with only the auction ID and a salted commitment hash in the shielded memo, and reveals price, quantity and refund address later, privately, in a short reveal window. Wallet addresses, limit prices and quantities stay out of the public book, reducing the information available for order surveillance and front-running.',
-      'The same private-instruction model can support negotiated OTC trades: counterparties agree terms privately and use shielded settlement rather than publishing their entire negotiation. OTC matching and live settlement are production goals; this terminal currently provides a local auction sandbox and a wallet request builder.',
+      'A sealed-bid auction keeps every bid hidden until bidding closes, so no one can react to another bidder’s price. DarkZec’s design is commit/reveal: a bidder first pays a fixed collateral to the vault with only the auction ID and a salted commitment hash in the shielded memo, and reveals price, quantity and refund address later, privately, in a short reveal window. Wallet addresses, limit prices and quantities stay out of the public book, reducing the information available for order surveillance and front-running.',
+      'Scope, plainly: DarkZec runs one batch auction per vault account with one operator. Bids are collected sealed, the auction closes, and it clears once at a uniform price; settlement pays every refund, the seller and the burn on chain in one transaction. It is not a continuous dark pool or an OTC desk, and the operator still holds the collateral between deposit and settlement.',
     ],
     note: 'LOCAL BOUNDARY / The terminal makes no external runtime requests. Shielded payments reduce on-chain metadata exposure; they do not eliminate timing correlation, device compromise or disclosures to a trusted vault or wallet.',
   },

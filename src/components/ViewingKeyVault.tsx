@@ -67,10 +67,10 @@ export class ViewingKeyVault implements Disposable {
   #build(): void {
     const panel = node('section', 'panel viewing-vault'); panel.setAttribute('aria-label', 'Viewing Key Vault & Decryption Engine');
     const heading = node('div', 'panel-heading');
-    heading.append(node('h2', '', '03 / Viewing Key Vault & Decryption Engine'), this.#mode); this.#mode.id = 'vault-mode';
+    heading.append(node('h2', '', '03b / Training vault (mock keys and notes)'), this.#mode); this.#mode.id = 'vault-mode';
     const intro = node('div', 'vault-intro');
-    intro.append(node('span', 'eyebrow', 'INCOMING VIEW AUTHORITY / LOCAL SIMULATION'), node('h2', '', 'Unseal the note. Keep the key local.'),
-      node('p', '', 'An isolated scanner for simulated shielded notes. Unlock the vault, authenticate incoming envelopes and inspect validated commitment hashes. No chain connection or spending authority.'));
+    intro.append(node('span', 'eyebrow', 'TRAINING MODE / SIMULATED NOTES, NOT THE CHAIN'), node('h2', '', 'Unseal the note. Keep the key local.'),
+      node('p', '', 'A practice scanner with simulated notes and a demo key, for trying the unlock, authentication and quarantine flow. It never touches the chain; the real scan above reads testnet with a real viewing key.'));
     const grid = node('div', 'vault-grid'); const credentials = node('section', 'vault-credentials');
     credentials.append(node('h3', '', 'Vault access'), this.#saved); this.#saved.id = 'vault-saved-state';
     this.#form.id = 'vault-key-form'; this.#form.autocomplete = 'off';

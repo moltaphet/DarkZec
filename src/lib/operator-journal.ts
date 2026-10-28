@@ -10,6 +10,7 @@ export interface ResultSummary {
   readonly forfeitedCollateral: string; readonly postedCollateral: string; readonly allocations: readonly Allocation[];
 }
 export type ParsedStatement =
+  | { readonly type: 'listing'; readonly auctionId: string; readonly digest: string }
   | { readonly type: 'close'; readonly auctionId: string; readonly root: string; readonly count: number; readonly closedAt: number; readonly revealDeadline: number }
   | { readonly type: 'reveal-ack'; readonly auctionId: string; readonly root: string; readonly commitment: string; readonly index: number; readonly acceptedAt: number }
   | { readonly type: 'result'; readonly auctionId: string; readonly root: string; readonly digest: string };
@@ -40,6 +41,12 @@ export async function verifyStatement(publicKey: string, signed: SignedStatement
   } catch { return false; }
 }
 
+/** Signed before the first bid: binds the operator key to the public listing (rules, vault and deadlines). */
+export function listingStatement(auctionId: string, digest: string): string {
+  validateAuctionId(auctionId);
+  if (!HASH.test(digest)) throw new Error('Invalid listing statement.');
+  return JSON.stringify(['DARKZEC/listing/v1', auctionId, digest]);
+}
 export function closeStatement(auctionId: string, root: string, count: number, closedAt: number, revealDeadline: number): string {
   validateAuctionId(auctionId);
   if (!HASH.test(root) || !Number.isSafeInteger(count) || count < 0 || count > 128 || !isTime(closedAt) || !isTime(revealDeadline) || revealDeadline <= closedAt) throw new Error('Invalid close statement.');
@@ -63,7 +70,11 @@ export function parseStatement(text: string): ParsedStatement {
   if (!Array.isArray(value) || typeof value[1] !== 'string') throw new Error('Invalid operator statement.');
   const [tag, auctionId, root] = value as unknown[];
   let parsed: ParsedStatement;
-  if (tag === 'DARKZEC/close/v1' && value.length === 6) {
+  if (tag === 'DARKZEC/listing/v1' && value.length === 3) {
+    if (typeof root !== 'string') throw new Error('Invalid operator statement.');
+    parsed = { type: 'listing', auctionId: auctionId as string, digest: root };
+    if (listingStatement(parsed.auctionId, root) !== text) throw new Error('Invalid operator statement.');
+  } else if (tag === 'DARKZEC/close/v1' && value.length === 6) {
     const [, , , count, closedAt, revealDeadline] = value as unknown[];
     if (typeof root !== 'string' || typeof count !== 'number' || !isTime(closedAt) || !isTime(revealDeadline)) throw new Error('Invalid operator statement.');
     parsed = { type: 'close', auctionId: auctionId as string, root, count, closedAt, revealDeadline };
@@ -110,6 +121,10 @@ export class OperatorJournal {
   async #append(statement: string): Promise<SignedStatement> {
     const signed = Object.freeze({ statement, signature: await this.#signer.sign(statement) });
     this.#statements.push(signed); return signed;
+  }
+  async recordListing(digest: string): Promise<SignedStatement> {
+    if (this.#root !== undefined || this.#statements.some(item => item.statement.startsWith('["DARKZEC/listing/'))) throw new Error('The listing can be signed once, before close.');
+    return this.#append(listingStatement(this.#auctionId, digest));
   }
   async recordClose(root: string, count: number, closedAt: number, revealDeadline: number): Promise<SignedStatement> {
     if (this.#root !== undefined) throw new Error('The close statement is already signed.');

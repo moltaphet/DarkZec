@@ -55,7 +55,7 @@ describe('zcash-devtool vault wallet adapter', () => {
     dirs.push(dir); process.env.DARKZEC_DEVTOOL_WALLET = dir;
     await expect(localChainStatus()).resolves.toEqual({ connected: true, network: 'testnet', synced: true, blocks: 100, headers: 100 });
     await expect(listVaultMemos(TEST_VAULT, 'LIVE-001', 10_000_000)).resolves.toEqual({
-      status: 'ok', commits: [{ txid: displayTxid(1), commitment: 'b'.repeat(64), confirmations: 6 }], reveals: [] });
+      status: 'ok', tip: 100, commits: [{ txid: displayTxid(1), commitment: 'b'.repeat(64), confirmations: 6, height: 95 }], reveals: [] });
   });
 
   it('reports a mainnet wallet, an unsynced wallet and a missing wallet without throwing', async () => {

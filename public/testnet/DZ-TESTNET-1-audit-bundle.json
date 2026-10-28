@@ -66,5 +66,13 @@
         "signature": "032eeeef766c75df1a4bdf8f7b761177622509189d5f0e34e8344de2fac2aea791562f08ec8884fd123e3d5f4dcc2e66b3df90dac8395b1dd3e6036dba8f1bf0"
       }
     ]
+  },
+  "settlement": {
+    "viewingKey": "uviewtest18dendecq5qf3vuf8cdvauknd2jmvezjyefjkvue73mad69u72dqfehsakghatnde6qcldgp2lk9p6sv9xwj0h0v6ts6lek8ne6del2m3q9nar8078pk3wy5q7pq2uy3ccqed662q7wl4j6uzqyzj4zjnjuzfl8qlq08j0y5nkdzl6mfkk3w9rr3pn0zzalsxnet085p8r6298538y3hhrp6guculer49a2as9324xdgvh0mn636uc5qvzz2l73aq9wpsag2z3t20jpwmxatnaykjxj7lq3txtjqh5h80tdjv0vekhfv8f32vx8mh5gzdmarq5wx5eegpekd3jmtc89p057cwsx0wd6v54c7254hafsqylzzkw9eru4k3rf5pm6t6wdgsgamytdtrxj5yrlsek9dsrrterp4z7k9fxvz2w4hytmftry77ak5973409pnstcngvqcmkx4teqnzqtmmvxu2l88ms37fsy7eargydjvzjclxegsz",
+    "birthday": 4548212,
+    "seller": "utest1deatr2fc2lqv6psjqaz5mavgxrh30w3c4ghmypg749rr6a67m97rsxpmvpn6uvypv4sjuw97gfapqgstdvvly6ux7x6dhu6rcg035ahr",
+    "txids": [
+      "96e8acf603418f2a9fc9e4177e5526aeb75cc69d334437ce47bc35d089b50a60"
+    ]
   }
 }

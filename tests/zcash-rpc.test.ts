@@ -79,9 +79,9 @@ describe('local Zcash testnet RPC', () => {
       receivedNote({ txid: '8'.repeat(64), memo: padded(JSON.stringify({ v: 2, t: 'commit', c: 'a'.repeat(64), a: auctionId })) }),
     ]);
     await expect(listVaultMemos(address, auctionId, 1_000_000_000)).resolves.toEqual({
-      status: 'ok',
-      commits: [{ txid: '2'.repeat(64), commitment: 'e'.repeat(64), confirmations: 9 }, { txid: '1'.repeat(64), commitment: 'd'.repeat(64), confirmations: 3 }],
-      reveals: [{ txid: '3'.repeat(64), memo: reveal, confirmations: 1 }],
+      status: 'ok', tip: 100,
+      commits: [{ txid: '2'.repeat(64), commitment: 'e'.repeat(64), confirmations: 9, height: 92 }, { txid: '1'.repeat(64), commitment: 'd'.repeat(64), confirmations: 3, height: 98 }],
+      reveals: [{ txid: '3'.repeat(64), memo: reveal, confirmations: 1, height: 100 }],
     });
     await expect(listVaultMemos(address, auctionId, 5)).rejects.toThrow('Invalid vault memo request.');
     await expect(verifyLocalCommitPayment(address, auctionId, commitment, 7)).rejects.toThrow('Invalid testnet commit verification request.');

@@ -141,10 +141,10 @@ export async function verifyLocalCommitPayment(address: string, auctionId: strin
   }
 }
 
-export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number }
-export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number }
+export interface VaultCommitNote { readonly txid: string; readonly commitment: string; readonly confirmations: number; readonly height: number }
+export interface VaultRevealNote { readonly txid: string; readonly memo: string; readonly confirmations: number; readonly height: number }
 export type VaultMemoResult =
-  | { readonly status: 'ok'; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
+  | { readonly status: 'ok'; readonly tip: number; readonly commits: readonly VaultCommitNote[]; readonly reveals: readonly VaultRevealNote[] }
   | { readonly status: 'wrong-network' | 'syncing' | 'wallet-not-configured' | 'node-unavailable' };
 
 /**
@@ -168,22 +168,23 @@ export async function listVaultMemos(address: string, auctionId: string, collate
   const confirmed = notes.filter((note: unknown): note is JsonRecord => isRecord(note) && isShieldedPool(note.pool) && /^[a-f0-9]{64}$/.test(String(note.txid)) &&
     Number.isSafeInteger(note.confirmations) && Number(note.confirmations) >= 1 && Number.isSafeInteger(note.amountZat) && Number(note.amountZat) > 0)
     .sort((a, b) => Number(b.confirmations) - Number(a.confirmations) || String(a.txid).localeCompare(String(b.txid)));
+  const tip = status.blocks; if (!Number.isSafeInteger(tip)) return { status: 'node-unavailable' };
   const commits: VaultCommitNote[] = []; const reveals: VaultRevealNote[] = []; const seen = new Set<string>();
   for (const note of confirmed.slice(0, 512)) {
     const memo = decodeMemoHex(note.memo); if (!memo || seen.has(memo)) continue;
     let value: unknown;
     try { value = JSON.parse(memo); } catch { continue; }
     if (!isRecord(value) || value.a !== auctionId) continue;
-    const txid = String(note.txid); const confirmations = Number(note.confirmations);
+    const txid = String(note.txid); const confirmations = Number(note.confirmations); const height = (tip as number) - confirmations + 1;
     if (value.v === 2 && value.t === 'commit' && typeof value.c === 'string' && /^[a-f0-9]{64}$/.test(value.c) && matchesCommitMemo(note, auctionId, value.c)) {
       if (Number(note.amountZat) !== collateralZat) continue;
-      seen.add(memo); commits.push({ txid, commitment: value.c, confirmations });
+      seen.add(memo); commits.push({ txid, commitment: value.c, confirmations, height });
     } else if (value.v === 1 && Buffer.byteLength(memo) <= 512) {
-      seen.add(memo); reveals.push({ txid, memo, confirmations });
+      seen.add(memo); reveals.push({ txid, memo, confirmations, height });
     }
     if (commits.length >= 128 && reveals.length >= 128) break;
   }
-  return { status: 'ok', commits: commits.slice(0, 128), reveals: reveals.slice(0, 128) };
+  return { status: 'ok', tip: tip as number, commits: commits.slice(0, 128), reveals: reveals.slice(0, 128) };
 }
 
 export function checkSameLocalOrigin(request: import('node:http').IncomingMessage, port: number): boolean {

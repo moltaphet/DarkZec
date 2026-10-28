@@ -1,4 +1,5 @@
 import { assertDistinctRefund, orchardPaymentAddress } from './protocol/address';
+import { validateSchedule } from './lib/schedule';
 import { formatZec, parseQuantity, parseZec, validateAuctionId } from './protocol/amount';
 import { clearUniformAuction } from './lib/darkpool';
 import type { AuctionConfig, ClearingResult, VerifiedBid } from './lib/darkpool';
@@ -54,7 +55,12 @@ export class Sandbox {
     const revealWindowMs = config.revealWindowMs ?? 60_000;
     if (!Number.isSafeInteger(revealWindowMs) || revealWindowMs < 1 || revealWindowMs > 86_400_000) throw new Error('Invalid reveal window.');
     if (config.unitDemand !== undefined && typeof config.unitDemand !== 'boolean') throw new Error('Unit demand must be true or false.');
-    return new Sandbox(Object.freeze({ ...config, collateral, revealWindowMs, unitDemand: config.unitDemand === true, vault: orchardPaymentAddress(config.vault, config.network) }), clock);
+    if (config.procurement !== undefined && typeof config.procurement !== 'boolean') throw new Error('Procurement must be true or false.');
+    const procurement = config.procurement === true;
+    const schedule = config.schedule === undefined ? undefined : validateSchedule(config.schedule);
+    const { schedule: _omitted, procurement: _unused, ...rest } = config;
+    return new Sandbox(Object.freeze({ ...rest, collateral, revealWindowMs, unitDemand: procurement || config.unitDemand === true, vault: orchardPaymentAddress(config.vault, config.network),
+      ...(procurement ? { procurement } : {}), ...(schedule ? { schedule } : {}) }), clock);
   }
   /** The validated, normalized configuration (Orchard-only vault, canonical collateral). */
   get config(): AuctionConfig { return this.#config; }
@@ -102,7 +108,7 @@ export class Sandbox {
       if (Object.keys(input).sort().join(',') !== 'auctionId,price,quantity,refund,salt') throw new Error('Invalid reveal schema.');
       const bid = Object.freeze(parseBidMemo(serializeBidMemo({ ...input }, this.#config.network), this.#config.network));
       if (bid.auctionId !== this.#config.auctionId) throw new Error('Wrong auction ID.');
-      if (this.#config.unitDemand && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
+      if ((this.#config.unitDemand || this.#config.procurement) && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
       assertDistinctRefund(bid.refund, this.#config.vault, this.#config.network);
       const hash = await commitment(bid);
       const acceptedAt = this.#now();
@@ -110,7 +116,7 @@ export class Sandbox {
       const index = this.#records.findIndex(item => item.commitment === hash); const record = this.#records[index];
       if (!record) throw new Error('Reveal does not match a recorded commitment.');
       if (record.reveal) throw new Error('Commitment has already been revealed.');
-      if (parseZec(bid.price) * BigInt(bid.quantity) > parseZec(record.collateral)) throw new Error('Insufficient collateral for reveal.');
+      if (!this.#config.procurement && parseZec(bid.price) * BigInt(bid.quantity) > parseZec(record.collateral)) throw new Error('Insufficient collateral for reveal.');
       record.reveal = bid;
       return Object.freeze({ commitment: hash, index, acceptedAt });
     } finally { this.#busy = false; }

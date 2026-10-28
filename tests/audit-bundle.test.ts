@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AuctionSession } from '../src/lib/auction-session';
 import { parseAuditBundle, serializeAuditBundle, verifyAuditBundle } from '../src/lib/audit-bundle';
 import type { AuditBundle } from '../src/lib/audit-bundle';
+import { parseChainActivity } from '../src/lib/settlement';
 import { closeStatement, createOperatorSigner, OperatorJournal, parseStatement, revealAckStatement, verifyStatement } from '../src/lib/operator-journal';
 import { commitSubmission, DEFAULT_COLLATERAL, prepareBid } from '../src/protocol/memo';
 import type { PreparedBid } from '../src/protocol/memo';
@@ -82,12 +83,29 @@ describe('audit bundle verification', () => {
   });
 });
 
-describe('recorded Zcash testnet auction', () => {
-  it('keeps verifying the DZ-TESTNET-1 bundle built from real commit and reveal memos', async () => {
+describe('recorded Zcash testnet auctions', () => {
+  // Each shipped run is a settled real auction with its recorded chain snapshot; the checks beyond the base eight depend on what the run used.
+  const runs = [['DZ-TESTNET-1', 10], ['DZ-TESTNET-2', 10]] as const;
+  for (const [id, checks] of runs) {
+    it(`keeps verifying the settled ${id} bundle, on chain through its recorded snapshot`, async () => {
+      const { readFile } = await import('node:fs/promises');
+      const text = await readFile(`public/testnet/${id}-audit-bundle.json`, 'utf8');
+      const snapshot = parseChainActivity(JSON.parse(await readFile(`public/testnet/${id}-chain-activity.json`, 'utf8')));
+      const report = await verifyAuditBundle(text, snapshot);
+      expect(report.checks.filter(check => !check.ok)).toEqual([]);
+      expect(report.checks).toHaveLength(checks);
+      expect(report).toMatchObject({ ok: true, auctionId: id });
+      // Without a chain source the two on-chain checks are skipped, never passed.
+      expect((await verifyAuditBundle(text)).checks.filter(check => check.skipped).map(check => check.id)).toEqual(['chain-deposits', 'chain-payouts']);
+    });
+  }
+  it('burned DZ-TESTNET-2\'s forfeited bond to the unspendable address, so any other recipient would fail', async () => {
     const { readFile } = await import('node:fs/promises');
-    const report = await verifyAuditBundle(await readFile('docs/testnet-run/DZ-TESTNET-1-audit-bundle.json', 'utf8'));
-    expect(report.checks.filter(check => !check.ok)).toEqual([]);
-    expect(report).toMatchObject({ ok: true, auctionId: 'DZ-TESTNET-1' });
+    const text = await readFile('public/testnet/DZ-TESTNET-2-audit-bundle.json', 'utf8');
+    const snapshot = JSON.parse(await readFile('public/testnet/DZ-TESTNET-2-chain-activity.json', 'utf8')) as { sent: { address: string | null; amountZat: number }[] };
+    expect(snapshot.sent.some(output => output.address?.startsWith('t2') && output.amountZat === 10_000_000)).toBe(true);
+    const diverted = structuredClone(snapshot); const burn = diverted.sent.find(output => output.address?.startsWith('t2')); if (burn) burn.address = 't2Gxm7HJjMAH2ZNnWpvBNGiZ2UavUM5rE1h';
+    expect((await verifyAuditBundle(text, parseChainActivity(diverted))).checks.find(check => check.id === 'chain-payouts')?.ok).toBe(false);
   });
 });
 

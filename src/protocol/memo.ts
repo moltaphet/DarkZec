@@ -97,6 +97,8 @@ export interface PrepareBidInput {
   readonly vault: string;
   readonly network: Network;
   readonly collateral?: string;
+  /** A procurement offer is a bid bond: the offered price is not paid out of the collateral, so it is not capped by it. */
+  readonly procurement?: boolean;
 }
 export async function prepareBid(input: PrepareBidInput, audit?: AuditObserver<ProtocolAuditEvent>): Promise<PreparedBid> {
   let phase: 'input' | 'memo' | 'commitment' | 'uri' = 'input';
@@ -111,7 +113,7 @@ export async function prepareBid(input: PrepareBidInput, audit?: AuditObserver<P
     const total = parseZec(bid.price) * BigInt(bid.quantity);
     if (total > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
     const amount = formatZec(parseZec(input.collateral ?? DEFAULT_COLLATERAL));
-    if (parseZec(amount) === 0n || total > parseZec(amount)) throw new Error('Bid maximum exceeds the posted collateral.');
+    if (parseZec(amount) === 0n || (input.procurement !== true && total > parseZec(amount))) throw new Error('Bid maximum exceeds the posted collateral.');
     phase = 'commitment'; const hash = await commitment(bid);
     phase = 'memo'; const memo = serializeCommitMemo(bid.auctionId, hash); const byteLength = memoBytes(memo).length;
     notifyAudit(audit, { type: 'memo-validated', bytes: byteLength });

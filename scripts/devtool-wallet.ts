@@ -14,7 +14,7 @@ export interface ReceivedNote { readonly pool: 'orchard' | 'ironwood'; readonly 
 
 export const devtoolWalletDir = (): string | undefined => process.env.DARKZEC_DEVTOOL_WALLET || undefined;
 
-async function openReadOnly(dir: string): Promise<import('node:sqlite').DatabaseSync> {
+export async function openReadOnly(dir: string): Promise<import('node:sqlite').DatabaseSync> {
   const { DatabaseSync } = await import('node:sqlite');
   return new DatabaseSync(join(dir, 'data.sqlite'), { readOnly: true });
 }

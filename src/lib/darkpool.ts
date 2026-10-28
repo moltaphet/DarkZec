@@ -3,6 +3,7 @@ import { assertDistinctRefund, orchardPaymentAddress } from '../protocol/address
 import { formatZec, MAX_MONEY, parseQuantity, parseZec, validateAuctionId } from '../protocol/amount';
 import { canonicalPreimage } from '../protocol/crypto';
 import type { BidMemo } from '../protocol/memo';
+import type { Schedule } from './schedule';
 
 export interface AuctionConfig {
   readonly auctionId: string;
@@ -14,6 +15,14 @@ export interface AuctionConfig {
   readonly revealWindowMs?: number;
   /** Every bid is for exactly one lot. Uniform (k+1)-th price clearing is then truthful; with one lot it is Vickrey. */
   readonly unitDemand?: boolean;
+  /**
+   * Reverse (procurement) auction: bidders offer to supply one unit each, the lowest prices win and the winners are priced at the
+   * (k+1)-th lowest offer, capped by `reserve`, which is then the most the buyer pays. Collateral is a bid bond refunded in full
+   * (nothing is collected from bidders; the buyer pays the winners outside the vault). Always unit demand.
+   */
+  readonly procurement?: boolean;
+  /** Block-height deadlines; see schedule.ts. Absent for sandbox auctions, which use the ledger clock. */
+  readonly schedule?: Schedule;
 }
 export interface Allocation {
   readonly commitment: string;
@@ -40,22 +49,26 @@ export function clearUniformAuction(config: AuctionConfig, bids: readonly Verifi
   const ordered = bids.map(({ bid, commitment, collateral }, sequence) => {
     bid = Object.freeze({ ...bid }); canonicalPreimage(bid);
     if (bid.auctionId !== config.auctionId) throw new Error('Wrong auction ID.');
-    if (config.unitDemand && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
+    if ((config.unitDemand || config.procurement) && bid.quantity !== 1) throw new Error('This unit-demand auction accepts exactly one lot per bid.');
     if (!/^[a-f0-9]{64}$/.test(commitment) || seen.has(commitment)) throw new Error('Invalid or duplicate commitment.');
     seen.add(commitment);
     assertDistinctRefund(bid.refund, config.vault, config.network);
     const price = parseZec(bid.price); const maximum = price * BigInt(bid.quantity);
     if (maximum > MAX_MONEY) throw new Error('Bid escrow exceeds the ZEC monetary limit.');
     const escrow = collateral === undefined ? maximum : parseZec(collateral);
-    if (escrow < maximum) throw new Error('Insufficient collateral.');
+    if (escrow < (config.procurement ? 1n : maximum)) throw new Error('Insufficient collateral.');
     return { bid, commitment, sequence, price, escrow };
   });
-  ordered.sort((a, b) => a.price === b.price ? a.sequence - b.sequence : a.price > b.price ? -1 : 1);
-  const eligible = ordered.filter(item => item.price >= reserve);
+  if (config.procurement && config.unitDemand !== true) throw new Error('A procurement auction is always unit demand.');
+  const procurement = config.procurement === true;
+  // Forward: highest limit first, reserve is a floor. Procurement: lowest offer first, reserve is a ceiling.
+  ordered.sort((a, b) => a.price === b.price ? a.sequence - b.sequence : (a.price > b.price) === procurement ? 1 : -1);
+  const acceptable = (price: bigint): boolean => procurement ? price <= reserve : price >= reserve;
+  const eligible = ordered.filter(item => acceptable(item.price));
   const demand = eligible.reduce((total, item) => total + BigInt(item.bid.quantity), 0n);
   let remaining = config.supply;
   const fills = ordered.map(item => {
-    const filled = item.price >= reserve ? Math.min(remaining, item.bid.quantity) : 0;
+    const filled = acceptable(item.price) ? Math.min(remaining, item.bid.quantity) : 0;
     remaining -= filled; return filled;
   });
   let clearing = reserve;
@@ -64,12 +77,14 @@ export function clearUniformAuction(config: AuctionConfig, bids: readonly Verifi
     const soleWinner = winners.length === 1 ? winners[0] : undefined;
     // A sole winner must price against another envelope, never its own excess quantity.
     // With multiple winners, an unfilled part of the marginal bid can set the uniform price.
-    const margin = ordered.find((item, index) => item !== soleWinner && item.price >= reserve && (fills[index] ?? 0) < item.bid.quantity);
-    if (margin && margin.price > clearing) clearing = margin.price;
+    const margin = ordered.find((item, index) => item !== soleWinner && acceptable(item.price) && (fills[index] ?? 0) < item.bid.quantity);
+    if (margin && (procurement ? margin.price < clearing : margin.price > clearing)) clearing = margin.price;
   }
   const allocations = ordered.map((item, index): Allocation => {
-    const filled = fills[index] ?? 0; const paid = clearing * BigInt(filled);
-    if (filled > 0 && clearing > item.price) throw new Error('Clearing exceeds a filled bid limit.');
+    const filled = fills[index] ?? 0;
+    // Procurement bonds are returned whole; the winners' contract price is the clearing price, settled outside the vault.
+    const paid = procurement ? 0n : clearing * BigInt(filled);
+    if (filled > 0 && (procurement ? clearing < item.price : clearing > item.price)) throw new Error('Clearing is outside a filled bid limit.');
     return Object.freeze({ commitment: item.commitment, price: item.bid.price, requested: item.bid.quantity, filled,
       paid: formatZec(paid), refundAmount: formatZec(item.escrow - paid), refundAddress: orchardPaymentAddress(item.bid.refund, config.network) });
   });

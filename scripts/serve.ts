@@ -3,6 +3,7 @@ import { access, readFile, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { checkSameLocalOrigin, listVaultMemos, localChainStatus, readJsonBody, verifyLocalCommitPayment } from './zcash-rpc.ts';
+import { isTestnetViewingKey, viewKeyActivity } from './view-wallet.ts';
 
 const root = resolve('dist');
 try {
@@ -30,7 +31,7 @@ const server = createServer(async (request, response) => {
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
   // Only same-origin, read-only testnet wallet checks are exposed. No raw RPC proxy or request logging.
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
-  if (pathname === '/api/chain/status' || pathname === '/api/chain/verify' || pathname === '/api/chain/vault-memos') {
+  if (pathname === '/api/chain/status' || pathname === '/api/chain/verify' || pathname === '/api/chain/vault-memos' || pathname === '/api/chain/view-activity') {
     if (request.method !== 'POST') { json(response, 405, { error: 'method-not-allowed' }); return; }
     if (!checkSameLocalOrigin(request, port)) { json(response, 403, { error: 'same-origin-required' }); return; }
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json')) { json(response, 415, { error: 'json-required' }); return; }
@@ -39,6 +40,11 @@ const server = createServer(async (request, response) => {
       if (pathname === '/api/chain/status') { json(response, 200, await localChainStatus()); return; }
       if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('invalid-body');
       const record = body as Record<string, unknown>;
+      if (pathname === '/api/chain/view-activity') {
+        // Published (or the caller's own) viewing key only: a view-only wallet on this machine reads it; nothing can spend.
+        if (!isTestnetViewingKey(record.viewingKey) || typeof record.birthday !== 'number') throw new Error('invalid-body');
+        json(response, 200, await viewKeyActivity(record.viewingKey, record.birthday)); return;
+      }
       const address = typeof record.address === 'string' ? record.address : '';
       const auctionId = typeof record.auctionId === 'string' ? record.auctionId : '';
       const collateralZat = record.collateralZat === undefined ? 1_000_000_000 : typeof record.collateralZat === 'number' ? record.collateralZat : Number.NaN;

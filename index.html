@@ -23,6 +23,7 @@
       </header>
 
       <nav class="navigation" aria-label="Terminal views">
+        <button id="listing-tab" class="nav-item" aria-pressed="false" hidden>This auction <span>00</span></button>
         <button id="sandbox-tab" class="nav-item active" aria-pressed="true">Auction sandbox <span>01</span></button>
         <button id="wallet-tab" class="nav-item" aria-pressed="false">Pay with wallet <span>02</span></button>
         <button id="vault-tab" class="nav-item" aria-pressed="false">Vault scanner <span>03</span></button>
@@ -151,6 +152,7 @@
           <div class="panel-heading"><h2>Pay with your own wallet</h2><span class="micro">ZIP-321 / NO WALLET CONNECT</span></div>
           <p class="wallet-why"><b>No wallet connect, by design.</b> Shielded Zcash wallets run as their own apps, and DarkZec never asks for your keys, balance or addresses. It builds a ZIP-321 payment request; you scan it or open it in your wallet, review it there and send it yourself.</p>
           <p class="wallet-description">Build a request for an independently verified vault. Wallet UAs with Orchard are accepted; requests use Orchard-only versions of the supplied addresses to prevent fallback. Refund and vault must differ. Review the resulting Orchard destination, amount and memo in your wallet before paying.</p>
+          <p id="wallet-listing-note" class="wallet-why" hidden><span id="wallet-listing-text"></span> <button id="wallet-listing-unlock" class="reset" type="button">Use without this auction</button></p>
           <form id="wallet-form" autocomplete="off">
             <div class="wallet-grid"><div><label for="wallet-network">Network</label><select id="wallet-network"><option value="testnet">Testnet</option><option value="mainnet" disabled>Mainnet (disabled in prototype)</option></select></div><div><label for="wallet-auction">Auction ID</label><input id="wallet-auction" value="NODE07-001" required maxlength="48" /></div><div><label for="wallet-collateral">Collateral tier</label><select id="wallet-collateral"><option value="0.1">0.1 ZEC</option><option value="1">1 ZEC</option><option value="10" selected>10 ZEC</option><option value="100">100 ZEC</option></select></div></div>
             <label for="wallet-vault">Verified vault address <span>ORCHARD-CAPABLE UA</span></label><textarea id="wallet-vault" required spellcheck="false" placeholder="Paste the vault's u1… or utest1… address"></textarea>
@@ -180,6 +182,8 @@
           </form>
         </section>
 
+        <section id="listing-view" hidden aria-label="Auction listing"></section>
+        <section id="real-scan-view" hidden aria-label="Real testnet vault scan"></section>
         <section id="viewing-key-view" hidden aria-label="Viewing-key scanner"></section>
 
         <section id="audit-view" hidden aria-label="Audit mode"></section>
@@ -196,7 +200,7 @@
       <div id="telemetry-body" class="telemetry-body">
         <div class="telemetry-node"><span class="status-dot"></span>NODE 07 <span>POLICY MONITOR</span></div>
         <dl class="telemetry-counters"><div><dt>LEAKS BLOCKED</dt><dd id="telemetry-leaks">0</dd></div><div><dt>SHIELD STATUS</dt><dd id="telemetry-shield">IDLE</dd></div><div><dt>MEMO BYTES</dt><dd id="telemetry-bytes">0/512</dd></div></dl>
-        <div class="telemetry-policy">No verified encrypted payload.<br />Hash-only local auction ledger. Optional testnet checks use the local wallet; no settlement transaction is sent.</div>
+        <div class="telemetry-policy">No verified encrypted payload.<br />Hash-only local auction ledger. Optional testnet checks use the local wallet; the browser never sends a transaction (testnet settlement runs from the operator wallet).</div>
         <div class="telemetry-log-heading"><span>EVENT STREAM</span><span>LOCAL / MOCK FEED</span></div>
         <div id="telemetry-log" class="telemetry-log" role="log" aria-label="Local simulation security events" aria-live="off" tabindex="0"></div>
         <div class="telemetry-footer"><span class="status-dot"></span>NO PAYLOADS LOGGED <span>▰▰▰▱</span></div>

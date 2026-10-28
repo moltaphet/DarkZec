@@ -1,0 +1,77 @@
+{
+  "tip": 4550524,
+  "received": [
+    {
+      "txid": "93bbda52b9c57a5e899a1cc22ae87a32b6acad7875eadcf3d8b7c826b91f3d9a",
+      "height": 4550438,
+      "amountZat": 10000000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":2,\"t\":\"commit\",\"a\":\"DZ-TESTNET-2\",\"c\":\"367c6c5253000d724467488361ed94301acb90088140e5911c79f05d420e9123\"}"
+    },
+    {
+      "txid": "69fb5c02dae93d198d8cb9127d93a87e420c0f5444de111aad43f7e01a4b233d",
+      "height": 4550438,
+      "amountZat": 10000000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":2,\"t\":\"commit\",\"a\":\"DZ-TESTNET-2\",\"c\":\"3b74b7ff29d8ee7b870c1dfdfa6c93d634cf4cc440844dec8fcb01a12fa97746\"}"
+    },
+    {
+      "txid": "69bc71ca0fe0985da88655f96414d1d778ac5a8fe4ca3e6f6a8b12f892e6ac08",
+      "height": 4550439,
+      "amountZat": 10000000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":2,\"t\":\"commit\",\"a\":\"DZ-TESTNET-2\",\"c\":\"2d683284bfbe1c5cec8dd273987ad055996ed5a1c69f40026f6166cec051eb46\"}"
+    },
+    {
+      "txid": "750217f36388af4fc1a21823df4778770b77e23de62e0160da0407d5cd4203be",
+      "height": 4550446,
+      "amountZat": 10000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":1,\"a\":\"DZ-TESTNET-2\",\"p\":\"0.08\",\"q\":1,\"s\":\"a97458110ebb54793092d1061f2885158d6df75d516bd25fc3621fb0ae3df71a\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}"
+    },
+    {
+      "txid": "d0251e2c82ab77c707de878aca47cbc0d9f796c3ad2f77a620b0fcb0886cbb9b",
+      "height": 4550446,
+      "amountZat": 10000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":1,\"a\":\"DZ-TESTNET-2\",\"p\":\"0.05\",\"q\":1,\"s\":\"a07cbbd545da6a36e8d20d81deaaf4d500be0de91b2679ab2c59180cbec595ca\",\"r\":\"utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq\"}"
+    },
+    {
+      "txid": "a8c274a7ea857cebbf3dafdbc901e2f8df52f5d46f282f8b481a1f0228763c92",
+      "height": 4550494,
+      "amountZat": 50000,
+      "address": "utest1wuu9mxscrvxxmrrzpp8almm6t5xxwvh9vhl62hraxw9x2kqtj98nf95785wk89t7zg0vwvyatcrlnjpfl6wxqzglvfknrz7qufenj9887zufspwwc5ad5prdwsw2mvaajh089k806nvqzdl4z20697k3e39776qhyt2xqvcmtt7qdugemvhc2dnup9c99hcu07p2nqgym9wc2f8f00c",
+      "memo": "{\"v\":1,\"t\":\"fee\",\"a\":\"DZ-TESTNET-2\"}"
+    }
+  ],
+  "sent": [
+    {
+      "txid": "34a2b4879a76b7f6a02d1271f485605d6b91d8861d26a4b18b29ccf5aed7069f",
+      "height": 4550523,
+      "amountZat": 10000000,
+      "address": "t2CYfLDri6rrH4WSuXtHiu1WMWus6kFY2Ea",
+      "memo": null
+    },
+    {
+      "txid": "34a2b4879a76b7f6a02d1271f485605d6b91d8861d26a4b18b29ccf5aed7069f",
+      "height": 4550523,
+      "amountZat": 10000000,
+      "address": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq",
+      "memo": "{\"v\":1,\"t\":\"refund\",\"a\":\"DZ-TESTNET-2\",\"c\":\"3b74b7ff29d8ee7b870c1dfdfa6c93d634cf4cc440844dec8fcb01a12fa97746\"}"
+    },
+    {
+      "txid": "34a2b4879a76b7f6a02d1271f485605d6b91d8861d26a4b18b29ccf5aed7069f",
+      "height": 4550523,
+      "amountZat": 5000000,
+      "address": "utest1deatr2fc2lqv6psjqaz5mavgxrh30w3c4ghmypg749rr6a67m97rsxpmvpn6uvypv4sjuw97gfapqgstdvvly6ux7x6dhu6rcg035ahr",
+      "memo": "{\"v\":1,\"t\":\"proceeds\",\"a\":\"DZ-TESTNET-2\"}"
+    },
+    {
+      "txid": "34a2b4879a76b7f6a02d1271f485605d6b91d8861d26a4b18b29ccf5aed7069f",
+      "height": 4550523,
+      "amountZat": 5000000,
+      "address": "utest145eu40r9awke9644xsspkptk2znd2u825vsvyghmxna0ngtd6lmjug2cc5u4z66xx2eqs5yfqkd0kjfappfd5yqyhswur38hnytw8gqq",
+      "memo": "{\"v\":1,\"t\":\"refund\",\"a\":\"DZ-TESTNET-2\",\"c\":\"367c6c5253000d724467488361ed94301acb90088140e5911c79f05d420e9123\"}"
+    }
+  ]
+}

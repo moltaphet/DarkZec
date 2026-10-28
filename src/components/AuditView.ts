@@ -1,7 +1,16 @@
 import { Lifetime } from '../lib/dom';
 import type { Disposable } from '../lib/dom';
-import { AUDIT_BUNDLE_MAX_BYTES, verifyAuditBundle } from '../lib/audit-bundle';
+import { AUDIT_BUNDLE_MAX_BYTES, parseAuditBundle, verifyAuditBundle } from '../lib/audit-bundle';
 import type { AuditReport } from '../lib/audit-bundle';
+import type { ChainActivity } from '../lib/settlement';
+
+/** Where a settled bundle's on-chain checks read from: a live light client, or the snapshot recorded with a shipped run. */
+export interface AuditChainSources {
+  readonly live?: (viewingKey: string, birthday: number) => Promise<ChainActivity>;
+  /** Real testnet auctions shipped with the site, with the bundle and the recorded chain snapshot of each. */
+  readonly runs?: readonly { readonly id: string; readonly bundle: () => Promise<string>; readonly snapshot: () => Promise<ChainActivity> }[];
+}
+type ChainSource = { readonly kind: 'live' | 'recorded'; readonly tip: number } | undefined;
 
 const node = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '', className = ''): HTMLElementTagNameMap[K] => {
   const element = document.createElement(tag); element.textContent = text; if (className) element.className = className; return element;
@@ -21,9 +30,11 @@ export class AuditView implements Disposable {
   readonly #rows = node('tbody');
   readonly #tableWrap = node('div', '', 'table-scroll max-w-full overflow-x-auto');
   readonly #current: () => string | undefined;
+  readonly #sources: AuditChainSources;
+  readonly #runs: HTMLButtonElement[] = [];
   #busy = false;
-  constructor(host: HTMLElement, current: () => string | undefined) {
-    this.#host = host; this.#current = current; host.className = 'panel audit-view'; host.setAttribute('data-independent-controls', '');
+  constructor(host: HTMLElement, current: () => string | undefined, sources: AuditChainSources = {}) {
+    this.#host = host; this.#current = current; this.#sources = sources; host.className = 'panel audit-view'; host.setAttribute('data-independent-controls', '');
     const heading = node('div', '', 'panel-heading'); heading.append(node('h2', 'Audit mode'), node('span', 'RE-RUN AN AUCTION WITHOUT TRUSTING THE OPERATOR'));
     const content = node('div', '', 'tool-content');
     const help = node('p', 'Paste or import an audit bundle published after clearing. This page recomputes the Merkle root, opens every reveal against its commitment, re-runs the clearing rule, checks collateral conservation and verifies the operator\'s signed close statement, reveal acknowledgements and result. Nothing is sent anywhere.');
@@ -32,6 +43,11 @@ export class AuditView implements Disposable {
     this.#file.type = 'file'; this.#file.accept = 'application/json,.json'; this.#file.id = 'audit-bundle-file'; this.#file.hidden = true; this.#file.setAttribute('aria-label', 'Audit bundle file');
     const actions = node('div', '', 'tool-actions');
     for (const [button, id] of [[this.#verify, 'audit-verify'], [this.#import, 'audit-import'], [this.#session, 'audit-session'], [this.#clear, 'audit-clear']] as const) { button.type = 'button'; button.id = id; actions.append(button); }
+    for (const run of sources.runs ?? []) {
+      const button = node('button', `Load ${run.id} (real testnet)`, 'button quiet'); button.type = 'button'; button.id = `audit-run-${run.id}`; this.#runs.push(button);
+      button.addEventListener('click', () => { void this.#run(async () => { const text = await run.bundle(); this.#input.value = text; return text; }, run.snapshot); }, { signal: this.#life.signal });
+      actions.insertBefore(button, this.#clear);
+    }
     this.#verdict.id = 'audit-verdict'; this.#verdict.setAttribute('role', 'status');
     const table = node('table', '', 'audit-checks'); table.setAttribute('aria-label', 'Audit checks');
     const head = node('thead'); const row = node('tr'); for (const title of ['Check', 'Result', 'Detail']) { const th = node('th', title); th.scope = 'col'; row.append(th); }
@@ -54,25 +70,44 @@ export class AuditView implements Disposable {
     this.#clear.addEventListener('click', () => { this.#input.value = ''; this.#show(undefined, ''); }, { signal });
     this.refresh();
   }
-  async #run(read: () => string | Promise<string>): Promise<void> {
+  async #run(read: () => string | Promise<string>, snapshot?: () => Promise<ChainActivity>): Promise<void> {
     if (this.#busy) return;
     this.#busy = true; this.refresh();
-    try { this.#show(await verifyAuditBundle(await read())); }
+    try {
+      const text = await read();
+      let settlement: ReturnType<typeof parseAuditBundle>['settlement'];
+      try { settlement = parseAuditBundle(text).settlement; } catch { settlement = undefined; }
+      let activity: ChainActivity | undefined; let source: ChainSource;
+      if (settlement && this.#sources.live) {
+        this.#verdict.textContent = 'Reading the vault on Zcash testnet through the published viewing key…'; this.#verdict.classList.remove('is-ok', 'is-bad');
+        try { activity = await this.#sources.live(settlement.viewingKey, settlement.birthday); source = { kind: 'live', tip: activity.tip }; } catch { activity = undefined; }
+      }
+      if (settlement && !activity && snapshot) {
+        try { activity = await snapshot(); source = { kind: 'recorded', tip: activity.tip }; } catch { activity = undefined; }
+      }
+      this.#show(await verifyAuditBundle(text, activity), '', source);
+    }
     catch { this.#show(undefined, 'The bundle could not be read.'); }
     finally { this.#busy = false; this.refresh(); }
   }
-  #show(report: AuditReport | undefined, message = ''): void {
+  #show(report: AuditReport | undefined, message = '', source: ChainSource = undefined): void {
     this.#rows.replaceChildren(); this.#verdict.classList.remove('is-ok', 'is-bad');
     if (!report) { this.#verdict.textContent = message; this.#tableWrap.hidden = true; if (message) this.#verdict.classList.add('is-bad'); return; }
-    const passed = report.checks.filter(check => check.ok).length;
-    this.#verdict.textContent = report.ok ? `VERIFIED / ${report.auctionId ?? 'auction'}: all ${passed} checks passed.` : `NOT VERIFIED / ${report.checks.length - passed} of ${report.checks.length} checks failed.`;
+    const passed = report.checks.filter(check => check.ok).length; const skipped = report.checks.filter(check => check.skipped).length;
+    const id = report.auctionId ?? 'auction';
+    this.#verdict.textContent = !report.ok ? `NOT VERIFIED / ${report.checks.length - passed - skipped} of ${report.checks.length} checks failed.` :
+      skipped ? `VERIFIED / ${id}: ${passed} checks passed; ${skipped} on-chain checks need a Zcash light client (run scripts/verify-chain.ts).` :
+        source?.kind === 'live' ? `VERIFIED / ${id}: all ${passed} checks passed, the on-chain ones read live from testnet at height ${source.tip}.` :
+          source?.kind === 'recorded' ? `VERIFIED / ${id}: all ${passed} checks passed; the on-chain ones used the chain snapshot recorded at height ${source.tip}. For a live read run scripts/verify-chain.ts.` :
+            `VERIFIED / ${id}: all ${passed} checks passed.`;
     this.#verdict.classList.add(report.ok ? 'is-ok' : 'is-bad');
     for (const check of report.checks) {
-      const row = node('tr', '', check.ok ? 'is-ok' : 'is-bad'); row.dataset.check = check.id;
-      row.append(node('td', check.label), node('td', check.ok ? 'PASS' : 'FAIL', 'state'), node('td', check.detail)); this.#rows.append(row);
+      const state = check.skipped ? 'is-skip' : check.ok ? 'is-ok' : 'is-bad';
+      const row = node('tr', '', state); row.dataset.check = check.id;
+      row.append(node('td', check.label), node('td', check.skipped ? 'SKIP' : check.ok ? 'PASS' : 'FAIL', 'state'), node('td', check.detail)); this.#rows.append(row);
     }
     this.#tableWrap.hidden = false;
   }
-  refresh(): void { for (const button of [this.#verify, this.#import, this.#session]) button.disabled = this.#busy; this.#host.setAttribute('aria-busy', String(this.#busy)); }
+  refresh(): void { for (const button of [this.#verify, this.#import, this.#session, ...this.#runs]) button.disabled = this.#busy; this.#host.setAttribute('aria-busy', String(this.#busy)); }
   destroy(): void { this.#life.destroy(); this.#host.replaceChildren(); }
 }

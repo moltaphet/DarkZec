@@ -6,13 +6,13 @@
 
 **Private order submission. Deterministic price discovery. Verifiable inclusion.**
 
-**Live demo: [darkzec.xyz](https://darkzec.xyz)** — the static build of `main`. The auction, operator view, audit mode, wallet requests and mock vault all run there; testnet payment checks and live testnet auctions read a local Zcash wallet, so they need the local server below.
+**Live demo: [darkzec.xyz](https://darkzec.xyz)** — the static build of `main`. The auction, operator view, audit mode (including the settled testnet runs), wallet requests and the training vault all run there; testnet payment checks and live testnet auctions read a local Zcash wallet, so they need the local server below.
 
-**Proven on testnet: [DZ-TESTNET-1](docs/testnet-run/README.md)** — a complete auction on the public Zcash testnet: two commits paid as shielded memos, two reveals sent as shielded memos, imported from the chain, cleared at the Vickrey second price and audited 8/8. Txids, the audit bundle and the lessons learned (Ironwood routing, memo enhancement) are in that report.
+**Proven on testnet, settled on chain: [DZ-TESTNET-1 and DZ-TESTNET-2](docs/testnet-run/README.md)** — complete auctions on the public Zcash testnet: commits and reveals paid as shielded memos and imported from the chain, cleared at the Vickrey second price, then **settled in one on-chain transaction** (refunds, seller proceeds and, in DZ-TESTNET-2, a burned forfeit). Each vault's viewing key is published, so anyone can check every deposit and payout on chain: **10 of 10 audit checks**. See [settlement and trust model](docs/settlement.md).
 
 DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** paid to Orchard receivers and settled in Zcash's shielded Ironwood pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
 
-[Judge path](#judge-path-60-seconds) · [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
+[Judge path](#judge-path-60-seconds) · [Run a real auction](#run-a-real-auction) · [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
 
 ## Judge path (60 seconds)
 
@@ -23,7 +23,8 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 3. **Close auction** (the operator signs the frozen root), then **Reveal all local receipts / demo** (each reveal gets a signed acknowledgement; only now does the operator see bids).
 4. **Finalize & clear**: `0.68 ZEC`, `10 / 10` lots and a green `BALANCED` conservation line.
 5. **Audit mode** → **Load this session's bundle**: all 8 checks pass. Edit the clearing price in the JSON and verify again: the clearing re-run and the result signature fail.
-6. **Real chain:** in Audit mode, import [`DZ-TESTNET-1-audit-bundle.json`](docs/testnet-run/DZ-TESTNET-1-audit-bundle.json), the auction run on the public Zcash testnet with shielded commits and reveals ([txids](docs/testnet-run/README.md)). It verifies 8/8.
+6. **Real chain:** in Audit mode choose **Load DZ-TESTNET-2 (real testnet)**: a settled auction on the public Zcash testnet ([txids](docs/testnet-run/README.md)). All 10 checks pass, including *Deposits on chain* and *Settlement on chain*. On the public site those two use the chain snapshot recorded at verification and the verdict says so; on a local server they read testnet live, and `npm run verify-chain -- public/testnet/DZ-TESTNET-2-audit-bundle.json` does the same from the command line.
+7. **Vault scanner** → **Load DZ-TESTNET-2 published key**: every note the vault received (commits, reveals) and every payment it made (refunds, proceeds, burn).
 
 | Sealed book: hashes only | Operator view after reveal |
 | --- | --- |
@@ -32,6 +33,16 @@ DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctio
 | <img src="docs/media/clearing-result.png" alt="Uniform price 0.68 ZEC, 10 of 10 lots, balanced settlement" /> | <img src="docs/media/audit-mode-testnet.png" alt="Audit mode verifying DZ-TESTNET-1 with all eight checks passing" /> |
 
 Screenshots are regenerated with `node scripts/capture-media.ts` against a running build.
+
+## Run a real auction
+
+A seller describes what is for sale, picks the rules and gets **one link**; bidders open it on darkzec.xyz, pay with their own shielded wallet and later check their result. No account, no server of ours in the loop.
+
+1. **Seller** (local DarkZec server + a zcash-devtool wallet): title, description, vault, mode, lots, reserve, collateral, and how long bidding and reveals stay open. The page turns durations into **block heights**, signs the listing with the session key and returns the link.
+2. **Bidder:** the link shows the signed rules, the deadlines and the vault. *Bid on this auction* opens the wallet tab locked to the listing; scan the QR, pay the collateral, later pay the reveal.
+3. **Anyone:** the audit bundle re-runs the auction, and a view-only wallet built from the published viewing key checks every payment on chain, including that **no on-time commit or acceptable reveal was left out** and **no late one was admitted**.
+
+Modes: uniform price, unit demand, Vickrey, and **procurement** (a buyer collects sealed offers; the lowest win at the next-lowest price and bids are bonds returned whole). The link carries everything inside its URL fragment, which browsers never send to a server. Full walkthrough, limits and the trust model: [auction links](docs/auction-links.md), [settlement](docs/settlement.md).
 
 ## What is real and what is mock
 
@@ -42,22 +53,26 @@ Screenshots are regenerated with `node scripts/capture-media.ts` against a runni
 | Salted, domain-separated bid commitments and SHA-256 Merkle inclusion proofs | **Real**, computed locally with Web Crypto. |
 | Memo round trip: verify a commit memo copied from a real wallet against your prepared request; reveal receipt download/import | **Real**, local checks (see [testnet round trip](docs/testnet-interop.md)). |
 | Local Zcash testnet payment check | **Real read-only wallet check** for a confirmed shielded note at the vault's Orchard receiver (Ironwood pool) with the exact collateral tier and commit memo; user-triggered, local node only. |
-| Live testnet auction | **Real** commit and reveal ingestion from confirmed shielded memos (Ironwood pool) at a vault the local wallet views (read-only RPC). Commits enter the ledger oldest first; reveals arrive as a second shielded memo. No funds are settled. |
-| Operator signatures and audit mode | **Real**: ECDSA P-256 signatures over the frozen root at close, every accepted reveal and the result; an exportable audit bundle that any browser re-verifies in eight checks. The signing key is per session and not bound to an identity. |
+| Live testnet auction | **Real** commit and reveal ingestion from confirmed shielded memos (Ironwood pool) at a vault the local wallet views (read-only RPC). Commits enter the ledger oldest first; reveals arrive as a second shielded memo. |
+| Auction links, block-height deadlines, procurement mode | **Real**: operator-signed listings in a URL fragment, deadlines as block heights checked on chain (no late payment admitted, no on-time one dropped), a bidder page and one-click result check, and a reverse (procurement) mode. [Details](docs/auction-links.md). The operator key lives in one browser tab; there is no persistent operator service. |
+| On-chain settlement and public verification | **Real on testnet**: `npm run settle` pays every refund, the seller proceeds and the forfeit burn (to a provably unspendable P2SH(OP_RETURN) address) in one transaction from the auction's own vault account, then publishes that account's viewing key. `npm run verify-chain` and Audit mode on a local server rebuild a view-only wallet from the key and check every deposit and payout on chain ([details](docs/settlement.md)). |
+| Operator signatures and audit mode | **Real**: ECDSA P-256 signatures over the frozen root at close, every accepted reveal and the result; an exportable audit bundle that any browser re-verifies in eight checks, plus two on-chain checks once the auction is settled. The signing key is per session and not bound to an identity. |
 | Collateral tiers and unit-demand mode | **Real**: 0.1, 1, 10 or 100 ZEC per auction; unit-demand auctions clear at the truthful (k+1)-th price (Vickrey for one lot). |
-| Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; refunds are accounting results, not transactions. |
-| Viewing Key Vault and note scanner | **Mock**: `mock:node07:` keys only, authenticated AES-GCM mock notes. Real viewing keys are rejected. |
-| In-browser Orchard IVK scanning, transaction submission, on-chain escrow and burn, external root anchoring, OTC/RFQ matching, NEAR Intents settlement | **Not implemented** (integration work). No relayer or solver runs. |
+| Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; on testnet its result is settled on chain as above. In the browser sandbox nothing moves. |
+| Vault scanner | **Real on testnet**: paste a unified full viewing key and the local server's view-only light wallet lists every note received and payment made. Below it, a **training vault** with `mock:node07:` keys and simulated notes is kept for practising the unlock and quarantine flow; it never touches the chain. |
+| Escrow that prevents the operator from keeping collateral (threshold custody), in-browser trial decryption, external root anchoring, mainnet | **Not implemented.** The operator holds collateral until settlement; misbehaviour is provable, not prevented. The FROST design is in [settlement](docs/settlement.md#next-step-threshold-custody-with-frost). Mainnet stays disabled until that and a security review exist. |
 | Zodl Wallet handoff | Standard `zcash:` request; installed-wallet compatibility needs device testing. |
-| QR rendering | Not included in this build. |
+| QR rendering | **Real**: ZIP-321 requests drawn as QR codes in the browser, decoded back in tests. |
 
 No funds move in the Judge Sandbox. The build has not had an independent security audit.
 
-## The dark-pool thesis
+## Why sealed bids
 
 Public orderflow can reveal a trader's limits, size, timing and address relationships before a trade completes, which enables front-running, inventory inference and counterparty profiling. DarkZec keeps bid instructions out of the public book: during the commit phase only an auction ID and a salted hash travel in the shielded memo. Prices, quantities and refund addresses stay with the bidder until the reveal window, and the clearing service publishes only the clearing result plus an inclusion root.
 
-Shielding reduces on-chain disclosure; it does not erase every metadata channel. Timing, pool crossings, wallet behavior and cross-chain endpoints still matter. The vault operator sees revealed bids, so privacy against public observers and confidentiality from the operator are distinct properties. The OTC direction reuses the same private-instruction model; a live OTC matching service is not implemented.
+Shielding reduces on-chain disclosure; it does not erase every metadata channel. Timing, pool crossings, wallet behavior and cross-chain endpoints still matter. The vault operator sees revealed bids, so privacy against public observers and confidentiality from the operator are distinct properties.
+
+**Scope, plainly.** DarkZec is one sealed-bid batch auction per vault account, run by one operator: bids are collected, the auction closes, and it clears once at a uniform price. It is not a continuous dark pool, an order-matching engine or an OTC desk.
 
 ## Core architecture & ZIP compliance
 
@@ -251,7 +266,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **94 unit/privacy tests (14 files), 45 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
+`npm run test:e2e` runs a fresh strict build first; `npm run verify` runs unit tests plus that command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to reuse an installed Chromium. Current local results on Node 26.10.0: **115 unit/privacy tests (16 files), 51 end-to-end tests and a strict production build**; CI runs the same commands on Node 22 and 24 (see the [engineering report](docs/engineering-report.md#build-serve-and-verification)). Coverage includes receipt file and wallet-memo round-trips, the settlement balance check, address vectors, independent SHA-256/HMAC checks, exact money arithmetic, 512-byte ASCII/multibyte boundaries, commit/reveal tampering, frozen-root consistency, partial fills, proof tampering, authenticated scanner failures, encrypted session behavior, event redaction, CSP enforcement, a 12px/14px text floor and responsive layouts. Screenshots go to ignored `test-results/`. These are local results, not a hosted CI badge or an audit.
 
 ## Security & privacy boundaries
 

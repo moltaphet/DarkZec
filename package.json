@@ -9,7 +9,9 @@
     "preview": "node scripts/serve.ts",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
-    "verify": "npm test && npm run test:e2e"
+    "verify": "npm test && npm run test:e2e",
+    "settle": "node --import ./scripts/resolve-ts.ts scripts/settle.ts",
+    "verify-chain": "node --import ./scripts/resolve-ts.ts scripts/verify-chain.ts"
   },
   "engines": {
     "node": "^22.18.0 || ^24.0.0 || >=26.0.0"
