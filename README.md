@@ -12,7 +12,7 @@
 
 DarkZec is a browser-local market terminal for **commit/reveal sealed-bid auctions** paid to Orchard receivers and settled in Zcash's shielded Ironwood pool. Built for **ZECATHON — Track: Private Markets**. A bidder commits a salted hash plus fixed collateral, reveals the private bid in a short window, and any participant can verify that their commitment is in the frozen Merkle root.
 
-[Judge path](#judge-path-60-seconds) · [Run a real auction](#run-a-real-auction) · [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
+[Judge path](#judge-path-60-seconds) · [Run a real auction](#run-a-real-auction) · [Roadmap](#roadmap) · [Quick start](#local-development) · [Judge walkthrough](#judge-walkthrough) · [What is real vs mock](#what-is-real-and-what-is-mock) · [ZIP compliance](#core-architecture--zip-compliance) · [Clearing and audit](#clearing-engine--merkle-audit) · [Threat model](#threat-model) · [Security boundaries](#security--privacy-boundaries)
 
 ## Judge path (60 seconds)
 
@@ -67,13 +67,25 @@ Modes: uniform price, unit demand, Vickrey, and **procurement** (a buyer collect
 | Collateral tiers and unit-demand mode | **Real**: 0.1, 1, 10 or 100 ZEC per auction; unit-demand auctions clear at the truthful (k+1)-th price (Vickrey for one lot). |
 | Commit/reveal ledger, uniform-price clearing and zatoshi-exact collateral/refund accounting | **Real** local engine; on testnet its result is settled on chain as above. In the browser sandbox nothing moves. |
 | Vault scanner | **Real on testnet**: paste a unified full viewing key and the local server's view-only light wallet lists every note received and payment made. Below it, a **training vault** with `mock:node07:` keys and simulated notes is kept for practising the unlock and quarantine flow; it never touches the chain. |
-| Escrow that prevents the operator from keeping collateral (threshold custody), in-browser trial decryption, external root anchoring, mainnet | **Not implemented.** The operator holds collateral until settlement; misbehaviour is provable, not prevented. The FROST design is in [settlement](docs/settlement.md#next-step-threshold-custody-with-frost). Mainnet stays disabled until that and a security review exist. |
+| Escrow that prevents the operator from keeping collateral (threshold custody), in-browser trial decryption, external root anchoring, mainnet | **On the [roadmap](#roadmap), not implemented.** The operator holds collateral until settlement; misbehaviour is provable, not prevented. The FROST design is in [settlement](docs/settlement.md#next-step-threshold-custody-with-frost). Mainnet stays disabled until that and a security review exist. |
 | Zodl Wallet handoff | Standard `zcash:` request; installed-wallet compatibility needs device testing. |
 | QR rendering | **Real**: ZIP-321 requests drawn as QR codes in the browser, decoded back in tests. |
 
 No funds move in the Judge Sandbox. The build has not had an independent security audit.
 
 > **Not safe for real funds.** The operator's wallet holds the collateral and can spend it alone: the co-signer policy is a building block, not custody, and threshold signing is not implemented. Mainnet stays disabled for this reason. Everything runs on Zcash testnet, whose coins have no value.
+
+## Roadmap
+
+What exists today is **publicly provable fraud detection**. What comes next is **prevention and reach**. Everything below is planned, not built, and in this order for a reason: custody first, because it is what stands between this prototype and real funds.
+
+| Step | What it adds | Status |
+| --- | --- | --- |
+| **1. Threshold custody (FROST, 2-of-3)** | The vault's spend key is split between the operator, an independent co-signer and a bidder-appointed party, so no one can move the collateral alone. The co-signer's policy check, which approves a settlement only if it matches the verified audit bundle to the zatoshi, is already built (`npm run cosign-check`); the key ceremony, threshold signing protocol and signer service are not. [Design](docs/settlement.md#next-step-threshold-custody-with-frost) | Designed, policy built |
+| **2. Operator service** | A self-hosted container behind TLS and authentication, so a seller does not need a laptop running `npm run auction`. A view-only relay for hosted reading is deliberately not planned (it would see reveals). [Notes](docs/auction-links.md#running-the-operator-somewhere-other-than-a-laptop-next-step) | Planned |
+| **3. External anchoring** | The signed close statement published to an external timestamped record, so omission becomes provable even without the chain. | Planned |
+| **4. In-browser verification** | A WASM light client so the on-chain audit checks run live on the public site instead of replaying a recorded snapshot. | Planned |
+| **5. Security review, then mainnet** | An independent review of the clearing engine, the key handling and the signer service. Mainnet stays disabled until steps 1 and 5 are done. | Planned |
 
 ## Why sealed bids
 
